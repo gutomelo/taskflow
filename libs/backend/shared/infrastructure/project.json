@@ -25,7 +25,7 @@
     "prisma-generate": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{workspaceRoot}/prisma/schema.prisma", "{workspaceRoot}/prisma.config.ts"],
+      "inputs": ["{workspaceRoot}/prisma/**/*.prisma", "{workspaceRoot}/prisma.config.ts"],
       "outputs": ["{projectRoot}/src/generated/prisma"],
       "options": {
         "command": "prisma generate"

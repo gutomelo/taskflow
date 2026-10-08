@@ -9,7 +9,20 @@
 * 🟢 You can import this file directly.
 */
 
+export const SessionRevocationReason = {
+  logout: 'logout',
+  user_revoked: 'user_revoked',
+  reuse_detected: 'reuse_detected',
+  password_changed: 'password_changed',
+  password_reset: 'password_reset'
+} as const
+
+export type SessionRevocationReason = (typeof SessionRevocationReason)[keyof typeof SessionRevocationReason]
 
 
-// This file is empty because there are no enums in the schema.
-export {}
+export const UserTokenPurpose = {
+  email_verification: 'email_verification',
+  password_reset: 'password_reset'
+} as const
+
+export type UserTokenPurpose = (typeof UserTokenPurpose)[keyof typeof UserTokenPurpose]

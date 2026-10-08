@@ -1,9 +1,14 @@
-// Schema único do TaskFlow (modular monolith, um banco PostgreSQL).
-// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md.
+// Ponto de entrada do schema multi-arquivo do TaskFlow (modular monolith, um banco PostgreSQL).
+// Este arquivo contém apenas generator e datasource; os modelos ficam em prisma/models/,
+// um arquivo por bounded context (ex.: identity.prisma, organizations.prisma) e shared.prisma
+// para infraestrutura compartilhada. O prisma.config.ts aponta para o DIRETÓRIO prisma/.
+//
+// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md:
 // - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.
 // - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.
 // - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).
-//
+// - Relações entre arquivos são permitidas pelo Prisma, mas entre contextos diferentes são
+//   proibidas pela arquitetura: contextos não referenciam tabelas uns dos outros.
 
 generator client {
   provider     = "prisma-client"
@@ -14,18 +19,3 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-
-// --- Infraestrutura compartilhada -------------------------------------------
-
-/// Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
-/// da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.
-model OutboxEvent {
-  id          String    @id @db.Uuid
-  type        String    @db.VarChar(100)
-  payload     Json
-  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(3)
-  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
-
-  @@map("outbox_events")
-}
-

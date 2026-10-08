@@ -29,8 +29,8 @@ export * from "./enums"
  * const prisma = new PrismaClient({
  *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
  * })
- * // Fetch zero or more OutboxEvents
- * const outboxEvents = await prisma.outboxEvent.findMany()
+ * // Fetch zero or more Users
+ * const users = await prisma.user.findMany()
  * ```
  * 
  * Read more in our [docs](https://pris.ly/d/client).
@@ -39,6 +39,26 @@ export const PrismaClient = $Class.getPrismaClientClass()
 export type PrismaClient<LogOpts extends Prisma.LogLevel = never, OmitOpts extends Prisma.PrismaClientOptions["omit"] = Prisma.PrismaClientOptions["omit"], ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = $Class.PrismaClient<LogOpts, OmitOpts, ExtArgs>
 export { Prisma }
 
+/**
+ * Model User
+ * Usuário. E-mail normalizado (minúsculas, sem espaços) — reforçado por CHECK na migration.
+ */
+export type User = Prisma.UserModel
+/**
+ * Model Session
+ * Sessão de login (BR-012, BR-015). Cliente armazenado de forma aproximada (minimização).
+ */
+export type Session = Prisma.SessionModel
+/**
+ * Model RefreshToken
+ * Refresh token (somente hash SHA-256). No máximo um não rotacionado por sessão (índice parcial).
+ */
+export type RefreshToken = Prisma.RefreshTokenModel
+/**
+ * Model UserToken
+ * Token de uso único enviado por e-mail (somente hash). Emitido pelo worker (ADR 0011).
+ */
+export type UserToken = Prisma.UserTokenModel
 /**
  * Model OutboxEvent
  * Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação

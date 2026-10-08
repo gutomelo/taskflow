@@ -64,7 +64,7 @@ libs/
                                   rate limiter, probes; /testing para testes  — implementado
   backend/<context>/{domain,application,infrastructure,http}                 — planejado por spec
   frontend/<domain>/{feature,ui,data-access,util,model}                      — planejado quando extraído
-prisma/           schema único e migrations
+prisma/           schema.prisma (generator/datasource) + models/<contexto>.prisma + migrations
 infra/docker/     Dockerfiles de produção
 docs/  specs/  .claude/
 ```

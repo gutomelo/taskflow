@@ -1,0 +1,13 @@
+// Infraestrutura compartilhada entre contextos (não pertence a nenhum bounded context).
+
+/// Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
+/// da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.
+model OutboxEvent {
+  id          String    @id @db.Uuid
+  type        String    @db.VarChar(100)
+  payload     Json
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(3)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
+
+  @@map("outbox_events")
+}

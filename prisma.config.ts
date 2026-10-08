@@ -11,7 +11,9 @@ if (existsSync('.env')) {
 const databaseUrl = process.env['DATABASE_URL'];
 
 export default defineConfig({
-  schema: 'prisma/schema.prisma',
+  // Diretório (não o arquivo): com o arquivo, os modelos de prisma/models/ seriam ignorados
+  // silenciosamente pelo generate.
+  schema: 'prisma',
   migrations: {
     path: 'prisma/migrations',
   },

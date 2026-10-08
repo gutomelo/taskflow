@@ -31,7 +31,7 @@ Entidades, value objects, invariantes e eventos de domínio.
 
 ## Modelagem de dados
 
-Mudanças no `schema.prisma` (tabelas, colunas, índices, constraints), classificação aditiva/destrutiva e plano de migração.
+Mudanças em `prisma/models/<contexto>.prisma` (tabelas, colunas, índices, constraints), classificação aditiva/destrutiva e plano de migração.
 
 ## Contratos
 

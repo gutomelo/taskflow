@@ -1,6 +1,6 @@
 ---
 name: database-migration
-description: Padroniza mudanças de schema no TaskFlow com Prisma 7 e PostgreSQL — modelagem multi-tenant, compatibilidade, geração e revisão da migration, rollback/roll-forward, integridade, índices, segurança de dados e validação com testes de integração. Use ao alterar prisma/schema.prisma.
+description: Padroniza mudanças de schema no TaskFlow com Prisma 7 e PostgreSQL — modelagem multi-tenant, compatibilidade, geração e revisão da migration, rollback/roll-forward, integridade, índices, segurança de dados e validação com testes de integração. Use ao alterar modelos em prisma/models/*.prisma.
 argument-hint: '<descrição da mudança>'
 ---
 
@@ -11,6 +11,8 @@ Mudança: $ARGUMENTS
 Siga `.claude/rules/database.md`. A mudança deve estar descrita no `design.md` de uma spec aprovada.
 
 ## 1. Modelagem
+
+- Edite o arquivo do contexto em `prisma/models/<contexto>.prisma` (crie-o se o contexto ainda não tiver tabelas). `prisma/schema.prisma` só contém `generator`/`datasource`.
 
 - Tabela tenant-scoped? → `organizationId` + FK + índices iniciando por ele + unicidade escopada.
 - Edição concorrente? → `version Int @default(1)`.

@@ -18,6 +18,26 @@ export { Prisma }
 export * as $Enums from './enums'
 export * from './enums';
 /**
+ * Model User
+ * Usuário. E-mail normalizado (minúsculas, sem espaços) — reforçado por CHECK na migration.
+ */
+export type User = Prisma.UserModel
+/**
+ * Model Session
+ * Sessão de login (BR-012, BR-015). Cliente armazenado de forma aproximada (minimização).
+ */
+export type Session = Prisma.SessionModel
+/**
+ * Model RefreshToken
+ * Refresh token (somente hash SHA-256). No máximo um não rotacionado por sessão (índice parcial).
+ */
+export type RefreshToken = Prisma.RefreshTokenModel
+/**
+ * Model UserToken
+ * Token de uso único enviado por e-mail (somente hash). Emitido pelo worker (ADR 0011).
+ */
+export type UserToken = Prisma.UserTokenModel
+/**
  * Model OutboxEvent
  * Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
  * da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.

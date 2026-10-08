@@ -15,7 +15,8 @@ const PROTECTED_RULES = [
   },
   {
     test: (path) => path.includes('/generated/prisma/'),
-    reason: 'O Prisma Client é gerado. Altere prisma/schema.prisma e rode pnpm db:generate.',
+    reason:
+      'O Prisma Client é gerado. Altere os modelos em prisma/models/ e rode pnpm db:generate.',
   },
   {
     test: (path) =>

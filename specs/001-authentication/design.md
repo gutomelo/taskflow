@@ -154,7 +154,8 @@ model OutboxEvent {
 
 - Índice parcial criado por SQL na migration: `CREATE INDEX outbox_events_unpublished_idx ON outbox_events (occurred_at) WHERE published_at IS NULL`.
 - Payload da outbox: apenas `userId`, exceto `password_reset_requested` (`{ email }` normalizado, necessário para o trabalho constante). Removido pela limpeza após 7 dias.
-- Migration **aditiva** (primeira do projeto); roll-forward.
+- Restrições manuais na migration `add_identity_tables` (T9), além do schema Prisma: `CHECK` de e-mail normalizado; `CHECK` inatividade ≤ absoluto; `CHECK` revogação consistente (data e motivo juntos); **índice único parcial "um refresh token atual por sessão"** (BR-012 no banco); `CHECK` tolerância só após rotação; `CHECK` validade de token posterior à criação; índice parcial de usuários não verificados por `created_at` (RF-15). Motivos de revogação e finalidades de token são enums do PostgreSQL. Hashes de token em `CHAR(64)` (SHA-256 hex).
+- Migrations **aditivas** (`add_outbox_events` na T5, `add_identity_tables` na T9); roll-forward.
 
 ## Contratos
 

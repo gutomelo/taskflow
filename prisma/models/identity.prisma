@@ -1,0 +1,89 @@
+// Bounded context: Identity & Access (spec 001). Tabelas pertencem exclusivamente a este contexto.
+// Tabelas globais: identidade existe antes de qualquer organização (ADR 0004).
+
+/// Usuário. E-mail normalizado (minúsculas, sem espaços) — reforçado por CHECK na migration.
+model User {
+  id                String    @id @db.Uuid
+  email             String    @unique @db.VarChar(254)
+  name              String    @db.VarChar(100)
+  passwordHash      String    @map("password_hash")
+  emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  passwordChangedAt DateTime  @map("password_changed_at") @db.Timestamptz(3)
+  version           Int       @default(1)
+  createdAt         DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions Session[]
+  tokens   UserToken[]
+
+  @@map("users")
+}
+
+enum SessionRevocationReason {
+  logout
+  user_revoked
+  reuse_detected
+  password_changed
+  password_reset
+
+  @@map("session_revocation_reason")
+}
+
+/// Sessão de login (BR-012, BR-015). Cliente armazenado de forma aproximada (minimização).
+model Session {
+  id                String                   @id @db.Uuid
+  userId            String                   @map("user_id") @db.Uuid
+  createdAt         DateTime                 @map("created_at") @db.Timestamptz(3)
+  lastUsedAt        DateTime                 @map("last_used_at") @db.Timestamptz(3)
+  idleExpiresAt     DateTime                 @map("idle_expires_at") @db.Timestamptz(3)
+  absoluteExpiresAt DateTime                 @map("absolute_expires_at") @db.Timestamptz(3)
+  revokedAt         DateTime?                @map("revoked_at") @db.Timestamptz(3)
+  revocationReason  SessionRevocationReason? @map("revocation_reason")
+  userAgent         String?                  @map("user_agent") @db.VarChar(256)
+  ipPrefix          String?                  @map("ip_prefix") @db.VarChar(64)
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@map("sessions")
+}
+
+/// Refresh token (somente hash SHA-256). No máximo um não rotacionado por sessão (índice parcial).
+model RefreshToken {
+  id          String    @id @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  tokenHash   String    @unique @map("token_hash") @db.Char(64)
+  createdAt   DateTime  @map("created_at") @db.Timestamptz(3)
+  rotatedAt   DateTime? @map("rotated_at") @db.Timestamptz(3)
+  graceUsedAt DateTime? @map("grace_used_at") @db.Timestamptz(3)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("refresh_tokens")
+}
+
+enum UserTokenPurpose {
+  email_verification
+  password_reset
+
+  @@map("user_token_purpose")
+}
+
+/// Token de uso único enviado por e-mail (somente hash). Emitido pelo worker (ADR 0011).
+model UserToken {
+  id            String           @id @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  purpose       UserTokenPurpose
+  tokenHash     String           @unique @map("token_hash") @db.Char(64)
+  sourceEventId String           @unique @map("source_event_id") @db.Uuid
+  expiresAt     DateTime         @map("expires_at") @db.Timestamptz(3)
+  consumedAt    DateTime?        @map("consumed_at") @db.Timestamptz(3)
+  createdAt     DateTime         @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, consumedAt])
+  @@map("user_tokens")
+}
