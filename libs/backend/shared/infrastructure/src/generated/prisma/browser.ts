@@ -17,4 +17,9 @@ import * as Prisma from './internal/prismaNamespaceBrowser'
 export { Prisma }
 export * as $Enums from './enums'
 export * from './enums';
-
+/**
+ * Model OutboxEvent
+ * Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
+ * da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.
+ */
+export type OutboxEvent = Prisma.OutboxEventModel

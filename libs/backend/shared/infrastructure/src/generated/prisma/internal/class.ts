@@ -20,7 +20,7 @@ const config: runtime.GetPrismaClientConfig = {
   "clientVersion": "7.10.0",
   "engineVersion": "0edf323efd1d98336f3f0a68684b56f689b900d3",
   "activeProvider": "postgresql",
-  "inlineSchema": "// Schema único do TaskFlow (modular monolith, um banco PostgreSQL).\n// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md.\n// - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.\n// - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.\n// - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).\n//\n// Fase 0: nenhum modelo ainda. O primeiro modelo nasce com a spec 001 (Identity & Access).\n\ngenerator client {\n  provider     = \"prisma-client\"\n  output       = \"../libs/backend/shared/infrastructure/src/generated/prisma\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n",
+  "inlineSchema": "// Schema único do TaskFlow (modular monolith, um banco PostgreSQL).\n// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md.\n// - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.\n// - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.\n// - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).\n//\n\ngenerator client {\n  provider     = \"prisma-client\"\n  output       = \"../libs/backend/shared/infrastructure/src/generated/prisma\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\n// --- Infraestrutura compartilhada -------------------------------------------\n\n/// Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação\n/// da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.\nmodel OutboxEvent {\n  id          String    @id @db.Uuid\n  type        String    @db.VarChar(100)\n  payload     Json\n  occurredAt  DateTime  @map(\"occurred_at\") @db.Timestamptz(3)\n  publishedAt DateTime? @map(\"published_at\") @db.Timestamptz(3)\n\n  @@map(\"outbox_events\")\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -32,10 +32,10 @@ const config: runtime.GetPrismaClientConfig = {
   }
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"OutboxEvent\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"payload\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"occurredAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"occurred_at\"},{\"name\":\"publishedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"published_at\"}],\"dbName\":\"outbox_events\",\"schema\":null}},\"enums\":{},\"types\":{}}")
 config.parameterizationSchema = {
-  strings: JSON.parse("[]"),
-  graph: "AAAA"
+  strings: JSON.parse("[\"where\",\"OutboxEvent.findUnique\",\"OutboxEvent.findUniqueOrThrow\",\"orderBy\",\"cursor\",\"OutboxEvent.findFirst\",\"OutboxEvent.findFirstOrThrow\",\"OutboxEvent.findMany\",\"data\",\"OutboxEvent.createOne\",\"OutboxEvent.createMany\",\"OutboxEvent.createManyAndReturn\",\"OutboxEvent.updateOne\",\"OutboxEvent.updateMany\",\"OutboxEvent.updateManyAndReturn\",\"create\",\"update\",\"OutboxEvent.upsertOne\",\"OutboxEvent.deleteOne\",\"OutboxEvent.deleteMany\",\"having\",\"_count\",\"_min\",\"_max\",\"OutboxEvent.groupBy\",\"OutboxEvent.aggregate\",\"AND\",\"OR\",\"NOT\",\"id\",\"type\",\"payload\",\"occurredAt\",\"publishedAt\",\"equals\",\"in\",\"notIn\",\"lt\",\"lte\",\"gt\",\"gte\",\"not\",\"string_contains\",\"string_starts_with\",\"string_ends_with\",\"array_starts_with\",\"array_ends_with\",\"array_contains\",\"contains\",\"startsWith\",\"endsWith\",\"set\"]"),
+  graph: "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"
 }
 
 async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
@@ -70,8 +70,8 @@ export interface PrismaClientConstructor {
    * const prisma = new PrismaClient({
    *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
    * })
-   * // Fetch zero or more Users
-   * const users = await prisma.user.findMany()
+   * // Fetch zero or more OutboxEvents
+   * const outboxEvents = await prisma.outboxEvent.findMany()
    * ```
    * 
    * Read more in our [docs](https://pris.ly/d/client).
@@ -94,8 +94,8 @@ export interface PrismaClientConstructor {
  * const prisma = new PrismaClient({
  *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
  * })
- * // Fetch zero or more Users
- * const users = await prisma.user.findMany()
+ * // Fetch zero or more OutboxEvents
+ * const outboxEvents = await prisma.outboxEvent.findMany()
  * ```
  * 
  * Read more in our [docs](https://pris.ly/d/client).
@@ -188,7 +188,15 @@ export interface PrismaClient<
     extArgs: ExtArgs
   }>>
 
-    
+      /**
+   * `prisma.outboxEvent`: Exposes CRUD operations for the **OutboxEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more OutboxEvents
+    * const outboxEvents = await prisma.outboxEvent.findMany()
+    * ```
+    */
+  get outboxEvent(): Prisma.OutboxEventDelegate<ExtArgs, { omit: OmitOpts }>;
 }
 
 export function getPrismaClientClass(): PrismaClientConstructor {

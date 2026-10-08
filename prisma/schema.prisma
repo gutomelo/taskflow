@@ -4,7 +4,6 @@
 // - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.
 // - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).
 //
-// Fase 0: nenhum modelo ainda. O primeiro modelo nasce com a spec 001 (Identity & Access).
 
 generator client {
   provider     = "prisma-client"
@@ -15,3 +14,18 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// --- Infraestrutura compartilhada -------------------------------------------
+
+/// Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
+/// da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.
+model OutboxEvent {
+  id          String    @id @db.Uuid
+  type        String    @db.VarChar(100)
+  payload     Json
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(3)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
+
+  @@map("outbox_events")
+}
+
