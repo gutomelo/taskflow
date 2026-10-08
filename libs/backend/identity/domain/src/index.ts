@@ -15,3 +15,30 @@ export {
   type RegisterUserInput,
   type UserSnapshot,
 } from './lib/user/user';
+export {
+  REFRESH_GRACE_PERIOD_MS,
+  Session,
+  SESSION_ABSOLUTE_TIMEOUT_MS,
+  SESSION_IDLE_TIMEOUT_MS,
+  type NewRefreshToken,
+  type RefreshTokenRecord,
+  type RotateInput,
+  type RotationOutcome,
+  type SessionClient,
+  type SessionRevocationReason,
+  type SessionSnapshot,
+  type StartSessionInput,
+} from './lib/session/session';
+export {
+  RefreshInProgressError,
+  SessionExpiredError,
+  SessionRevokedError,
+} from './lib/session/session-errors';
+export {
+  InvalidOrExpiredTokenError,
+  UserToken,
+  USER_TOKEN_TTL_MS,
+  type IssueUserTokenInput,
+  type UserTokenPurpose,
+  type UserTokenSnapshot,
+} from './lib/token/user-token';

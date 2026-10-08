@@ -28,6 +28,14 @@ describe('User', () => {
     });
   });
 
+  it('exposes its identity, email and name', () => {
+    const user = registerUser();
+
+    expect(user.id).toBe('01920000-0000-7000-8000-000000000001');
+    expect(user.email.value).toBe('ana@exemplo.com');
+    expect(`${user.name}`).toBe('Ana');
+  });
+
   it('verifies the email once', () => {
     const user = registerUser();
 
