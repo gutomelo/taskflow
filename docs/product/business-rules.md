@@ -87,3 +87,41 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Regra**: alteração do estado principal e registros obrigatoriamente associados (auditoria, contadores, outbox) são gravados atomicamente na mesma transação.
 - **Efeitos externos** (fila, e-mail, socket) ocorrem somente após o commit; nunca são anunciados como concluídos antes disso.
 - **Falha**: qualquer erro na transação desfaz tudo; o cliente recebe erro sem estado parcial.
+
+---
+
+## Identity & Access (spec 001)
+
+Status: **Aprovadas / não implementadas** (spec [001-authentication](../../specs/001-authentication/requirements.md), aprovada em 2026-10-08). Detalhes de implementação em [design.md](../../specs/001-authentication/design.md).
+
+### BR-011 — Política de senha
+
+8–128 caracteres, com ao menos uma letra maiúscula, uma minúscula, um dígito e um símbolo; não pode ser igual ao e-mail nem constar na lista local de senhas comuns/vazadas (100 mil mais frequentes). Validada no backend (domínio); o frontend apenas antecipa o feedback. Erro: `PASSWORD_POLICY_VIOLATION` (422) listando as regras não atendidas.
+
+### BR-012 — Rotação de refresh token
+
+Cada uso emite novo refresh e invalida o anterior. Reapresentar um refresh rotacionado revoga a sessão inteira (`SESSION_REVOKED`, 401) e registra evento de segurança — **exceto** uma única vez para o predecessor imediato, até 5 s após a rotação, vindo do mesmo cliente (prefixo de IP e user agent), que recebe 409 `REFRESH_IN_PROGRESS` sem revogar.
+
+### BR-013 — Gate de e-mail verificado
+
+Criar ou entrar em organização exige e-mail verificado (aplicado pela spec 002 por porta própria ligada a uma consulta desta spec). Login e gestão da própria conta não exigem.
+
+### BR-014 — Não enumeração de contas
+
+Cadastro, recuperação de senha e reenvio respondem igual para e-mails existentes e inexistentes; o titular de uma conta existente recebe e-mail informativo ("você já tem conta") no lugar do link de verificação. Envios a um mesmo e-mail são limitados e o excesso é suprimido silenciosamente.
+
+### BR-015 — Expiração de sessão
+
+Sessão expira após 7 dias sem uso (deslizante) ou 30 dias após o login (absoluto), o que ocorrer primeiro. Access token: 15 min.
+
+### BR-016 — Troca/redefinição de senha
+
+Trocar a senha revoga todas as outras sessões, rotaciona a sessão atual e invalida tokens de recuperação pendentes; redefinir por e-mail revoga todas as sessões e invalida tokens de recuperação pendentes.
+
+### BR-017 — Confirmação de e-mail pelo titular
+
+O link de verificação só confirma o e-mail quando usado por uma sessão autenticada da **mesma conta** e por ação explícita do usuário; evita que uma conta criada por terceiro com o e-mail da vítima seja verificada pelo clique da vítima (pré-sequestro).
+
+### BR-018 — Atraso progressivo de login
+
+Após 5 falhas consecutivas para uma conta, cada nova tentativa exige espera que dobra (1 s até 15 min), zerada no sucesso; sem bloqueio permanente.

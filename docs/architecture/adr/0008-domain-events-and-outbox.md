@@ -1,6 +1,7 @@
 # 0008 — Domain events despachados após commit; Transactional Outbox quando justificado
 
 - **Status**: Aceito (despacho pós-commit) · Outbox: **Proposto** para a Fase 4
+- **Nota**: o trecho da Outbox é parcialmente substituído pelo [ADR 0011](0011-early-worker-and-outbox-for-email.md) (Outbox adotada na Fase 1 para e-mails transacionais) e a localização dos contratos de integração é restringida por ele.
 - **Data**: 2026-10-08
 - **Relacionados**: BR-007, BR-010, [data-flow](../data-flow.md)
 

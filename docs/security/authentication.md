@@ -1,6 +1,6 @@
 # Autenticação
 
-Status: **Planejado** — arquitetura proposta no ADR [0005](../architecture/adr/0005-authentication-tokens-and-cookies.md); requisitos e design detalhados serão definidos na spec `001-authentication`.
+Status: **Aprovado / não implementado.** A fonte vigente é o [design da spec 001](../../specs/001-authentication/design.md) e o ADR [0005](../architecture/adr/0005-authentication-tokens-and-cookies.md) (aceito). Onde este resumo divergir deles (ex.: janela de tolerância do refresh, cookies CSRF), prevalecem a spec e o ADR; este documento será reescrito na tarefa T30.
 
 ## Componentes
 
