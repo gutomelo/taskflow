@@ -27,7 +27,8 @@
         "./libs/backend/shared/infrastructure/src/index.ts"
       ],
       "@taskflow/backend/shared/kernel": ["./libs/backend/shared/kernel/src/index.ts"],
-      "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"]
+      "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"],
+      "@taskflow/backend/shared/http": ["./libs/backend/shared/http/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

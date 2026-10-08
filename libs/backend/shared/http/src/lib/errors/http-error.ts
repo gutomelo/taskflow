@@ -1,15 +1,32 @@
+import type { FieldViolation } from '@taskflow/contracts';
+
+export interface HttpErrorOptions {
+  readonly detail?: string;
+  readonly violations?: ReadonlyArray<FieldViolation>;
+  /** Enviado como header `Retry-After` (respostas 429/503). */
+  readonly retryAfterSeconds?: number;
+}
+
 /**
- * Erro de transporte HTTP com código estável. Erros de domínio terão sua própria
- * hierarquia (DomainError) e serão mapeados no error handler quando existirem.
+ * Erro de transporte HTTP com código estável. Regras de negócio usam `DomainError`
+ * (kernel), mapeado pelo error handler; este tipo cobre autenticação, CSRF,
+ * validação de entrada e limites de taxa.
  */
 export class HttpError extends Error {
+  readonly detail: string | undefined;
+  readonly violations: ReadonlyArray<FieldViolation> | undefined;
+  readonly retryAfterSeconds: number | undefined;
+
   constructor(
     readonly status: number,
     readonly code: string,
     readonly title: string,
-    readonly detail?: string,
+    options: HttpErrorOptions = {},
   ) {
-    super(detail ?? title);
+    super(options.detail ?? title);
     this.name = 'HttpError';
+    this.detail = options.detail;
+    this.violations = options.violations;
+    this.retryAfterSeconds = options.retryAfterSeconds;
   }
 }

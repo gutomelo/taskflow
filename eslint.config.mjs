@@ -89,7 +89,8 @@ export default [
                 'type:contracts',
                 'type:presentation',
               ],
-              bannedExternalImports: ['@prisma/*', 'prisma', '@angular/*'],
+              // Middlewares recebem portas; nunca falam com Redis ou filas diretamente.
+              bannedExternalImports: ['@prisma/*', 'prisma', 'ioredis', 'bullmq', '@angular/*'],
             },
             {
               sourceTag: 'type:contracts',

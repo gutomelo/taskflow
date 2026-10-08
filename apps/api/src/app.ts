@@ -3,9 +3,13 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
 import type { DependencyProbe } from '@taskflow/backend/shared/infrastructure';
+import {
+  createErrorHandler,
+  httpLogSerializers,
+  notFoundHandler,
+} from '@taskflow/backend/shared/http';
 import type { AppConfig } from './config/env';
 import { createHealthRouter } from './health/health.router';
-import { errorHandler, notFoundHandler } from './http/problem-details';
 import { resolveRequestId } from './http/request-id';
 
 export interface AppDependencies {
@@ -28,6 +32,7 @@ export function createApp({ config, logger, probes }: AppDependencies): Express 
     pinoHttp({
       logger,
       genReqId: resolveRequestId,
+      serializers: httpLogSerializers,
       // Health checks são frequentes e sem valor diagnóstico quando bem-sucedidos.
       autoLogging: { ignore: (request) => request.url?.startsWith('/health/live') ?? false },
       customLogLevel: (_request, response, error) =>
@@ -45,7 +50,7 @@ export function createApp({ config, logger, probes }: AppDependencies): Express 
   // Rotas de negócio serão montadas em /api/v1 pelos módulos (spec 001 em diante).
 
   app.use(notFoundHandler);
-  app.use(errorHandler);
+  app.use(createErrorHandler());
 
   return app;
 }
