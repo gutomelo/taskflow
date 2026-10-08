@@ -1,0 +1,15 @@
+export type { Actor, RequestContext } from './lib/context/request-context';
+export type { TransactionRunner } from './lib/persistence/transaction-runner';
+export {
+  createIntegrationEvent,
+  type IntegrationEvent,
+  type IntegrationEventFactoryDependencies,
+  type JsonValue,
+} from './lib/events/integration-event';
+export type { OutboxWriter } from './lib/events/outbox-writer';
+export type { EmailMessage, EmailSender } from './lib/email/email-sender';
+export type {
+  RateLimitDecision,
+  RateLimitPolicy,
+  RateLimiter,
+} from './lib/rate-limiting/rate-limiter';
