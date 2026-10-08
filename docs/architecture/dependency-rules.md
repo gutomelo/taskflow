@@ -45,13 +45,15 @@ flowchart LR
     application --> domain
 ```
 
-| Origem                | Pode depender de                                                         | Importações externas proibidas                                                                                     |
-| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `type:domain`         | `type:domain`                                                            | `express`, `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `socket.io`, `pino`, `pino-http`, `@angular/*`              |
-| `type:application`    | `type:domain`, `type:application`                                        | as mesmas de `type:domain`                                                                                         |
-| `type:infrastructure` | `type:domain`, `type:application`, `type:infrastructure`                 | `express`, `@angular/*`                                                                                            |
-| `type:presentation`   | `type:application`, `type:domain`, `type:contracts`, `type:presentation` | `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `@angular/*` — middlewares recebem portas, nunca falam com Redis/filas |
-| `type:contracts`      | `type:contracts`                                                         | tudo exceto `zod` (`allowedExternalImports`)                                                                       |
+| Origem                | Pode depender de                                                         | Importações externas proibidas                                                                                              |
+| --------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `type:domain`         | `type:domain`                                                            | **todos** os pacotes npm (`allowedExternalImports: []`) — domínio é TypeScript puro; capacidades externas entram por portas |
+| `type:application`    | `type:domain`, `type:application`                                        | `express`, `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `socket.io`, `pino`, `pino-http`, `@angular/*`                       |
+| `type:infrastructure` | `type:domain`, `type:application`, `type:infrastructure`                 | `express`, `@angular/*`                                                                                                     |
+| `type:presentation`   | `type:application`, `type:domain`, `type:contracts`, `type:presentation` | `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `@angular/*` — middlewares recebem portas, nunca falam com Redis/filas          |
+| `type:contracts`      | `type:contracts`                                                         | tudo exceto `zod` (`allowedExternalImports`)                                                                                |
+
+O Nx verifica apenas pacotes presentes no grafo (instalados); módulos nativos do Node (`node:*`) não são verificados — seu uso em `domain` é barrado na revisão de código.
 
 `presentation → domain` é permitido apenas para mapear erros e tipos de valor na resposta; controllers não chamam métodos de entidades.
 

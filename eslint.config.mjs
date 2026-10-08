@@ -69,7 +69,8 @@ export default [
             {
               sourceTag: 'type:domain',
               onlyDependOnLibsWithTags: ['type:domain'],
-              bannedExternalImports: INFRASTRUCTURE_PACKAGES,
+              // Domínio é TypeScript puro: nenhum pacote externo (ex.: argon2 entra via porta).
+              allowedExternalImports: [],
             },
             {
               sourceTag: 'type:application',
