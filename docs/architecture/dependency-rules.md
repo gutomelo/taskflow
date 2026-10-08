@@ -45,15 +45,29 @@ flowchart LR
     application --> domain
 ```
 
-| Origem                | Pode depender de                                                         | Importações externas proibidas                                                  |
-| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `type:domain`         | `type:domain`                                                            | `express`, `@prisma/*`, `ioredis`, `bullmq`, `socket.io`, `pino*`, `@angular/*` |
-| `type:application`    | `type:domain`, `type:application`                                        | as mesmas de `type:domain`                                                      |
-| `type:infrastructure` | `type:domain`, `type:application`, `type:infrastructure`                 | `express`, `@angular/*`                                                         |
-| `type:presentation`   | `type:application`, `type:domain`, `type:contracts`, `type:presentation` | `@prisma/*`, `@angular/*`                                                       |
-| `type:contracts`      | `type:contracts`                                                         | tudo exceto `zod`                                                               |
+| Origem                | Pode depender de                                                         | Importações externas proibidas                                                                                     |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `type:domain`         | `type:domain`                                                            | `express`, `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `socket.io`, `pino`, `pino-http`, `@angular/*`              |
+| `type:application`    | `type:domain`, `type:application`                                        | as mesmas de `type:domain`                                                                                         |
+| `type:infrastructure` | `type:domain`, `type:application`, `type:infrastructure`                 | `express`, `@angular/*`                                                                                            |
+| `type:presentation`   | `type:application`, `type:domain`, `type:contracts`, `type:presentation` | `@prisma/*`, `prisma`, `ioredis`, `bullmq`, `@angular/*` — middlewares recebem portas, nunca falam com Redis/filas |
+| `type:contracts`      | `type:contracts`                                                         | tudo exceto `zod` (`allowedExternalImports`)                                                                       |
 
 `presentation → domain` é permitido apenas para mapear erros e tipos de valor na resposta; controllers não chamam métodos de entidades.
+
+## Bibliotecas compartilhadas do backend (implementadas)
+
+Todas com `scope:backend` e `domain:shared` — qualquer contexto pode usá-las, respeitando a camada.
+
+| Projeto                              | `type:*`         | Import                                            | Conteúdo                                                                                                                                                                      |
+| ------------------------------------ | ---------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/backend/shared/kernel`         | `domain`         | `@taskflow/backend/shared/kernel`                 | `DomainError`, `Clock`, `IdGenerator`, `EmailAddress`                                                                                                                         |
+| `libs/backend/shared/application`    | `application`    | `@taskflow/backend/shared/application`            | `RequestContext`, `TransactionRunner`, `IntegrationEvent`/`createIntegrationEvent`, `OutboxWriter`, `EmailSender`, `RateLimiter`                                              |
+| `libs/backend/shared/http`           | `presentation`   | `@taskflow/backend/shared/http`                   | `HttpError`, error handler (`DomainError` → Problem Details), `parseBody`, `createAuthenticate`, `createCsrfProtection`, `createRateLimit`, `clientIpKey`, serializers de log |
+| `libs/backend/shared/infrastructure` | `infrastructure` | `@taskflow/backend/shared/infrastructure`         | Prisma (cliente, `PrismaTransactionRunner`, `PrismaOutboxWriter`), Redis (cliente, `RedisRateLimiter`), `SmtpEmailSender`, `UuidV7Generator`, `SystemClock`, probes de saúde  |
+| ↳ subcaminho de testes               | —                | `@taskflow/backend/shared/infrastructure/testing` | `startPostgresTestDatabase()` (PostgreSQL efêmero + migrations reais). **Somente em testes**; excluído do `tsconfig.lib.json`                                                 |
+
+Regra de inclusão: algo só entra em `shared/*` quando dois ou mais contextos já precisam dele (ou a spec que o cria demonstra o segundo uso, como `RequestContext` para a spec 002).
 
 ## Restrições por tipo (frontend)
 

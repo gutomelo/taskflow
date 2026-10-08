@@ -95,7 +95,8 @@ export default [
             {
               sourceTag: 'type:contracts',
               onlyDependOnLibsWithTags: ['type:contracts'],
-              bannedExternalImports: ['express', '@prisma/*', 'prisma', 'ioredis', '@angular/*'],
+              // Contratos atravessam backend e frontend: apenas schemas Zod.
+              allowedExternalImports: ['zod'],
             },
 
             // Camadas do frontend

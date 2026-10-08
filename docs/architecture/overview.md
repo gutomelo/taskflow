@@ -44,7 +44,7 @@ flowchart LR
     class worker planned
 ```
 
-`*` = planejado (Fases 2 e 4). Implementado na Fase 0: `apps/web`, `apps/api` (health checks), PostgreSQL e Redis via Docker Compose.
+`*` = planejado. Implementado: `apps/web`, `apps/api` (health checks; módulos de negócio a partir da spec 001), PostgreSQL, Redis e Mailpit via Docker Compose. `apps/worker` é antecipado pela spec 001 (ADR [0011](adr/0011-early-worker-and-outbox-for-email.md)).
 
 ## Organização do monorepo
 
@@ -53,10 +53,15 @@ apps/
   api/            composition root HTTP (Express)       — implementado (fundação)
   web/            SPA Angular                            — implementado (shell + status)
   web-e2e/        testes Playwright                      — implementado
-  worker/         composition root de filas              — planejado (Fase 4 ou antes, por ADR)
+  worker/         composition root de filas              — planejado (spec 001, tarefa T19; ADR 0011)
 libs/
   contracts/                      contratos HTTP compartilhados (Zod)        — implementado
-  backend/shared/infrastructure/  Prisma, Redis, probes de dependência       — implementado
+  backend/shared/kernel/          DomainError, Clock, IdGenerator, EmailAddress — implementado
+  backend/shared/application/     portas: RequestContext, TransactionRunner,
+                                  OutboxWriter, EmailSender, RateLimiter      — implementado
+  backend/shared/http/            erros, autenticação, CSRF, rate limit, logs — implementado
+  backend/shared/infrastructure/  Prisma, transações, outbox, Redis, SMTP,
+                                  rate limiter, probes; /testing para testes  — implementado
   backend/<context>/{domain,application,infrastructure,http}                 — planejado por spec
   frontend/<domain>/{feature,ui,data-access,util,model}                      — planejado quando extraído
 prisma/           schema único e migrations
@@ -90,8 +95,10 @@ Detalhes e restrições verificáveis em [dependency-rules.md](dependency-rules.
 
 - **Composition root** (`apps/api/src/main.ts`): carrega config validada (Zod), cria clientes (Prisma, Redis), instancia módulos com constructor injection, monta o app (`createApp`) e controla o graceful shutdown.
 - **`createApp(deps)`**: sem efeitos colaterais; recebe dependências prontas — testável com Supertest.
-- **Erros**: `application/problem+json` (RFC 9457) com `code` estável e `requestId`.
-- **Logs**: Pino com `requestId` (aceita `x-request-id` válido do proxy ou gera UUID) e redação de credenciais.
+- **Erros**: `application/problem+json` (RFC 9457) com `code` estável e `requestId`; `DomainError` mapeado por `code` no error handler de `libs/backend/shared/http`.
+- **Transações**: casos de uso delimitam a transação via `TransactionRunner`; a implementação Prisma guarda o cliente da transação em `AsyncLocalStorage` (restrito à infraestrutura) e chamadas aninhadas reutilizam a transação externa.
+- **Outbox**: eventos de integração gravados em `outbox_events` na mesma transação (ADR 0011); publicação pelo worker.
+- **Logs**: Pino com `requestId` (aceita `x-request-id` válido do proxy ou gera UUID), redação de credenciais e serializers mínimos (sem headers completos nem query string).
 - **Health**: `/health/live` (processo vivo) e `/health/ready` (PostgreSQL + Redis com timeout).
 
 ## Frontend
