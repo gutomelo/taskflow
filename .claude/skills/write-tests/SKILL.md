@@ -1,7 +1,7 @@
 ---
 name: write-tests
 description: Cria testes para o TaskFlow a partir das regras de negócio (BR-xxx) e critérios de aceitação de uma spec — escolhendo o nível certo (domínio, aplicação, integração com Testcontainers, HTTP com Supertest, componente Angular ou E2E Playwright). Use ao implementar uma tarefa, ao cobrir uma regra sem teste ou ao reproduzir um bug.
-argument-hint: "<arquivo, BR-xxx ou spec>"
+argument-hint: '<arquivo, BR-xxx ou spec>'
 ---
 
 # Escrever testes

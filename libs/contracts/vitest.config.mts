@@ -1,21 +1,24 @@
 import { defineConfig } from 'vitest/config';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 
-export default defineConfig(() => ({
+export default defineConfig({
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/libs/contracts',
-  plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
+  resolve: { tsconfigPaths: true },
   test: {
     name: 'contracts',
     watch: false,
     globals: true,
     environment: 'node',
-    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: ['src/**/*.spec.ts'],
+    // Testes com containers rodam no target integration-test.
+    exclude: ['**/*.integration.spec.ts', '**/node_modules/**'],
+    passWithNoTests: true,
     reporters: ['default'],
     coverage: {
+      provider: 'v8',
       reportsDirectory: '../../coverage/libs/contracts',
-      provider: 'v8' as const,
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.spec.ts', 'src/**/generated/**', 'src/main.ts'],
     },
   },
-}));
+});

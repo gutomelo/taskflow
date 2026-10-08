@@ -1,8 +1,8 @@
 ---
 paths:
-  - "prisma/**"
-  - "prisma.config.ts"
-  - "libs/backend/**/infrastructure/**"
+  - 'prisma/**'
+  - 'prisma.config.ts'
+  - 'libs/backend/**/infrastructure/**'
 ---
 
 # Regras de banco de dados (PostgreSQL + Prisma 7)

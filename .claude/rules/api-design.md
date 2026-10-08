@@ -1,9 +1,9 @@
 ---
 paths:
-  - "apps/api/**"
-  - "libs/backend/**/http/**"
-  - "libs/contracts/**"
-  - "docs/api/**"
+  - 'apps/api/**'
+  - 'libs/backend/**/http/**'
+  - 'libs/contracts/**'
+  - 'docs/api/**'
 ---
 
 # Regras de design de API REST

@@ -1,7 +1,7 @@
 ---
 name: security-audit
 description: Auditoria de segurança focada do TaskFlow — autenticação, sessões e refresh tokens, autorização RBAC + recurso, isolamento entre tenants, validação de entrada, exposição de informações, segredos e pipeline. Use após mudanças em auth, permissões, queries tenant-scoped, endpoints, sockets ou infraestrutura, e antes de concluir specs de Identity & Access.
-argument-hint: "[escopo: base-ref, caminho ou spec]"
+argument-hint: '[escopo: base-ref, caminho ou spec]'
 context: fork
 agent: security-reviewer
 background: false

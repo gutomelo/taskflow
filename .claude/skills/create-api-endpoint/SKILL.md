@@ -1,7 +1,7 @@
 ---
 name: create-api-endpoint
 description: Padroniza a criação de um endpoint REST no backend Express do TaskFlow — método, URI, autenticação, autorização, validação Zod, contrato em libs/contracts, caso de uso, erros Problem Details, OpenAPI e testes Supertest. Use ao adicionar ou alterar um endpoint previsto no design.md de uma spec.
-argument-hint: "<MÉTODO /api/v1/rota> [spec]"
+argument-hint: '<MÉTODO /api/v1/rota> [spec]'
 ---
 
 # Criar endpoint de API
@@ -12,18 +12,18 @@ Siga `.claude/rules/api-design.md` e `.claude/rules/express.md`. O endpoint prec
 
 ## Ficha do endpoint (preencha antes de codar)
 
-| Item | Valor |
-| --- | --- |
-| Método + URI | |
-| Caso de uso | `<Verb><Noun>UseCase` |
-| Autenticação | pública / autenticada |
-| Autorização | papel(éis) + checagem de recurso (quem pode, sobre o quê) |
-| Tenant | como o `organizationId` é obtido e verificado |
-| Entrada | params, query, body (schema Zod `.strict()`) |
-| Saída | contrato de resposta + status de sucesso |
-| Erros | códigos (`code`) e status possíveis |
-| Concorrência / idempotência | `version`, `Idempotency-Key` |
-| Rate limit | se sensível |
+| Item                        | Valor                                                     |
+| --------------------------- | --------------------------------------------------------- |
+| Método + URI                |                                                           |
+| Caso de uso                 | `<Verb><Noun>UseCase`                                     |
+| Autenticação                | pública / autenticada                                     |
+| Autorização                 | papel(éis) + checagem de recurso (quem pode, sobre o quê) |
+| Tenant                      | como o `organizationId` é obtido e verificado             |
+| Entrada                     | params, query, body (schema Zod `.strict()`)              |
+| Saída                       | contrato de resposta + status de sucesso                  |
+| Erros                       | códigos (`code`) e status possíveis                       |
+| Concorrência / idempotência | `version`, `Idempotency-Key`                              |
+| Rate limit                  | se sensível                                               |
 
 ## Passos
 

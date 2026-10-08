@@ -6,7 +6,8 @@ import { relative, sep } from 'node:path';
 const PROTECTED_RULES = [
   {
     test: (path) => /(^|\/)\.env(\..+)?$/.test(path) && !path.endsWith('.env.example'),
-    reason: 'Arquivos .env contêm segredos locais e não devem ser editados pelo agente. Altere .env.example e peça ao usuário para ajustar o .env.',
+    reason:
+      'Arquivos .env contêm segredos locais e não devem ser editados pelo agente. Altere .env.example e peça ao usuário para ajustar o .env.',
   },
   {
     test: (path) => path === 'pnpm-lock.yaml',
@@ -17,7 +18,8 @@ const PROTECTED_RULES = [
     reason: 'O Prisma Client é gerado. Altere prisma/schema.prisma e rode pnpm db:generate.',
   },
   {
-    test: (path) => path.startsWith('node_modules/') || path.startsWith('dist/') || path.startsWith('.nx/'),
+    test: (path) =>
+      path.startsWith('node_modules/') || path.startsWith('dist/') || path.startsWith('.nx/'),
     reason: 'Diretórios de dependências, build e cache não devem ser editados.',
   },
 ];

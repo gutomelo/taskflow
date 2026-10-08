@@ -1,7 +1,7 @@
 ---
 name: implement-spec
 description: Executa uma especificação SDD aprovada de forma incremental — uma tarefa de tasks.md por vez, com testes, verificação e atualização do progresso. Use quando o usuário pedir para implementar uma spec ou a próxima tarefa de uma spec.
-argument-hint: "<specs/NNN-nome> [Tn]"
+argument-hint: '<specs/NNN-nome> [Tn]'
 disable-model-invocation: true
 ---
 

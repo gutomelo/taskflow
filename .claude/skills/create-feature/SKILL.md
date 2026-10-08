@@ -1,7 +1,7 @@
 ---
 name: create-feature
 description: Conduz uma funcionalidade nova do TaskFlow do pedido até a entrega seguindo SDD — cria a spec (requirements, design, tasks, acceptance) a partir dos templates, coleta aprovação e só então implementa ponta a ponta. Use quando o usuário pedir uma funcionalidade nova relevante.
-argument-hint: "<descrição da funcionalidade>"
+argument-hint: '<descrição da funcionalidade>'
 disable-model-invocation: true
 ---
 

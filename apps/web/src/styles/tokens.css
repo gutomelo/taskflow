@@ -1,0 +1,121 @@
+/*
+ * Design tokens do TaskFlow — fonte única de cores, forma e movimento.
+ * Consumidos por Tailwind (tailwind.css) e Angular Material (material-theme.scss).
+ * Contraste documentado em docs/design-system.md; ao alterar, recalcule.
+ */
+:root {
+  color-scheme: light;
+
+  --tf-color-primary: #4f46e5;
+  --tf-color-primary-hover: #4338ca;
+  --tf-color-on-primary: #ffffff;
+  --tf-color-background: #f8fafc;
+  --tf-color-surface: #ffffff;
+  --tf-color-surface-muted: #f1f5f9;
+  --tf-color-sidebar: #111827;
+  --tf-color-on-sidebar: #e2e8f0;
+  --tf-color-text: #0f172a;
+  --tf-color-text-muted: #64748b;
+  --tf-color-border: #e2e8f0;
+  --tf-color-border-strong: #64748b;
+  --tf-color-focus-ring: #4f46e5;
+
+  /* Semânticas: indicador (preenchimentos/ícones grandes) e -text (texto acessível) */
+  --tf-color-success: #16a34a;
+  --tf-color-success-text: #15803d;
+  --tf-color-warning: #f59e0b;
+  --tf-color-warning-text: #b45309;
+  --tf-color-error: #dc2626;
+  --tf-color-error-text: #dc2626;
+  --tf-color-info: #0284c7;
+  --tf-color-info-text: #0369a1;
+
+  /* Prioridade de tarefas */
+  --tf-color-priority-critical: #dc2626;
+  --tf-color-priority-high: #f97316;
+  --tf-color-priority-high-text: #c2410c;
+  --tf-color-priority-medium: #f59e0b;
+  --tf-color-priority-medium-text: #b45309;
+  --tf-color-priority-low: #22c55e;
+  --tf-color-priority-low-text: #15803d;
+
+  --tf-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --tf-radius-sm: 6px;
+  --tf-radius-md: 8px;
+  --tf-radius-lg: 12px;
+
+  --tf-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+  --tf-shadow-md: 0 4px 12px rgb(15 23 42 / 0.1);
+  --tf-shadow-lg: 0 12px 32px rgb(15 23 42 / 0.16);
+
+  --tf-duration-fast: 120ms;
+  --tf-duration-base: 200ms;
+}
+
+/*
+ * Tema escuro: explícito via <html data-theme="dark"> ou pela preferência do sistema
+ * quando o usuário não escolheu (data-theme ausente). Os dois blocos devem ser idênticos.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --tf-color-primary: #818cf8;
+    --tf-color-primary-hover: #a5b4fc;
+    --tf-color-on-primary: #0f172a;
+    --tf-color-background: #0b1120;
+    --tf-color-surface: #111827;
+    --tf-color-surface-muted: #1e293b;
+    --tf-color-sidebar: #020617;
+    --tf-color-on-sidebar: #e2e8f0;
+    --tf-color-text: #f1f5f9;
+    --tf-color-text-muted: #94a3b8;
+    --tf-color-border: #334155;
+    --tf-color-border-strong: #64748b;
+    --tf-color-focus-ring: #818cf8;
+    --tf-color-success: #4ade80;
+    --tf-color-success-text: #4ade80;
+    --tf-color-warning: #fbbf24;
+    --tf-color-warning-text: #fbbf24;
+    --tf-color-error: #f87171;
+    --tf-color-error-text: #f87171;
+    --tf-color-info: #38bdf8;
+    --tf-color-info-text: #38bdf8;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --tf-color-primary: #818cf8;
+  --tf-color-primary-hover: #a5b4fc;
+  --tf-color-on-primary: #0f172a;
+  --tf-color-background: #0b1120;
+  --tf-color-surface: #111827;
+  --tf-color-surface-muted: #1e293b;
+  --tf-color-sidebar: #020617;
+  --tf-color-on-sidebar: #e2e8f0;
+  --tf-color-text: #f1f5f9;
+  --tf-color-text-muted: #94a3b8;
+  --tf-color-border: #334155;
+  --tf-color-border-strong: #64748b;
+  --tf-color-focus-ring: #818cf8;
+  --tf-color-success: #4ade80;
+  --tf-color-success-text: #4ade80;
+  --tf-color-warning: #fbbf24;
+  --tf-color-warning-text: #fbbf24;
+  --tf-color-error: #f87171;
+  --tf-color-error-text: #f87171;
+  --tf-color-info: #38bdf8;
+  --tf-color-info-text: #38bdf8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

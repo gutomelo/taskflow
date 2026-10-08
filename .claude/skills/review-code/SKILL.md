@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: Revisa as alterações atuais do TaskFlow (diff local ou branch vs master) verificando funcionalidade, arquitetura, segurança, manutenção e testes, com achados por gravidade. Use após concluir uma tarefa de spec e antes de commit ou PR.
-argument-hint: "[base-ref (padrão: master)]"
+argument-hint: '[base-ref (padrão: master)]'
 context: fork
 agent: code-reviewer
 background: false

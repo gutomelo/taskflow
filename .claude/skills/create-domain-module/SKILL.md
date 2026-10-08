@@ -1,7 +1,7 @@
 ---
 name: create-domain-module
 description: Padroniza a criação ou extensão de um bounded context no backend do TaskFlow — limites do domínio, bibliotecas Nx por camada com tags, entidades, value objects, invariantes, contratos de repositório, casos de uso, composição e testes. Use quando uma spec aprovada introduz um contexto novo ou novas entidades num contexto.
-argument-hint: "<contexto> (ex.: tasks, projects)"
+argument-hint: '<contexto> (ex.: tasks, projects)'
 ---
 
 # Criar módulo de domínio
@@ -24,6 +24,12 @@ pnpm nx g @nx/js:library libs/backend/$0/domain --name=backend-$0-domain \
   --linter=eslint --useProjectJson=true --minimal=true \
   --tags="scope:backend,domain:$0,type:domain" --no-interactive
 ```
+
+Após gerar cada biblioteca, ajuste para o padrão do workspace (o gerador do Nx ainda emite APIs deprecadas):
+
+- `vitest.config.mts`: copie o formato de `libs/contracts/vitest.config.mts` (`resolve: { tsconfigPaths: true }`, sem `nxViteTsPaths`).
+- `tsconfig.json`: `compilerOptions: {}` (herda da base); `tsconfig.spec.json`: `types: ["vitest/globals", "node"]`.
+- `project.json`: adicione o target `typecheck` como em `libs/contracts/project.json`.
 
 Repita para `application` (`type:application`), `infrastructure` (`type:infrastructure`) e `http` (`type:presentation`). Se `domain:$0` ainda não existe em `eslint.config.mjs`, adicione a restrição `domain:$0 → [domain:$0, domain:shared]`.
 

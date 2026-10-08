@@ -7,7 +7,25 @@
   "engines": {
     "node": ">=24.15.0 <25"
   },
-  "scripts": {},
+  "scripts": {
+    "dev": "nx run-many -t serve -p api web",
+    "infra:up": "docker compose up -d --wait postgres redis",
+    "infra:down": "docker compose down",
+    "infra:ps": "docker compose ps",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "lint": "nx run-many -t lint",
+    "typecheck": "nx run-many -t typecheck",
+    "test": "nx run-many -t test",
+    "test:integration": "nx run-many -t integration-test",
+    "e2e": "nx run web-e2e:e2e",
+    "build": "nx run-many -t build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "nx run-many -t lint typecheck test build"
+  },
   "devDependencies": {
     "@angular-devkit/core": "~22.2.2",
     "@angular-devkit/schematics": "~22.2.2",

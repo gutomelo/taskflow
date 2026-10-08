@@ -1,8 +1,8 @@
 ---
 paths:
-  - "apps/api/**"
-  - "apps/worker/**"
-  - "libs/backend/**"
+  - 'apps/api/**'
+  - 'apps/worker/**'
+  - 'libs/backend/**'
 ---
 
 # Regras de backend (Express + Clean Architecture)

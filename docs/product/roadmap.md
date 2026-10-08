@@ -4,7 +4,7 @@ Legenda de status: **Concluído** · **Em andamento** · **Planejado** · **Não
 
 Regra: nenhuma fase antecipa recursos de fases posteriores sem necessidade comprovada e registrada em spec/ADR.
 
-## Fase 0 — Fundação · Em andamento
+## Fase 0 — Fundação · Concluído
 
 Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 

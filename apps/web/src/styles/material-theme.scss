@@ -1,0 +1,36 @@
+@use '@angular/material' as mat;
+
+// Tema Material 3 alinhado aos tokens do TaskFlow (ADR 0010).
+// `theme-type: color-scheme` faz o Material seguir a propriedade CSS `color-scheme`,
+// controlada por tokens.css (claro/escuro). Os overrides apontam os system tokens do
+// Material para as variáveis --tf-*, mantendo uma única fonte de cores.
+html {
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$violet-palette,
+        theme-type: color-scheme,
+      ),
+      typography: (
+        plain-family: var(--tf-font-sans),
+        brand-family: var(--tf-font-sans),
+      ),
+      density: 0,
+    ),
+    $overrides: (
+      primary: var(--tf-color-primary),
+      on-primary: var(--tf-color-on-primary),
+      background: var(--tf-color-background),
+      on-background: var(--tf-color-text),
+      surface: var(--tf-color-surface),
+      on-surface: var(--tf-color-text),
+      on-surface-variant: var(--tf-color-text-muted),
+      outline: var(--tf-color-border-strong),
+      outline-variant: var(--tf-color-border),
+      error: var(--tf-color-error),
+      corner-small: var(--tf-radius-sm),
+      corner-medium: var(--tf-radius-md),
+      corner-large: var(--tf-radius-lg)
+    )
+  );
+}

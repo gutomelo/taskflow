@@ -62,12 +62,12 @@ Uma tarefa só está concluída quando: critérios de aceitação da spec atendi
 
 ## Mapa de contexto
 
-| Preciso de… | Onde |
-| --- | --- |
-| Visão de produto e roadmap | `docs/product/vision.md`, `docs/product/roadmap.md` |
-| Arquitetura e fluxos | `docs/architecture/overview.md`, `docs/architecture/data-flow.md` |
-| Decisões registradas | `docs/architecture/adr/` |
-| Autenticação, autorização, tenancy | `docs/security/` |
-| Setup, workflow, testes, convenções | `docs/development/` |
-| Design System | `docs/design-system.md` |
-| Como agentes/skills/regras se organizam | `docs/context-engineering.md` |
+| Preciso de…                             | Onde                                                              |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| Visão de produto e roadmap              | `docs/product/vision.md`, `docs/product/roadmap.md`               |
+| Arquitetura e fluxos                    | `docs/architecture/overview.md`, `docs/architecture/data-flow.md` |
+| Decisões registradas                    | `docs/architecture/adr/`                                          |
+| Autenticação, autorização, tenancy      | `docs/security/`                                                  |
+| Setup, workflow, testes, convenções     | `docs/development/`                                               |
+| Design System                           | `docs/design-system.md`                                           |
+| Como agentes/skills/regras se organizam | `docs/context-engineering.md`                                     |

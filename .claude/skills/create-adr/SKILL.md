@@ -1,7 +1,7 @@
 ---
 name: create-adr
 description: Registra uma decisão arquitetural do TaskFlow como Architecture Decision Record numerado em docs/architecture/adr, com contexto, alternativas, decisão e consequências. Use quando uma decisão afeta estrutura, tecnologia, segurança, dados ou processo e não é trivialmente reversível, ou quando uma decisão aceita precisa ser substituída.
-argument-hint: "<título da decisão>"
+argument-hint: '<título da decisão>'
 ---
 
 # Criar ADR

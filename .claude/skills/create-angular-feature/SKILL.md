@@ -1,7 +1,7 @@
 ---
 name: create-angular-feature
 description: Padroniza a criação de uma feature Angular no TaskFlow — rota lazy, componentes standalone, estado com Signals, acesso HTTP tipado por contratos, estados de loading/vazio/erro, responsividade, acessibilidade e testes. Use ao implementar telas previstas em uma spec aprovada.
-argument-hint: "<nome-da-feature> [spec]"
+argument-hint: '<nome-da-feature> [spec]'
 ---
 
 # Criar feature Angular

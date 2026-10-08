@@ -1,10 +1,10 @@
 ---
 paths:
-  - "**/*.spec.ts"
-  - "**/*.test.ts"
-  - "**/*.integration.spec.ts"
-  - "**/vitest*.config.mts"
-  - "apps/web-e2e/**"
+  - '**/*.spec.ts'
+  - '**/*.test.ts'
+  - '**/*.integration.spec.ts'
+  - '**/vitest*.config.mts'
+  - 'apps/web-e2e/**'
 ---
 
 # Regras de testes
@@ -13,14 +13,14 @@ Referência: `docs/development/testing.md`.
 
 ## Estratégia orientada a risco
 
-| Camada | Tipo | Ferramenta | Arquivo |
-| --- | --- | --- | --- |
-| Domain | unitário puro, sem mocks de infraestrutura | Vitest | `*.spec.ts` ao lado do código |
-| Application | unitário com fakes em memória das portas | Vitest | `*.spec.ts` |
-| HTTP | contrato/controller com app real e fakes | Vitest + Supertest | `*.spec.ts` |
-| Infrastructure | integração com PostgreSQL/Redis reais | Vitest + Testcontainers | `*.integration.spec.ts` |
-| Frontend | componente/estado/formulário | Vitest (`@angular/build:unit-test`) | `*.spec.ts` |
-| Jornada | E2E | Playwright | `apps/web-e2e/src/*.spec.ts` |
+| Camada         | Tipo                                       | Ferramenta                          | Arquivo                       |
+| -------------- | ------------------------------------------ | ----------------------------------- | ----------------------------- |
+| Domain         | unitário puro, sem mocks de infraestrutura | Vitest                              | `*.spec.ts` ao lado do código |
+| Application    | unitário com fakes em memória das portas   | Vitest                              | `*.spec.ts`                   |
+| HTTP           | contrato/controller com app real e fakes   | Vitest + Supertest                  | `*.spec.ts`                   |
+| Infrastructure | integração com PostgreSQL/Redis reais      | Vitest + Testcontainers             | `*.integration.spec.ts`       |
+| Frontend       | componente/estado/formulário               | Vitest (`@angular/build:unit-test`) | `*.spec.ts`                   |
+| Jornada        | E2E                                        | Playwright                          | `apps/web-e2e/src/*.spec.ts`  |
 
 ## Regras
 

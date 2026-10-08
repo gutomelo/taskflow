@@ -53,3 +53,18 @@ Thumbs.db
 __screenshots__/
 vitest.config.*.timestamp*
 .vitest
+
+# Ambiente (segredos locais) — apenas o exemplo é versionado
+.env
+.env.*
+!.env.example
+
+# Código gerado
+libs/**/src/generated/
+
+# Playwright
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+dist/.playwright

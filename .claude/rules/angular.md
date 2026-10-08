@@ -1,8 +1,8 @@
 ---
 paths:
-  - "apps/web/**"
-  - "apps/web-e2e/**"
-  - "libs/frontend/**"
+  - 'apps/web/**'
+  - 'apps/web-e2e/**'
+  - 'libs/frontend/**'
 ---
 
 # Regras de Angular

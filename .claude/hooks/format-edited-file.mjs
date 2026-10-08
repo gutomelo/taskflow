@@ -7,7 +7,19 @@ import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 const FORMATTABLE_EXTENSIONS = new Set([
-  '.ts', '.mts', '.cts', '.js', '.mjs', '.cjs', '.json', '.html', '.css', '.scss', '.md', '.yml', '.yaml',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.html',
+  '.css',
+  '.scss',
+  '.md',
+  '.yml',
+  '.yaml',
 ]);
 
 let rawInput = '';

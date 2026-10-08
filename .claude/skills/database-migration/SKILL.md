@@ -1,7 +1,7 @@
 ---
 name: database-migration
 description: Padroniza mudanças de schema no TaskFlow com Prisma 7 e PostgreSQL — modelagem multi-tenant, compatibilidade, geração e revisão da migration, rollback/roll-forward, integridade, índices, segurança de dados e validação com testes de integração. Use ao alterar prisma/schema.prisma.
-argument-hint: "<descrição da mudança>"
+argument-hint: '<descrição da mudança>'
 ---
 
 # Migration de banco

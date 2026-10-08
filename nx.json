@@ -57,7 +57,7 @@
     },
     "@nx/esbuild:esbuild": {
       "cache": true,
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^prisma-generate"],
       "inputs": [
         "production",
         "^production",
@@ -81,14 +81,32 @@
           "runtime": "node -e \"try{console.log('pnpm major '+require('child_process').execSync('pnpm --version',{stdio:['ignore','pipe','ignore']}).toString().trim().split('.')[0])}catch{console.log('pnpm major unavailable')}\""
         }
       ]
+    },
+    "typecheck": {
+      "dependsOn": ["^prisma-generate", "prisma-generate"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["^prisma-generate", "prisma-generate"]
+    },
+    "integration-test": {
+      "dependsOn": ["^prisma-generate", "prisma-generate"]
+    },
+    "build": {
+      "dependsOn": ["^prisma-generate", "prisma-generate"]
     }
   },
   "generators": {
-    "@nx/angular:application": {
-      "e2eTestRunner": "playwright",
+    "@nx/js:library": {
+      "bundler": "none",
+      "unitTestRunner": "vitest",
       "linter": "eslint",
-      "style": "css",
-      "unitTestRunner": "vitest-angular"
+      "useProjectJson": true,
+      "minimal": true
+    },
+    "@nx/angular:component": {
+      "changeDetection": "OnPush",
+      "style": "none"
     }
   }
 }

@@ -1,7 +1,7 @@
 ---
 paths:
-  - "**/*.ts"
-  - "**/*.mts"
+  - '**/*.ts'
+  - '**/*.mts'
 ---
 
 # Regras de TypeScript

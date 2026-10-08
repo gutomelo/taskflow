@@ -7,6 +7,7 @@
       "Bash(pnpm typecheck)",
       "Bash(pnpm test)",
       "Bash(pnpm test:integration)",
+      "Bash(pnpm e2e)",
       "Bash(pnpm build)",
       "Bash(pnpm verify)",
       "Bash(pnpm format:check)",

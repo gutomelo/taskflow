@@ -37,7 +37,10 @@ O projeto exige Nx, Angular, Express, Prisma, PostgreSQL, Redis e TypeScript str
 5. **Scripts de instalação bloqueados por padrão** (`allowBuilds` em `pnpm-workspace.yaml`): liberados apenas `nx`, `@swc/core`, `prisma` e `@prisma/engines`.
 6. **Sem Husky/lint-staged**: o hook de formatação do Claude Code, o `format:check` e o CI cobrem o objetivo sem adicionar hooks Git que podem ser contornados com `--no-verify`. Reavaliar se surgirem commits mal formatados de colaboradores humanos.
 7. **`apps/worker` não criado na Fase 0**: sem filas, seria um app vazio. Nasce com a primeira fila real.
-8. **AI configs do template Nx descartadas**: o `create-nx-workspace` gerava configurações para seis ferramentas de IA e habilitava um marketplace de plugins de terceiros; mantivemos apenas a configuração própria de Claude Code em `.claude/`.
+8. **Vitest com `resolve.tsconfigPaths` nativo do Vite 8** em vez dos plugins `nxViteTsPaths`/`nxCopyAssetsPlugin` e do executor `@nx/vitest:test`, deprecados no Nx 23 e removidos no Nx 24. Novas bibliotecas geradas pelo Nx precisam desse ajuste (skill `/create-domain-module`).
+9. **Targets `prune*` removidos da API**: só funcionam no modo TS solution; o build já gera `package.json` e lockfile podados em `dist/apps/api`. O `.nxignore` reinclui o client Prisma gerado (ignorado pelo Git) para o Nx detectar `@prisma/client`.
+10. **Variáveis da API com prefixo** (`API_PORT`, `API_HOST`): o Nx injeta o `.env` em todas as tarefas e `PORT` era lida pelo dev server do Angular.
+11. **AI configs do template Nx descartadas**: o `create-nx-workspace` gerava configurações para seis ferramentas de IA e habilitava um marketplace de plugins de terceiros; mantivemos apenas a configuração própria de Claude Code em `.claude/`.
 
 ## Consequências
 

@@ -1,13 +1,15 @@
-import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
-import { NxWelcome } from './nx-welcome';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { AppShell } from './core/layout/app-shell';
 
 @Component({
-  imports: [NxWelcome, RouterModule],
   selector: 'tf-root',
-  templateUrl: './app.html',
-  styleUrl: './app.css',
+  imports: [AppShell, RouterOutlet],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <tf-app-shell>
+      <router-outlet />
+    </tf-app-shell>
+  `,
 })
-export class App {
-  protected title = 'web';
-}
+export class App {}

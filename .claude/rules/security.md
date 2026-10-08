@@ -1,15 +1,15 @@
 ---
 paths:
-  - "apps/api/**"
-  - "apps/worker/**"
-  - "libs/backend/**"
-  - "apps/web/src/app/core/**"
-  - "libs/frontend/**/auth/**"
-  - "prisma/**"
-  - ".env.example"
-  - "infra/**"
-  - "docker-compose.yml"
-  - ".github/**"
+  - 'apps/api/**'
+  - 'apps/worker/**'
+  - 'libs/backend/**'
+  - 'apps/web/src/app/core/**'
+  - 'libs/frontend/**/auth/**'
+  - 'prisma/**'
+  - '.env.example'
+  - 'infra/**'
+  - 'docker-compose.yml'
+  - '.github/**'
 ---
 
 # Regras de segurança

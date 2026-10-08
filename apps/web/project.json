@@ -20,7 +20,11 @@
             "input": "apps/web/public"
           }
         ],
-        "styles": ["apps/web/src/styles.css"]
+        "styles": [
+          "apps/web/src/styles/tokens.css",
+          "apps/web/src/styles/tailwind.css",
+          "apps/web/src/styles/material-theme.scss"
+        ]
       },
       "configurations": {
         "production": {
@@ -56,6 +60,10 @@
         "development": {
           "buildTarget": "web:build:development"
         }
+      },
+      "options": {
+        "port": 4200,
+        "proxyConfig": "apps/web/proxy.conf.json"
       }
     },
     "lint": {
@@ -75,6 +83,14 @@
         "port": 4200,
         "staticFilePath": "dist/apps/web/browser",
         "spa": true
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "options": {
+        "command": "ngc -p apps/web/tsconfig.app.json --noEmit && tsc --noEmit -p apps/web/tsconfig.spec.json"
       }
     }
   }

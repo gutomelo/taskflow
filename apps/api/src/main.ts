@@ -1,14 +1,88 @@
-import express from 'express';
+import { existsSync } from 'node:fs';
+import type { Server } from 'node:http';
+import {
+  createPostgresProbe,
+  createPrismaClient,
+  createRedisClient,
+  createRedisProbe,
+} from '@taskflow/backend/shared/infrastructure';
+import { createApp } from './app';
+import { InvalidConfigurationError, loadConfig } from './config/env';
+import { createLogger } from './http/logger';
 
-const host = process.env.HOST ?? 'localhost';
-const port = process.env.PORT ? Number(process.env.PORT) : 3333;
+// Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
 
-const app = express();
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
-app.get('/', (req, res) => {
-  res.send({ message: 'Hello API' });
-});
+function loadLocalEnvFile(): void {
+  // Em produção as variáveis vêm do orquestrador; .env é conveniência de desenvolvimento.
+  if (process.env['NODE_ENV'] !== 'production' && existsSync('.env')) {
+    process.loadEnvFile('.env');
+  }
+}
 
-app.listen(port, host, () => {
-  console.log(`[ ready ] http://${host}:${port}`);
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+    server.closeIdleConnections();
+  });
+}
+
+async function bootstrap(): Promise<void> {
+  loadLocalEnvFile();
+  const config = loadConfig(process.env);
+  const logger = await createLogger(config);
+
+  const prisma = createPrismaClient({ databaseUrl: config.databaseUrl });
+  const redis = createRedisClient({ redisUrl: config.redisUrl, connectionName: 'taskflow-api' });
+  redis.on('error', (error) => logger.warn({ err: error }, 'Redis connection error'));
+
+  const app = createApp({
+    config,
+    logger,
+    probes: [createPostgresProbe(prisma), createRedisProbe(redis)],
+  });
+
+  const server = app.listen(config.port, config.host, () => {
+    logger.info({ host: config.host, port: config.port }, 'TaskFlow API listening');
+  });
+
+  let isShuttingDown = false;
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    logger.info({ signal }, 'Shutting down');
+
+    const forceExit = setTimeout(() => {
+      logger.error('Graceful shutdown timed out; forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
+
+    const results = await Promise.allSettled([
+      closeServer(server),
+      prisma.$disconnect(),
+      // quit() envia QUIT e exige conexão ativa; sem ela, apenas descarta o cliente.
+      redis.status === 'ready' ? redis.quit() : Promise.resolve(redis.disconnect()),
+    ]);
+    const failures = results.filter((result) => result.status === 'rejected');
+    for (const failure of failures) {
+      logger.error({ err: failure.reason }, 'Error while releasing resource');
+    }
+    logger.flush();
+    process.exit(failures.length === 0 ? 0 : 1);
+  };
+
+  process.once('SIGTERM', (signal) => void shutdown(signal));
+  process.once('SIGINT', (signal) => void shutdown(signal));
+}
+
+bootstrap().catch((error: unknown) => {
+  // Logger pode não existir ainda (ex.: configuração inválida): stderr é o único canal seguro.
+  const message =
+    error instanceof InvalidConfigurationError
+      ? error.message
+      : `Falha ao iniciar a API: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`;
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
 });

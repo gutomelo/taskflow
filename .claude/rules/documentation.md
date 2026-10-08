@@ -1,8 +1,8 @@
 ---
 paths:
-  - "docs/**"
-  - "specs/**"
-  - "**/*.md"
+  - 'docs/**'
+  - 'specs/**'
+  - '**/*.md'
 ---
 
 # Regras de documentação
