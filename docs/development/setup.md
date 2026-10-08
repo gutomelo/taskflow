@@ -15,12 +15,12 @@ Nenhum serviço pago é necessário.
 ```bash
 pnpm install                 # instala dependências; scripts de build liberados em pnpm-workspace.yaml
 cp .env.example .env         # ajuste valores se necessário (nunca commite o .env)
-pnpm infra:up                # PostgreSQL 18 (porta 55432) + Redis 8 (porta 56379), só em 127.0.0.1
+pnpm infra:up                # PostgreSQL 18 (55432), Redis 8 (56379) e Mailpit (SMTP 51025, UI 58025), só em 127.0.0.1
 pnpm db:generate             # gera o Prisma Client em libs/backend/shared/infrastructure/src/generated
 pnpm dev                     # API em http://localhost:3333 e web em http://localhost:4200
 ```
 
-Abra <http://localhost:4200>: a página de status mostra a saúde da API, do PostgreSQL e do Redis.
+Abra <http://localhost:4200>: a página de status mostra a saúde da API, do PostgreSQL e do Redis. E-mails enviados em desenvolvimento aparecem no Mailpit: <http://localhost:58025>.
 
 ## Comandos
 
@@ -46,6 +46,9 @@ Abra <http://localhost:4200>: a página de status mostra a saúde da API, do Pos
 Validadas na inicialização da API (`apps/api/src/config/env.ts`); valores inválidos impedem o start com mensagem clara. Referência completa em `.env.example`.
 
 - **Não defina `PORT` no `.env`**: o Nx injeta o `.env` da raiz em todas as tarefas e o dev server do Angular passaria a usar essa porta, colidindo com a API. A API usa `API_PORT`/`API_HOST`.
+- **Segredos**: `AUTH_ACCESS_TOKEN_KEYS` (JSON `{"kid":"segredo"}`, entre aspas simples), `CSRF_SECRET` e `LOG_PSEUDONYMIZATION_KEY` exigem ≥ 32 bytes. Os valores `dev-only-…` do exemplo servem só para desenvolvimento e são recusados com `NODE_ENV=production`. Gere segredos reais com `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`.
+- **`.env` antigo**: após atualizar o projeto, compare com o `.env.example` (ou recrie com `cp .env.example .env`); a API recusa o start listando as variáveis ausentes.
+- Redis roda com `maxmemory-policy noeviction` (revogação de sessões e filas não podem perder chaves).
 - PostgreSQL e Redis do Compose usam portas **55432** e **56379** para não conflitar com instalações nativas nas portas padrão.
 - Variáveis já exportadas no shell têm precedência sobre o `.env` (útil para CI e testes pontuais).
 

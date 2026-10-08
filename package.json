@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "nx run-many -t serve -p api web",
-    "infra:up": "docker compose up -d --wait postgres redis",
+    "infra:up": "docker compose up -d --wait postgres redis mailpit",
     "infra:down": "docker compose down",
     "infra:ps": "docker compose ps",
     "db:generate": "prisma generate",

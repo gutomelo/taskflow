@@ -81,6 +81,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://taskflow:taskflow@localhost:5432/taskflow
       REDIS_URL: redis://localhost:6379
+      APP_ORIGIN: http://localhost:4200
+      # Segredos efêmeros apenas para o E2E (marcados como dev-only).
+      AUTH_ACCESS_TOKEN_KEYS: '{"ci":"dev-only-ci-access-token-key-000000000000000"}'
+      AUTH_ACCESS_TOKEN_ACTIVE_KID: ci
+      CSRF_SECRET: dev-only-ci-csrf-secret-0000000000000000000000
+      LOG_PSEUDONYMIZATION_KEY: dev-only-ci-log-key-00000000000000000000000000
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
