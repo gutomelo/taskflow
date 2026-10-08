@@ -1,0 +1,17 @@
+// Schema único do TaskFlow (modular monolith, um banco PostgreSQL).
+// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md.
+// - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.
+// - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.
+// - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).
+//
+// Fase 0: nenhum modelo ainda. O primeiro modelo nasce com a spec 001 (Identity & Access).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../libs/backend/shared/infrastructure/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}

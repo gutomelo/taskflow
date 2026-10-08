@@ -1,0 +1,9 @@
+{
+  "name": "backend-shared-infrastructure",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/shared/infrastructure/src",
+  "projectType": "library",
+  "tags": ["scope:backend", "domain:shared", "type:infrastructure"],
+  "// targets": "to see all targets run: nx show project backend-shared-infrastructure --web",
+  "targets": {}
+}
