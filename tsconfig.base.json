@@ -25,7 +25,8 @@
       "@taskflow/contracts": ["./libs/contracts/src/index.ts"],
       "@taskflow/backend/shared/infrastructure": [
         "./libs/backend/shared/infrastructure/src/index.ts"
-      ]
+      ],
+      "@taskflow/backend/shared/kernel": ["./libs/backend/shared/kernel/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
