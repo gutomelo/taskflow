@@ -23,6 +23,16 @@ export class PrismaUserRepository implements UserRepository {
     return row ? toUser(row) : null;
   }
 
+  async findByIds(ids: readonly string[]): Promise<User[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const rows = await this.transactions
+      .client()
+      .user.findMany({ where: { id: { in: [...ids] } } });
+    return rows.map(toUser);
+  }
+
   async add(user: User): Promise<void> {
     const snapshot = user.toSnapshot();
     try {

@@ -11,14 +11,14 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.spec.ts'],
     // Testes com containers rodam no target integration-test.
-    exclude: ['../../../..integration.spec.ts', '../../../..de_modules/**'],
+    exclude: ['**/*.integration.spec.ts', '**/node_modules/**'],
     passWithNoTests: true,
     reporters: ['default'],
     coverage: {
       provider: 'v8',
       reportsDirectory: '../../../../coverage/libs/backend/shared/application',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts', 'src/**/generated/**', 'src/main.ts'],
+      exclude: ['src/**/*.spec.ts', 'src/**/generated/**', 'src/main.ts', 'src/testing/**'],
     },
   },
 });

@@ -16,3 +16,14 @@ export type {
 export { ServiceBusyError } from './lib/errors/service-busy-error';
 export type { Pseudonymizer } from './lib/privacy/pseudonymizer';
 export { RateLimitedError } from './lib/errors/rate-limited-error';
+// Papéis vivem no kernel (o domínio de organizations precisa deles); reexportados aqui.
+export {
+  isOrganizationRole,
+  ORGANIZATION_ROLES,
+  type OrganizationRole,
+} from '@taskflow/backend/shared/kernel';
+export type { Tenant, TenantRequestContext } from './lib/context/tenant-request-context';
+export type {
+  SecurityEventBase,
+  SecurityEventRecorder,
+} from './lib/observability/security-event-recorder';

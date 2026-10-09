@@ -1,0 +1,73 @@
+// Bounded context: Organizations & Teams (spec 002). Tabelas pertencem exclusivamente a este contexto.
+// `user_id`, `invited_by_user_id` e `accepted_by_user_id` referenciam usuários de `identity` sem FK
+// (contextos não referenciam tabelas uns dos outros — ADR 0003).
+
+/// Papéis organizacionais (BR-021; matriz em docs/security/authorization.md).
+enum OrganizationRole {
+  owner
+  admin
+  member
+  viewer
+
+  @@map("organization_role")
+}
+
+/// Tenant (ADR 0004). Slug único e imutável (BR-022) — CHECK de formato na migration.
+model Organization {
+  id        String   @id @db.Uuid
+  name      String   @db.VarChar(80)
+  slug      String   @unique @db.VarChar(40)
+  /// Optimistic locking (BR-008). O lock de membership (FOR NO KEY UPDATE) não o altera.
+  version   Int      @default(1)
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships Membership[]
+  invitations Invitation[]
+
+  @@map("organizations")
+}
+
+/// Usuário ↔ organização. Remoção apaga a linha (histórico no log de segurança).
+model Membership {
+  id             String           @id @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  role           OrganizationRole
+  version        Int              @default(1)
+  createdAt      DateTime         @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Usado pelo middleware de tenant (uma consulta por requisição).
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+  /// Exceção documentada à regra "índices começam por organization_id": "minhas organizações".
+  @@index([userId])
+  @@map("memberships")
+}
+
+/// Convite nominal (BR-020). Token só como hash, emitido pelo worker; um aberto por e-mail (índice
+/// único parcial na migration); papel nunca owner (CHECK).
+model Invitation {
+  id               String           @id @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  email            String           @db.VarChar(254)
+  role             OrganizationRole
+  invitedByUserId  String           @map("invited_by_user_id") @db.Uuid
+  tokenHash        String?          @unique @map("token_hash") @db.Char(64)
+  /// Último evento de envio: só ele emite o token vigente.
+  deliveryEventId  String           @map("delivery_event_id") @db.Uuid
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz(3)
+  acceptedAt       DateTime?        @map("accepted_at") @db.Timestamptz(3)
+  acceptedByUserId String?          @map("accepted_by_user_id") @db.Uuid
+  revokedAt        DateTime?        @map("revoked_at") @db.Timestamptz(3)
+  createdAt        DateTime         @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("invitations")
+}

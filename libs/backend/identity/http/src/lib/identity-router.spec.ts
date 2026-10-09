@@ -438,6 +438,19 @@ describe('Identity HTTP API', () => {
       expect(created.text).toBe(existing.text);
     });
 
+    it('T2: refuses display names with invisible or bidi characters (anti-phishing)', async () => {
+      const { browser } = await setup();
+
+      const response = await browser.post('/auth/register', {
+        name: 'Suporte\u202Emoc.xe',
+        email: 'bia@exemplo.com',
+        password: 'Tr0ca-de-Senha',
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('INVALID_PERSON_NAME');
+    });
+
     it('CA-12: reports every violated password rule as structured violations (422)', async () => {
       const { browser } = await setup();
 

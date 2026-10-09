@@ -25,6 +25,9 @@ export {
 export { isUniqueConstraintViolation } from './lib/persistence/prisma-errors';
 /** Tipos das linhas do banco para os mapeadores dos repositórios (nunca saem da infraestrutura). */
 export type {
+  Invitation as InvitationRow,
+  Membership as MembershipRow,
+  Organization as OrganizationRow,
   OutboxEvent as OutboxEventRow,
   RefreshToken as RefreshTokenRow,
   Session as SessionRow,

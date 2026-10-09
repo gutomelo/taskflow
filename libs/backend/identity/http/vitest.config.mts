@@ -11,7 +11,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.spec.ts'],
     // Testes com containers rodam no target integration-test.
-    exclude: ['../../../..integration.spec.ts', '../../../..de_modules/**'],
+    exclude: ['**/*.integration.spec.ts', '**/node_modules/**'],
     passWithNoTests: true,
     reporters: ['default'],
     coverage: {

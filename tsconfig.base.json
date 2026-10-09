@@ -29,10 +29,26 @@
         "./libs/backend/identity/application/src/testing.ts"
       ],
       "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
+      "@taskflow/backend/organizations/application": [
+        "./libs/backend/organizations/application/src/index.ts"
+      ],
+      "@taskflow/backend/organizations/application/testing": [
+        "./libs/backend/organizations/application/src/testing.ts"
+      ],
+      "@taskflow/backend/organizations/domain": [
+        "./libs/backend/organizations/domain/src/index.ts"
+      ],
+      "@taskflow/backend/organizations/http": ["./libs/backend/organizations/http/src/index.ts"],
+      "@taskflow/backend/organizations/infrastructure": [
+        "./libs/backend/organizations/infrastructure/src/index.ts"
+      ],
       "@taskflow/backend/identity/infrastructure": [
         "./libs/backend/identity/infrastructure/src/index.ts"
       ],
       "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"],
+      "@taskflow/backend/shared/application/testing": [
+        "./libs/backend/shared/application/src/testing.ts"
+      ],
       "@taskflow/backend/shared/http": ["./libs/backend/shared/http/src/index.ts"],
       "@taskflow/backend/shared/infrastructure": [
         "./libs/backend/shared/infrastructure/src/index.ts"

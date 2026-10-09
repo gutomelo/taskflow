@@ -14,9 +14,12 @@ import {
   SystemClock,
   UuidV7Generator,
 } from '@taskflow/backend/shared/infrastructure';
+import { createTenantScope } from '@taskflow/backend/shared/http';
 import { createApp } from './app';
 import { loadConfig } from './config/env';
+import { createUserDirectory } from './modules/adapters/user-directory.adapter';
 import { createIdentityModule } from './modules/identity.module';
+import { createOrganizationsModule } from './modules/organizations.module';
 import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
@@ -57,24 +60,36 @@ async function bootstrap(): Promise<void> {
   });
 
   const transactions = new PrismaTransactionRunner(prisma);
-  const identity = await createIdentityModule({
-    config,
+  const shared = {
     logger,
-    redis,
     transactions,
     outbox: new PrismaOutboxWriter(transactions),
     rateLimiter: new RedisRateLimiter(redis),
     pseudonymizer: new HmacPseudonymizer(config.logPseudonymizationKey),
     idGenerator: new UuidV7Generator(),
     clock: new SystemClock(),
+  };
+  const identity = await createIdentityModule({ ...shared, config, redis });
+  const organizations = createOrganizationsModule({
+    ...shared,
+    users: createUserDirectory(identity),
+    authenticate: identity.authenticate,
+    csrf: identity.csrf,
+  });
+  // ADR 0012: `authenticate → csrf → tenantContext` uma vez sobre /organizations/:organizationId.
+  const tenantScope = createTenantScope({
+    authenticate: identity.authenticate,
+    csrf: identity.csrf,
+    resolve: organizations.resolveTenant,
+    routers: [organizations.tenantRouter],
   });
 
   const app = createApp({
     config,
     logger,
     probes: [createPostgresProbe(prisma), createRedisProbe(redis)],
-    apiRouters: [identity.router],
-    domainErrors: { ...identity.domainErrors },
+    apiRouters: [identity.router, organizations.router, tenantScope],
+    domainErrors: { ...identity.domainErrors, ...organizations.domainErrors },
     // RF-14: documentação interativa apenas fora de produção.
     ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),
   });

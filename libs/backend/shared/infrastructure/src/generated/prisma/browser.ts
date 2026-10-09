@@ -38,6 +38,22 @@ export type RefreshToken = Prisma.RefreshTokenModel
  */
 export type UserToken = Prisma.UserTokenModel
 /**
+ * Model Organization
+ * Tenant (ADR 0004). Slug único e imutável (BR-022) — CHECK de formato na migration.
+ */
+export type Organization = Prisma.OrganizationModel
+/**
+ * Model Membership
+ * Usuário ↔ organização. Remoção apaga a linha (histórico no log de segurança).
+ */
+export type Membership = Prisma.MembershipModel
+/**
+ * Model Invitation
+ * Convite nominal (BR-020). Token só como hash, emitido pelo worker; um aberto por e-mail (índice
+ * único parcial na migration); papel nunca owner (CHECK).
+ */
+export type Invitation = Prisma.InvitationModel
+/**
  * Model OutboxEvent
  * Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
  * da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.

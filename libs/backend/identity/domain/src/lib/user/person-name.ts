@@ -1,4 +1,4 @@
-import { DomainError } from '@taskflow/backend/shared/kernel';
+import { DomainError, normalizeDisplayText } from '@taskflow/backend/shared/kernel';
 
 export const PERSON_NAME_MAX_LENGTH = 100;
 
@@ -11,19 +11,18 @@ export class InvalidPersonNameError extends DomainError {
 }
 
 /**
- * Nome de exibição: NFC, espaços nas bordas removidos e sequências internas reduzidas a um,
- * 1–100 caracteres, sem caracteres de controle (evita quebras de layout e de cabeçalhos).
+ * Nome de exibição (aparece em telas e em e-mails para outras pessoas): texto exibível do
+ * kernel — NFC, espaços normalizados, 1–100 caracteres, sem controles nem formatação invisível.
  */
 export class PersonName {
   private constructor(readonly value: string) {}
 
   static create(raw: string): PersonName {
-    const normalized = raw.normalize('NFC').trim().replace(/\s+/gu, ' ');
-    const length = [...normalized].length;
-
-    if (length === 0 || length > PERSON_NAME_MAX_LENGTH || /\p{Cc}|\p{Cf}/u.test(normalized)) {
-      throw new InvalidPersonNameError();
-    }
+    const normalized = normalizeDisplayText(raw, {
+      minLength: 1,
+      maxLength: PERSON_NAME_MAX_LENGTH,
+    });
+    if (normalized === null) throw new InvalidPersonNameError();
     return new PersonName(normalized);
   }
 

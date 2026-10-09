@@ -38,3 +38,13 @@ export {
   type ApiDocumentOptions,
 } from './lib/openapi/openapi-document';
 export { createApiDocsRouter } from './lib/openapi/api-docs-router';
+export {
+  createTenantContext,
+  tenantRequestContextFrom,
+  type TenantContextOptions,
+} from './lib/tenant/tenant-context';
+export {
+  createTenantScope,
+  TENANT_PATH_PREFIX,
+  type TenantScopeOptions,
+} from './lib/tenant/tenant-scope';

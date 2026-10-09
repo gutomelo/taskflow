@@ -51,6 +51,19 @@ describe('Identity repositories (integration)', () => {
       expect(await users.findByEmail(EmailAddress.create('outra@exemplo.com'))).toBeNull();
     });
 
+    it('finds several users by id, ignoring unknown ids (UserDirectory, spec 002)', async () => {
+      const ana = buildUser('ana@exemplo.com');
+      const bruno = buildUser('bruno@exemplo.com');
+      await users.add(ana);
+      await users.add(bruno);
+      await users.add(buildUser('fora@exemplo.com'));
+
+      const found = await users.findByIds([ana.id, randomUUID(), bruno.id]);
+
+      expect(found.map((user) => user.id).sort()).toEqual([ana.id, bruno.id].sort());
+      expect(await users.findByIds([])).toEqual([]);
+    });
+
     it('BR-014: translates a duplicate email into EmailAlreadyRegisteredError', async () => {
       await users.add(buildUser('ana@exemplo.com'));
 

@@ -59,6 +59,12 @@ export {
   type ConfirmEmailVerificationDependencies,
 } from './lib/use-cases/confirm-email-verification.use-case';
 export { GetUserVerificationStatusUseCase } from './lib/use-cases/get-user-verification-status.use-case';
+export {
+  FindUserIdByEmailUseCase,
+  GetUserAccountsUseCase,
+  MAX_ACCOUNTS_PER_QUERY,
+  type UserAccountView,
+} from './lib/use-cases/user-directory.use-cases';
 export { CurrentPasswordIncorrectError } from './lib/shared/identity-errors';
 export {
   ChangePasswordUseCase,

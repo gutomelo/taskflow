@@ -26,3 +26,13 @@ export const UserTokenPurpose = {
 } as const
 
 export type UserTokenPurpose = (typeof UserTokenPurpose)[keyof typeof UserTokenPurpose]
+
+
+export const OrganizationRole = {
+  owner: 'owner',
+  admin: 'admin',
+  member: 'member',
+  viewer: 'viewer'
+} as const
+
+export type OrganizationRole = (typeof OrganizationRole)[keyof typeof OrganizationRole]

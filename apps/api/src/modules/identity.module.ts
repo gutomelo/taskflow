@@ -9,9 +9,11 @@ import type {
   TransactionRunner,
 } from '@taskflow/backend/shared/application';
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
+import type { RequestHandler } from 'express';
 import {
   createAuthenticate,
   createCsrfProtection,
+  type CsrfProtection,
   type DomainErrorMapping,
 } from '@taskflow/backend/shared/http';
 import type { PrismaTransactionRunner, Redis } from '@taskflow/backend/shared/infrastructure';
@@ -20,7 +22,9 @@ import {
   ChangePasswordUseCase,
   ConfirmEmailVerificationUseCase,
   EmailDeliveryThrottle,
+  FindUserIdByEmailUseCase,
   GetCurrentUserUseCase,
+  GetUserAccountsUseCase,
   GetUserVerificationStatusUseCase,
   ListSessionsUseCase,
   LoginUseCase,
@@ -70,8 +74,13 @@ export interface IdentityModuleDependencies {
 export interface IdentityModule {
   readonly router: Router;
   readonly domainErrors: Readonly<Record<string, DomainErrorMapping>>;
-  /** Consulta exposta a outros contextos (BR-013, spec 002). */
+  /** Sessão obrigatória e CSRF, reutilizados pelas rotas dos outros contextos (ADR 0012). */
+  readonly authenticate: RequestHandler;
+  readonly csrf: CsrfProtection;
+  /** Consultas expostas a outros contextos (BR-013; `UserDirectory` da spec 002). */
   readonly userVerificationStatus: GetUserVerificationStatusUseCase;
+  readonly userAccounts: GetUserAccountsUseCase;
+  readonly userIdByEmail: FindUserIdByEmailUseCase;
 }
 
 /** Composition root do contexto Identity & Access (spec 001). */
@@ -127,6 +136,12 @@ export async function createIdentityModule(
     if (!subject || (await revocationList.isRevoked(subject.sessionId))) return null;
     return subject;
   };
+  const csrf = createCsrfProtection({
+    appOrigin: config.appOrigin,
+    secret: config.csrfSecret,
+    secureCookie: true,
+  });
+  const authenticate = createAuthenticate({ cookieName: ACCESS_TOKEN_COOKIE, resolveActor });
 
   const router = createIdentityRouter({
     useCases: {
@@ -177,12 +192,8 @@ export async function createIdentityModule(
         securityEvents,
       }),
     },
-    csrf: createCsrfProtection({
-      appOrigin: config.appOrigin,
-      secret: config.csrfSecret,
-      secureCookie: true,
-    }),
-    authenticate: createAuthenticate({ cookieName: ACCESS_TOKEN_COOKIE, resolveActor }),
+    csrf,
+    authenticate,
     authenticateOptional: createAuthenticate({
       cookieName: ACCESS_TOKEN_COOKIE,
       resolveActor,
@@ -196,6 +207,10 @@ export async function createIdentityModule(
   return {
     router,
     domainErrors: identityErrorMappings,
+    authenticate,
+    csrf,
     userVerificationStatus: new GetUserVerificationStatusUseCase({ users }),
+    userAccounts: new GetUserAccountsUseCase({ users }),
+    userIdByEmail: new FindUserIdByEmailUseCase({ users }),
   };
 }
