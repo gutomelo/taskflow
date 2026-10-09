@@ -15,11 +15,11 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
 - Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
 
-## Fase 1 — MVP · Em andamento (spec 001 aprovada)
+## Fase 1 — MVP · Em andamento (spec 001 implementada)
 
 | Ordem | Spec                 | Conteúdo                                                                                     |
 | ----- | -------------------- | -------------------------------------------------------------------------------------------- |
-| 1     | `001-authentication` | Registro, login, logout, refresh rotativo, recuperação de senha, sessões.                    |
+| 1     | `001-authentication` | **Implementada.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.  |
 | 2     | `002-organizations`  | Organizações (tenant), membros, convites, troca de organização ativa, equipes básicas.       |
 | 3     | `006-permissions`    | Papéis, matriz de permissões, políticas por recurso, testes de isolamento.                   |
 | 4     | `003-projects`       | Projetos, membros do projeto, configurações, arquivamento.                                   |
@@ -38,6 +38,6 @@ Backlog e sprints (`007-sprints`, BR-005), dashboards e indicadores (`009-analyt
 
 ## Fase 4 — Robustez · Não iniciado
 
-`apps/worker` com BullMQ (e-mails, notificações, jobs agendados), Transactional Outbox quando justificado, OpenTelemetry (traces/métricas), testes de carga, RLS como defesa adicional (ADR 0004), CI/CD com deploy independente de web/api/worker.
+Novas filas do `apps/worker` (notificações, outros jobs agendados) — worker, BullMQ e Outbox já existem desde a spec 001 para e-mails e retenção (ADR 0011) —, OpenTelemetry (traces/métricas), testes de carga, RLS como defesa adicional (ADR 0004), CI/CD com deploy independente de web/api/worker.
 
-> Exceção prevista: se a Fase 1 exigir envio real de e-mail (recuperação de senha, convites), a spec correspondente decide entre envio síncrono com timeout ou antecipar `apps/worker` — registrando a decisão em ADR.
+> A exceção prevista aconteceu: a spec 001 antecipou `apps/worker`, BullMQ e a Outbox para os e-mails transacionais (ADR 0011).

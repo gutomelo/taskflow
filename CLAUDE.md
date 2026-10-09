@@ -6,7 +6,7 @@ SaaS multi-tenant de gestão de projetos e tarefas (referências: Jira, Linear, 
 
 - **Monorepo**: Nx 23 + pnpm 11, Node.js 24 LTS, TypeScript 6.0 (strict). Path aliases `@taskflow/*` em `tsconfig.base.json`.
 - **Frontend** `apps/web`: Angular 22 (standalone, zoneless, Signals), Angular Material/CDK, Tailwind CSS 4, Vitest, Playwright.
-- **Backend** `apps/api`: Express 5, Prisma 7 + PostgreSQL, Zod, Pino, Redis. `apps/worker` (composition root e health; filas BullMQ nas próximas tarefas). Planejados por spec: Socket.IO.
+- **Backend** `apps/api`: Express 5, Prisma 7 + PostgreSQL, Zod, Pino, Redis, JWT + refresh rotativo, Argon2id, OpenAPI 3.1. `apps/worker`: Outbox → BullMQ → SMTP e retenção diária. Planejados por spec: Socket.IO.
 - **Infra**: Docker Compose (PostgreSQL + Redis), GitHub Actions, Testcontainers.
 
 ## Arquitetura (detalhes em `docs/architecture/`)

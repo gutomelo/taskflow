@@ -90,23 +90,23 @@ Novas regras propostas (serão incorporadas a `docs/product/business-rules.md` n
 
 ## Critérios de aceitação (resumo)
 
-- [ ] CA-01 Cadastro cria conta não verificada e enfileira e-mail de verificação; e-mail chega ao Mailpit.
-- [ ] CA-02 Cadastro com e-mail existente responde igual e envia e-mail informativo.
-- [ ] CA-03 Link de verificação confirma o e-mail uma única vez, só pela própria conta autenticada; expirado/inválido falha com mensagem clara.
-- [ ] CA-04 Login correto cria sessão; credenciais erradas → 401 genérico; tempo de resposta semelhante para e-mail inexistente.
-- [ ] CA-05 Refresh rotaciona; reuso revoga a sessão; corrida legítima (mesmo cliente, ≤ 5 s, uma vez) não desloga.
-- [ ] CA-06 Expiração deslizante e absoluta respeitadas.
-- [ ] CA-07 Logout e revogação de sessão bloqueiam novas requisições daquela sessão em ≤ 1 s.
-- [ ] CA-08 Recuperação de senha completa revoga todas as sessões.
-- [ ] CA-09 Troca de senha exige a senha atual, revoga as outras sessões e rotaciona a atual.
-- [ ] CA-10 Rate limits retornam 429 com `Retry-After`.
-- [ ] CA-11 Mutação sem token CSRF ou com `Origin` estranha → 403.
-- [ ] CA-12 Política de senha (BR-011) validada no backend e refletida no formulário.
-- [ ] CA-13 E-mail não se perde se o worker estiver parado no momento do cadastro (entregue quando o worker volta).
-- [ ] CA-14 Jornada E2E: cadastro → e-mail → verificação → login → sessões → logout.
-- [ ] CA-15 OpenAPI 3.1 válido descreve todos os endpoints desta spec.
-- [ ] CA-17 Contas não verificadas há mais de 7 dias são removidas pela limpeza diária.
-- [ ] CA-16 Conta criada por terceiro com o e-mail da vítima não é verificada pelo clique da vítima (BR-017).
+- [x] CA-01 Cadastro cria conta não verificada e enfileira e-mail de verificação; e-mail chega ao Mailpit.
+- [x] CA-02 Cadastro com e-mail existente responde igual e envia e-mail informativo.
+- [x] CA-03 Link de verificação confirma o e-mail uma única vez, só pela própria conta autenticada; expirado/inválido falha com mensagem clara.
+- [x] CA-04 Login correto cria sessão; credenciais erradas → 401 genérico; tempo de resposta semelhante para e-mail inexistente.
+- [x] CA-05 Refresh rotaciona; reuso revoga a sessão; corrida legítima (mesmo cliente, ≤ 5 s, uma vez) não desloga.
+- [x] CA-06 Expiração deslizante e absoluta respeitadas.
+- [x] CA-07 Logout e revogação de sessão bloqueiam novas requisições daquela sessão em ≤ 1 s.
+- [x] CA-08 Recuperação de senha completa revoga todas as sessões.
+- [x] CA-09 Troca de senha exige a senha atual, revoga as outras sessões e rotaciona a atual.
+- [x] CA-10 Rate limits retornam 429 com `Retry-After`.
+- [x] CA-11 Mutação sem token CSRF ou com `Origin` estranha → 403.
+- [x] CA-12 Política de senha (BR-011) validada no backend e refletida no formulário.
+- [x] CA-13 E-mail não se perde se o worker estiver parado no momento do cadastro (entregue quando o worker volta).
+- [x] CA-14 Jornada E2E: cadastro → e-mail → verificação → login → sessões → logout.
+- [x] CA-15 OpenAPI 3.1 válido descreve todos os endpoints desta spec.
+- [x] CA-17 Contas não verificadas há mais de 7 dias são removidas pela limpeza diária.
+- [x] CA-16 Conta criada por terceiro com o e-mail da vítima não é verificada pelo clique da vítima (BR-017).
 
 ## Casos limite
 

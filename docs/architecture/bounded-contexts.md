@@ -1,6 +1,6 @@
 # Bounded contexts
 
-Status: todos **planejados**. Nenhum contexto de negócio implementado na Fase 0. A coluna "Spec/Fase" indica quando cada um nasce.
+Status: **Identity & Access implementado** (spec 001); os demais **planejados**. A coluna "Spec/Fase" indica quando cada um nasce.
 
 ## Mapa de contextos
 

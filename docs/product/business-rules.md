@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status de todas as regras abaixo: **Documentada / não implementada** (Fase 0). A spec que implementa cada regra está indicada.
+Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 002+); BR-011…BR-018 **implementadas e testadas** (spec 001). A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -92,7 +92,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 
 ## Identity & Access (spec 001)
 
-Status: **Aprovadas / não implementadas** (spec [001-authentication](../../specs/001-authentication/requirements.md), aprovada em 2026-10-08). Detalhes de implementação em [design.md](../../specs/001-authentication/design.md).
+Status: **Implementadas e testadas** (spec [001-authentication](../../specs/001-authentication/requirements.md)). Detalhes em [design.md](../../specs/001-authentication/design.md) e evidências em [tasks.md](../../specs/001-authentication/tasks.md). Os esclarecimentos marcados com _rev. 4_ vêm das correções da T29 e aguardam a aprovação da revisão 4 do design.
 
 ### BR-011 — Política de senha
 
@@ -108,7 +108,7 @@ Criar ou entrar em organização exige e-mail verificado (aplicado pela spec 002
 
 ### BR-014 — Não enumeração de contas
 
-Cadastro, recuperação de senha e reenvio respondem igual para e-mails existentes e inexistentes; o titular de uma conta existente recebe e-mail informativo ("você já tem conta") no lugar do link de verificação. Envios a um mesmo e-mail são limitados e o excesso é suprimido silenciosamente.
+Cadastro, recuperação de senha e reenvio respondem igual para e-mails existentes e inexistentes; o titular de uma conta existente recebe e-mail informativo ("você já tem conta") no lugar do link de verificação. Envios a um mesmo e-mail são limitados e o excesso é suprimido silenciosamente — com orçamentos separados por finalidade (verificação × recuperação), e na recuperação por endereço **e** rede de origem, para que terceiros não esgotem os links da vítima (_rev. 4_).
 
 ### BR-015 — Expiração de sessão
 
@@ -116,7 +116,7 @@ Sessão expira após 7 dias sem uso (deslizante) ou 30 dias após o login (absol
 
 ### BR-016 — Troca/redefinição de senha
 
-Trocar a senha revoga todas as outras sessões, rotaciona a sessão atual e invalida tokens de recuperação pendentes; redefinir por e-mail revoga todas as sessões e invalida tokens de recuperação pendentes.
+Trocar a senha revoga todas as outras sessões, rotaciona a sessão atual e invalida tokens de recuperação pendentes; redefinir por e-mail revoga todas as sessões e invalida tokens de recuperação pendentes. Pedidos de recuperação feitos antes da troca e ainda não processados (fila) também caducam (_rev. 4_).
 
 ### BR-017 — Confirmação de e-mail pelo titular
 
@@ -124,4 +124,4 @@ O link de verificação só confirma o e-mail quando usado por uma sessão auten
 
 ### BR-018 — Atraso progressivo de login
 
-Após 5 falhas consecutivas para uma conta, cada nova tentativa exige espera que dobra (1 s até 15 min), zerada no sucesso; sem bloqueio permanente.
+Após 5 falhas consecutivas para uma conta, cada nova tentativa exige espera que dobra (1 s até 15 min), zerada no sucesso; sem bloqueio permanente. Tentativas da mesma conta são processadas uma de cada vez; as simultâneas recebem 429, para que palpites paralelos não contornem a espera (_rev. 4_).

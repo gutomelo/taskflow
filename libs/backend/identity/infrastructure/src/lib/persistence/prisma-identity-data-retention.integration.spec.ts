@@ -165,7 +165,7 @@ describe('PrismaIdentityDataRetention (integration)', () => {
     expect(remaining.sort()).toEqual([consumedRecently, expiredRecently, pending].sort());
   });
 
-  it('removes unverified accounts older than the cutoff without recent login (RF-15)', async () => {
+  it('CA-17 / RF-15: removes unverified accounts older than the cutoff without recent activity', async () => {
     const abandoned = await user({ createdDaysAgo: 8, verified: false });
     await session(abandoned, { createdDaysAgo: 8 }); // login só no início do período
     await userToken(abandoned, { expiresAt: daysAhead(1) });

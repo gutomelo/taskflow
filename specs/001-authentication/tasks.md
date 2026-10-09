@@ -60,7 +60,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | ID  | Tarefa                                                                                                                                                     | Depende de | Verificação                                                              | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------ | ------ |
 | T29 | `/review-code` e `/security-audit` do conjunto; correções                                                                                                  | T1–T28     | sem bloqueantes / sem Críticos-Altos abertos                             | [x]    |
-| T30 | Docs: BR-011…BR-018 em `business-rules.md`; `docs/security/authentication.md`; setup (Mailpit, worker); ADRs 0005/0011 → Aceito; roadmap e índice de specs | T29        | verificação de links; `pnpm verify`, `pnpm test:integration`, `pnpm e2e` | [ ]    |
+| T30 | Docs: BR-011…BR-018 em `business-rules.md`; `docs/security/authentication.md`; setup (Mailpit, worker); ADRs 0005/0011 → Aceito; roadmap e índice de specs | T29        | verificação de links; `pnpm verify`, `pnpm test:integration`, `pnpm e2e` | [x]    |
 
 ## Evidências
 
@@ -642,3 +642,22 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **E2E**: a primeira execução da jornada CA-14 falhou numa **corrida do próprio teste**: na transição para o login, a seção "Confirmar e-mail" da página anterior casou com `getByLabel('E-mail')`, que não é exato. O teste passou a esperar o título do login e a usar rótulo exato (o mesmo no E2E dos links). **Três execuções seguidas: 17/17.**
 - **Observação de processo**: checagens intermediárias por `grep "error TS"` falhavam silenciosamente por causa dos códigos de cor; os gates sempre usaram o código de saída. As checagens passaram a remover ANSI antes de filtrar.
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 519 testes unitários; bundle inicial 337 kB); `pnpm test:integration --skip-nx-cache` ✔ (84); `pnpm e2e --skip-nx-cache` com banco descartável ✔ (17, três vezes); `pnpm format:check` ✔.
+
+### T30 — 2026-10-09
+
+- **Entregue**:
+  - **`docs/security/authentication.md` reescrito** a partir do código (antes descrevia a proposta: "JWT 10–15 min", "7–30 dias (decidir)"): credenciais (Argon2id 19.456 KiB/t=2/p=1, BR-011, não enumeração), cookies e validades, sessões e revogação, CSRF, e-mails de verificação e recuperação, tabela de limites, frontend, logs e retenção, riscos aceitos (MFA, teto de recuperação, HS256, actions por tag).
+  - **`business-rules.md`**: BR-011…BR-018 como implementadas e testadas, com os esclarecimentos da revisão 4 em BR-014, BR-016 e BR-018.
+  - **Arquitetura**: `dependency-rules.md` ganhou a seção das 4 bibliotecas de identidade (tags, aliases, conteúdo, subcaminhos de teste) e a linha atualizada da `shared/infrastructure`; `bounded-contexts.md` com identity implementado.
+  - **Roadmap**: spec 001 implementada; a exceção da Fase 1 (worker antecipado) registrada como ocorrida; a Fase 4 já não promete o que existe.
+  - **Índice de specs**: 001 "Implementado — revisão 4 do design aguarda aprovação". `CLAUDE.md`: stack do backend atualizada.
+  - **Critérios de aceite**: CA-01…CA-17 marcados em `requirements.md` e `acceptance.md`, com a tabela de evidências (arquivos de teste de cada critério); testes obrigatórios e definição de concluído marcados.
+  - ADRs 0005 e 0011 já estavam como Aceitos; conteúdo conferido, sem conflito com a revisão 4. Setup (Mailpit e worker) já estava documentado desde a T19/T28.
+- **Lacunas de teste encontradas e fechadas**:
+  - **CA-04 não tinha teste de tempo**, só de corpo de resposta. Novo `login-timing.spec.ts`: Argon2 real, 20 tentativas alternadas entre senha errada e e-mail inexistente, diferença média < 50 ms.
+  - O limite do CA (50 ms) é largo demais para Argon2 a ~10 ms nesta máquina: **pular o Argon2 para e-mail inexistente passava no teste**. O teste agora exige também que o caminho sem conta custe ≥ 70% do caminho com conta, e a mutação passou a ser detectada (proporção 0,0066). O original passou 3 vezes seguidas.
+  - CA-17 não tinha teste com o ID; o teste da RF-15 na retenção foi renomeado.
+- **Observação de processo**: a primeira tentativa de reforçar o teste de tempo **não alterou o arquivo**, porque a substituição de texto não casou depois de o Prettier reindentar, e o script não verificava. A mutação "sobreviveu" por isso. Toda substituição passou a exigir que o trecho exista (`assert`).
+- **Verificação de links**: 73 arquivos (`docs/`, `specs/`, `.claude/`, `CLAUDE.md`, `README.md`), links relativos e âncoras: nenhum quebrado além de 2 placeholders intencionais em templates (`adr/0000-template.md`, `specs/templates/technical-plan.md`).
+- **Pendente para fechar a spec**: aprovação do usuário para a revisão 4 do design.
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 520 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (84); `pnpm e2e --skip-nx-cache` com banco descartável ✔ (17); `pnpm format:check` ✔.

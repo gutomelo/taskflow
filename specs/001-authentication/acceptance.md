@@ -177,21 +177,40 @@ Então é OpenAPI 3.1 válido e descreve todos os endpoints, schemas e respostas
 
 ## Testes obrigatórios
 
-- [ ] Domínio: `Password` (BR-011), `Session.rotate` (BR-012/015), `User` (verificação, troca de senha)
-- [ ] Casos de uso com fakes: todos da tabela do design, incluindo caminhos de erro e eventos gravados
-- [ ] Integração (Testcontainers): repositórios, refresh concorrente, consumo de token concorrente, outbox relay + consumidor (Redis real)
-- [ ] HTTP (Supertest): status/contratos, cookies e seus atributos, CSRF, 401/404, rate limit
-- [ ] Frontend: formulários (validação e erros do servidor), `AuthStore`, interceptor de refresh (single-flight), guards
-- [ ] E2E: CA-14
+- [x] Domínio: `Password` (BR-011), `Session.rotate` (BR-012/015), `User` (verificação, troca de senha)
+- [x] Casos de uso com fakes: todos da tabela do design, incluindo caminhos de erro e eventos gravados
+- [x] Integração (Testcontainers): repositórios, refresh concorrente, consumo de token concorrente, outbox relay + consumidor (Redis real)
+- [x] HTTP (Supertest): status/contratos, cookies e seus atributos, CSRF, 401/404, rate limit
+- [x] Frontend: formulários (validação e erros do servidor), `AuthStore`, interceptor de refresh (single-flight), guards
+- [x] E2E: CA-14
 
 ## Evidências de validação
 
-| Critério | Evidência (comando + resultado) | Data |
-| -------- | ------------------------------- | ---- |
+| Critério | Evidência (comando + resultado)                                                                                                                                                                                                     | Data       |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| CA-01    | `identity-router.spec.ts`, `send-identity-emails.use-cases.spec.ts`, `email-delivery.integration.spec.ts` (Mailpit real) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`            | 2026-10-09 |
+| CA-02    | `identity-router.spec.ts`, `send-identity-emails.use-cases.spec.ts`, `email-delivery.integration.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                           | 2026-10-09 |
+| CA-03    | `identity-router.spec.ts`, `verify-email.page.spec.ts`, E2E `email-and-password-links.spec.ts` e `auth-journey.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`             | 2026-10-09 |
+| CA-04    | `identity-router.spec.ts` (corpo idêntico); `login-timing.spec.ts` (Argon2 real, 20 tentativas, diferença < 50 ms) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                  | 2026-10-09 |
+| CA-05    | `identity-router.spec.ts`, `refresh-session.integration.spec.ts` (PostgreSQL real, corrida e reuso) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                 | 2026-10-09 |
+| CA-06    | `identity-router.spec.ts` (7 dias de inatividade, 30 dias absolutos; navegador de teste respeita `Expires`) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                         | 2026-10-09 |
+| CA-07    | `identity-router.spec.ts`, `refresh-session.integration.spec.ts` (logout/revogação × refresh), `security.page.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`              | 2026-10-09 |
+| CA-08    | `identity-router.spec.ts`, `password.use-cases.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                                                             | 2026-10-09 |
+| CA-09    | `identity-router.spec.ts`, `security.page.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                                                                  | 2026-10-09 |
+| CA-10    | `identity-router.spec.ts`, `login.use-case.spec.ts` (BR-018, inclusive paralelo), `redis-login-attempt-tracker.integration.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md` | 2026-10-09 |
+| CA-11    | `identity-router.spec.ts`, `csrf.spec.ts`, `session-refresh.interceptor.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                                    | 2026-10-09 |
+| CA-12    | `identity-router.spec.ts`, `password.spec.ts`, `register.page.spec.ts`, E2E `auth-pages.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                    | 2026-10-09 |
+| CA-13    | `email-delivery.integration.spec.ts` (worker parado → entrega única; reprocessar não cria 2º token) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                 | 2026-10-09 |
+| CA-14    | E2E `auth-journey.spec.ts` contra web, API, worker e Mailpit reais (banco descartável) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                              | 2026-10-09 |
+| CA-15    | `openapi.spec.ts` (validado por `@readme/openapi-parser`) — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                                                           | 2026-10-09 |
+| CA-16    | `email-verification.use-cases.spec.ts`, `identity-router.spec.ts`, `verify-email.page.spec.ts`, E2E — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                 | 2026-10-09 |
+| CA-17    | `prisma-identity-data-retention.integration.spec.ts`, `maintenance.integration.spec.ts` — executado no gate da T30 (`pnpm verify`, `pnpm test:integration`, `pnpm e2e`), ver `tasks.md`                                             | 2026-10-09 |
 
 ## Definição de concluído
 
-- [ ] CA-01 a CA-17 comprovados por testes executados
-- [ ] `pnpm verify`, `pnpm test:integration` e `pnpm e2e` passando
-- [ ] `/review-code` sem bloqueantes e `/security-audit` sem achados Críticos/Altos abertos
-- [ ] BR-011…BR-016 em `docs/product/business-rules.md`; `docs/security/authentication.md` atualizado; ADRs 0005 e 0011 aceitos
+- [x] CA-01 a CA-17 comprovados por testes executados
+- [x] `pnpm verify`, `pnpm test:integration` e `pnpm e2e` passando
+- [x] `/review-code` sem bloqueantes e `/security-audit` sem achados Críticos/Altos abertos
+- [x] BR-011…BR-016 em `docs/product/business-rules.md`; `docs/security/authentication.md` atualizado; ADRs 0005 e 0011 aceitos
+
+> Pendente para fechar a spec: aprovação do usuário para a **revisão 4** do design (correções da T29).
