@@ -22,3 +22,12 @@ export {
   type Redis,
   type RedisClientOptions,
 } from './lib/cache/redis-client.factory';
+export { isUniqueConstraintViolation } from './lib/persistence/prisma-errors';
+/** Tipos das linhas do banco para os mapeadores dos repositórios (nunca saem da infraestrutura). */
+export type {
+  OutboxEvent as OutboxEventRow,
+  RefreshToken as RefreshTokenRow,
+  Session as SessionRow,
+  User as UserRow,
+  UserToken as UserTokenRow,
+} from './generated/prisma/client';

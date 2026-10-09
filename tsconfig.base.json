@@ -32,7 +32,10 @@
       ],
       "@taskflow/backend/shared/kernel": ["./libs/backend/shared/kernel/src/index.ts"],
       "@taskflow/contracts": ["./libs/contracts/src/index.ts"],
-      "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"]
+      "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
+      "@taskflow/backend/identity/infrastructure": [
+        "./libs/backend/identity/infrastructure/src/index.ts"
+      ]
     }
   },
   "exclude": ["node_modules", "tmp"]

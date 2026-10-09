@@ -42,3 +42,7 @@ export {
   type UserTokenPurpose,
   type UserTokenSnapshot,
 } from './lib/token/user-token';
+export { EmailAlreadyRegisteredError } from './lib/user/user-errors';
+export type { UserRepository } from './lib/repositories/user-repository';
+export type { SessionRepository } from './lib/repositories/session-repository';
+export type { UserTokenRepository } from './lib/repositories/user-token-repository';
