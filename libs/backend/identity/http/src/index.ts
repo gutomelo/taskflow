@@ -9,3 +9,4 @@ export {
   type SessionCredentials,
 } from './lib/session-cookies';
 export { IDENTITY_RATE_LIMITS } from './lib/identity-rate-limits';
+export { identityOpenApiPaths, identityOpenApiSchemas } from './lib/identity-openapi';

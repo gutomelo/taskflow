@@ -9,6 +9,8 @@ allowBuilds:
   # Usa binário pré-compilado (prebuilds) embarcado no pacote; dispensa compilação nativa.
   argon2: false
   '@prisma/engines': true
+  # Telemetria de instalação (dependência do swagger-ui-dist): mantida desligada.
+  '@scarf/scarf': false
   '@swc/core': true
   cpu-features: false
   esbuild: false

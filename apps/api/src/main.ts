@@ -16,6 +16,7 @@ import { createApp } from './app';
 import { InvalidConfigurationError, loadConfig } from './config/env';
 import { createLogger } from './http/logger';
 import { createIdentityModule } from './modules/identity.module';
+import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
 
@@ -69,6 +70,8 @@ async function bootstrap(): Promise<void> {
     probes: [createPostgresProbe(prisma), createRedisProbe(redis)],
     apiRouters: [identity.router],
     domainErrors: { ...identity.domainErrors },
+    // RF-14: documentação interativa apenas fora de produção.
+    ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),
   });
 
   const server = app.listen(config.port, config.host, () => {

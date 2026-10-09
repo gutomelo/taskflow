@@ -48,6 +48,7 @@
     "@nx/web": "23.3.0",
     "@nx/workspace": "23.3.0",
     "@playwright/test": "^1.63.0",
+    "@readme/openapi-parser": "^9.1.0",
     "@schematics/angular": "~22.2.2",
     "@swc-node/register": "^1.12.1",
     "@swc/core": "^1.16.13",
@@ -58,6 +59,7 @@
     "@types/node": "^24.19.1",
     "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.2.1",
+    "@types/swagger-ui-dist": "^3.30.6",
     "@typescript-eslint/utils": "^8.58.0",
     "@vitest/coverage-v8": "^4.1.11",
     "angular-eslint": "^22.1.0",
@@ -102,7 +104,9 @@
     "pino-http": "^11.0.0",
     "rate-limiter-flexible": "^11.2.1",
     "rxjs": "~7.8.0",
+    "swagger-ui-dist": "^5.33.1",
     "uuid": "^14.0.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   }
 }

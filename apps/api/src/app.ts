@@ -4,6 +4,7 @@ import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
 import type { DependencyProbe } from '@taskflow/backend/shared/infrastructure';
 import {
+  createApiDocsRouter,
   createErrorHandler,
   httpLogSerializers,
   notFoundHandler,
@@ -21,6 +22,8 @@ export interface AppDependencies {
   readonly apiRouters?: ReadonlyArray<Router>;
   /** Mapeamentos `code → HTTP` dos erros de domínio de todos os módulos. */
   readonly domainErrors?: Readonly<Record<string, DomainErrorMapping>>;
+  /** Documento OpenAPI servido em `/api/docs` — passe apenas fora de produção. */
+  readonly apiDocument?: object;
 }
 
 /**
@@ -33,6 +36,7 @@ export function createApp({
   probes,
   apiRouters = [],
   domainErrors = {},
+  apiDocument,
 }: AppDependencies): Express {
   const app = express();
 
@@ -58,6 +62,9 @@ export function createApp({
   app.use(express.json({ limit: config.jsonBodyLimit }));
 
   app.use('/health', createHealthRouter({ probes, timeoutMs: config.healthCheckTimeoutMs }));
+  if (apiDocument) {
+    app.use('/api', createApiDocsRouter(apiDocument));
+  }
   for (const router of apiRouters) {
     app.use('/api/v1', router);
   }

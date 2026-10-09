@@ -29,3 +29,12 @@ export {
   type RateLimitOptions,
 } from './lib/rate-limiting/rate-limit';
 export { httpLogSerializers } from './lib/logging/http-log-serializers';
+export {
+  createApiDocument,
+  problemResponse,
+  SECURITY,
+  SECURITY_SCHEMES,
+  type ApiDocument,
+  type ApiDocumentOptions,
+} from './lib/openapi/openapi-document';
+export { createApiDocsRouter } from './lib/openapi/api-docs-router';
