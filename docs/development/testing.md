@@ -31,7 +31,23 @@ A maior parte do valor está em **testes de domínio e de caso de uso** (rápido
 
 - Unitários: `*.spec.ts` ao lado do código, target `test` de cada projeto (Vitest; Angular via `@angular/build:unit-test`).
 - Integração: `*.integration.spec.ts`, target `integration-test` com `vitest.integration.config.mts`; containers sobem uma vez por arquivo de teste.
-- E2E: `apps/web-e2e`, target `e2e` (Playwright sobe API e web).
+- E2E: `apps/web-e2e`, target `e2e` (Playwright sobe API, worker e web; requer `pnpm infra:up`, que inclui o Mailpit).
+
+### E2E: banco descartável
+
+A jornada `auth-journey.spec.ts` (CA-14) não simula nada: cadastra um usuário de verdade, o worker envia o e-mail ao Mailpit e o teste segue o link. **Não rode contra o banco de desenvolvimento.** No CI o banco do serviço é efêmero; localmente, use um banco e um índice do Redis só para o E2E:
+
+```bash
+pnpm infra:up
+docker compose exec postgres createdb -U taskflow taskflow_e2e        # uma vez
+DATABASE_URL=postgresql://taskflow:taskflow@localhost:55432/taskflow_e2e pnpm db:deploy
+
+DATABASE_URL=postgresql://taskflow:taskflow@localhost:55432/taskflow_e2e \
+REDIS_URL=redis://localhost:56379/2 \
+pnpm e2e
+```
+
+As variáveis do shell têm precedência sobre o `.env` (o Nx não as sobrescreve). O Playwright lê o Mailpit em `MAILPIT_URL` (padrão `http://localhost:58025`). Os demais testes E2E simulam a API com `page.route` e não gravam dados. O cadastro é limitado a 5 por hora por IP: várias execuções seguidas da jornada podem receber 429; os contadores ficam no índice do Redis usado pelo E2E (`rate-limit:*`) e expiram sozinhos.
 
 ## Metas de cobertura
 
@@ -45,6 +61,10 @@ pnpm nx run <projeto>:test --coverage
 
 Os limites (`thresholds`) serão ativados por biblioteca quando cada contexto crítico for criado, para não bloquear a fundação com metas sem código.
 
-## Fase 0 (estado atual)
+## Estado atual
+
+Spec 001: unitários de domínio, aplicação, HTTP e frontend; integração com PostgreSQL, Redis e Mailpit (Testcontainers), inclusive o pipeline de e-mail do worker; E2E com jornadas simuladas e a jornada real CA-14. Evidências em `specs/001-authentication/tasks.md`.
+
+### Fase 0
 
 Implementado e executado: unitários de contratos, configuração e health da API (Supertest), componente de status do web, integração das probes de PostgreSQL/Redis com Testcontainers e um E2E de fumaça. Resultados na seção de validação de `specs/000-foundation/tasks.md`.

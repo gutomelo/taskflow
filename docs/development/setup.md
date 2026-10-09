@@ -24,22 +24,22 @@ Abra <http://localhost:4200>: a página de status mostra a saúde da API, do Pos
 
 ## Comandos
 
-| Comando                                               | O que faz                                                                                                                         |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                                            | Sobe API (watch), web (dev server com proxy `/api` e `/health` → 3333) e worker (health em `http://localhost:3334/health/ready`). |
-| `pnpm infra:up` / `pnpm infra:down` / `pnpm infra:ps` | Gerencia PostgreSQL e Redis (dados preservados em volumes).                                                                       |
-| `pnpm db:generate`                                    | Gera o Prisma Client.                                                                                                             |
-| `pnpm db:migrate`                                     | `prisma migrate dev`: cria/aplica migrations no banco local.                                                                      |
-| `pnpm db:deploy`                                      | `prisma migrate deploy`: aplica migrations pendentes (CI/produção).                                                               |
-| `pnpm db:studio`                                      | Prisma Studio.                                                                                                                    |
-| `pnpm lint`                                           | ESLint em todos os projetos (inclui limites de dependência).                                                                      |
-| `pnpm typecheck`                                      | Verificação de tipos de todos os projetos.                                                                                        |
-| `pnpm test`                                           | Testes unitários (Vitest).                                                                                                        |
-| `pnpm test:integration`                               | Testes de integração com Testcontainers (requer Docker).                                                                          |
-| `pnpm e2e`                                            | Playwright (sobe API e web automaticamente; requer `pnpm infra:up`).                                                              |
-| `pnpm build`                                          | Build de produção de todos os apps.                                                                                               |
-| `pnpm format` / `pnpm format:check`                   | Prettier.                                                                                                                         |
-| `pnpm verify`                                         | lint + typecheck + test + build — gate local antes de commit.                                                                     |
+| Comando                                               | O que faz                                                                                                                          |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                            | Sobe API (watch), web (dev server com proxy `/api` e `/health` → 3333) e worker (health em `http://localhost:3334/health/ready`).  |
+| `pnpm infra:up` / `pnpm infra:down` / `pnpm infra:ps` | Gerencia PostgreSQL e Redis (dados preservados em volumes).                                                                        |
+| `pnpm db:generate`                                    | Gera o Prisma Client.                                                                                                              |
+| `pnpm db:migrate`                                     | `prisma migrate dev`: cria/aplica migrations no banco local.                                                                       |
+| `pnpm db:deploy`                                      | `prisma migrate deploy`: aplica migrations pendentes (CI/produção).                                                                |
+| `pnpm db:studio`                                      | Prisma Studio.                                                                                                                     |
+| `pnpm lint`                                           | ESLint em todos os projetos (inclui limites de dependência).                                                                       |
+| `pnpm typecheck`                                      | Verificação de tipos de todos os projetos.                                                                                         |
+| `pnpm test`                                           | Testes unitários (Vitest).                                                                                                         |
+| `pnpm test:integration`                               | Testes de integração com Testcontainers (requer Docker).                                                                           |
+| `pnpm e2e`                                            | Playwright (sobe API, worker e web; requer `pnpm infra:up`). A jornada CA-14 grava dados: use o banco descartável de `testing.md`. |
+| `pnpm build`                                          | Build de produção de todos os apps.                                                                                                |
+| `pnpm format` / `pnpm format:check`                   | Prettier.                                                                                                                          |
+| `pnpm verify`                                         | lint + typecheck + test + build — gate local antes de commit.                                                                      |
 
 ## Variáveis de ambiente
 
@@ -60,7 +60,7 @@ Para simular produção localmente:
 docker compose --profile app up --build
 ```
 
-Sobe também `api` (imagem `infra/docker/api.Dockerfile`) e `web` (Nginx servindo o build Angular e fazendo proxy de `/api` e `/health` para a API) em <http://localhost:8080>. As migrations são aplicadas pelo serviço `migrate` antes da API iniciar.
+Sobe também `api` (imagem `infra/docker/api.Dockerfile`), `worker` (`infra/docker/worker.Dockerfile`; e-mails no Mailpit em <http://localhost:58025>) e `web` (Nginx servindo o build Angular e fazendo proxy de `/api` e `/health` para a API) em <http://localhost:8080>. As migrations são aplicadas pelo serviço `migrate` antes da API iniciar.
 
 ## Problemas comuns
 

@@ -53,7 +53,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [x]    |
 | T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [x]    |
 | T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [x]    |
-| T28 | E2E: jornada completa lendo e-mail pela API do Mailpit (CA-14); CI sobe Mailpit e worker                                                                               | T21, T25–T27 | `pnpm e2e`                                           | [ ]    |
+| T28 | E2E: jornada completa lendo e-mail pela API do Mailpit (CA-14); CI sobe Mailpit e worker                                                                               | T21, T25–T27 | `pnpm e2e`                                           | [x]    |
 
 ## Bloco F — Fechamento
 
@@ -573,3 +573,36 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Não executado**: Lighthouse em `/` e `/account/security`, que exigem sessão; a ferramenta de auditoria não simula as respostas da API. A jornada real com a API e o Mailpit é a T28.
 - **Docs**: `docs/architecture/overview.md` (Frontend → área autenticada, peças compartilhadas).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 502 testes unitários; bundle inicial 336 kB); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (16); `pnpm format:check` ✔.
+
+### T28 — 2026-10-09
+
+- **Entregue**:
+  - **Jornada CA-14** (`apps/web-e2e/src/auth-journey.spec.ts`), **sem simulações** (web, API, worker com outbox → BullMQ → SMTP, e Mailpit):
+    - cadastro ⇒ e-mail "Confirme seu e-mail no TaskFlow" no Mailpit, com saudação genérica ⇒ link com `#token=` aberto sem sessão (`needs_login`, token fora da URL) ⇒ login ⇒ volta à confirmação ⇒ clique ⇒ "E-mail confirmado";
+    - home **sem o aviso** de verificação;
+    - menu ⇒ Segurança com **1 sessão, "Esta sessão"**;
+    - logout ⇒ `/login`; `/account/security` ⇒ `/login?returnUrl=%2Faccount%2Fsecurity`.
+  - `support/mailpit.ts`: espera o e-mail por destinatário e assunto (poll de até 30 s) e extrai o link.
+  - **Playwright**: o worker entra no `webServer` (`worker:serve`, health em 3334).
+  - **CI** (`e2e`): serviço `axllent/mailpit:v1.31` com healthcheck; `APP_URL`, `SMTP_URL`, `EMAIL_FROM` e `MAILPIT_URL`; o banco do serviço é efêmero. O job `docker` constrói também `infra/docker/worker.Dockerfile`.
+  - **Imagem do worker** (`infra/docker/worker.Dockerfile`): mesma estrutura da API (deps, build, prod-deps com o `pnpm-workspace.yaml` do workspace, runtime `node:24-alpine` com usuário `node`), healthcheck em `:3334/health/live`. Serviço `worker` no perfil `app` do Compose (SMTP no Mailpit, `APP_URL` do web).
+- **Banco descartável** (decisão de execução): a jornada grava usuários reais.
+  - **Local:** rodada contra `taskflow_e2e` (criado no container local e migrado com `prisma migrate deploy`) e o índice 2 do Redis, via variáveis do shell.
+  - **Verificado no banco:** usuário de E2E verificado, 1 sessão revogada por `logout`, token consumido. **O banco de desenvolvimento tem 0 usuários de E2E.**
+  - **Documentado** em `docs/development/testing.md`.
+- **A jornada depende do sistema real**: com `SMTP_URL=smtp://localhost:1`, ela falha esperando o e-mail.
+- **Imagem**: `docker compose --profile app build worker` ✔ (208 MB, usando o cache; disco livre de 9,5 para 7,7 GB). O container rodou contra o ambiente descartável:
+  - healthcheck `healthy`;
+  - usuário `node`;
+  - `/health/ready` com PostgreSQL e Redis `up`;
+  - `docker stop` concluído dentro do prazo.
+- **Limpeza**:
+  - índice 2 do Redis: 26 chaves removidas (jobs BullMQ, inclusive o que falhou no teste com SMTP quebrado, e contadores de rate limit); restam 2 com TTL próprio;
+  - índice 0 (desenvolvimento) intocado;
+  - `taskflow_e2e` mantido como banco de E2E documentado.
+- **Pendências registradas**:
+  - o limite de cadastro (5/h por IP) pode barrar execuções locais seguidas da jornada; está documentado;
+  - o pipeline de CI só é validado quando rodar no GitHub (YAML validado localmente);
+  - imagem `taskflow-worker:latest` mantida localmente.
+- **Docs**: `docs/development/testing.md` (E2E com banco descartável, estado atual) e `docs/development/setup.md` (`pnpm e2e` e perfil `app` com worker).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 502 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` com banco descartável ✔ (17, incluindo CA-14); `pnpm format:check` ✔.

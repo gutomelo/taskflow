@@ -78,7 +78,14 @@ jobs:
         ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      # SMTP de teste da jornada CA-14: o worker entrega e o Playwright lê pela API (8025).
+      mailpit:
+        image: axllent/mailpit:v1.31
+        ports: ['1025:1025', '8025:8025']
+        options: >-
+          --health-cmd "/mailpit readyz" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
+      # Banco do serviço é efêmero: a jornada CA-14 pode gravar usuários reais.
       DATABASE_URL: postgresql://taskflow:taskflow@localhost:5432/taskflow
       REDIS_URL: redis://localhost:6379
       APP_ORIGIN: http://localhost:4200
@@ -87,6 +94,11 @@ jobs:
       AUTH_ACCESS_TOKEN_ACTIVE_KID: ci
       CSRF_SECRET: dev-only-ci-csrf-secret-0000000000000000000000
       LOG_PSEUDONYMIZATION_KEY: dev-only-ci-log-key-00000000000000000000000000
+      # Worker (iniciado pelo webServer do Playwright)
+      APP_URL: http://localhost:4200
+      SMTP_URL: smtp://localhost:1025
+      EMAIL_FROM: TaskFlow CI <nao-responda@taskflow.local>
+      MAILPIT_URL: http://localhost:8025
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -113,4 +125,5 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: docker build -f infra/docker/api.Dockerfile --target runtime -t taskflow-api:ci .
+      - run: docker build -f infra/docker/worker.Dockerfile -t taskflow-worker:ci .
       - run: docker build -f infra/docker/web.Dockerfile -t taskflow-web:ci .
