@@ -92,7 +92,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 
 ## Identity & Access (spec 001)
 
-Status: **Implementadas e testadas** (spec [001-authentication](../../specs/001-authentication/requirements.md)). Detalhes em [design.md](../../specs/001-authentication/design.md) e evidências em [tasks.md](../../specs/001-authentication/tasks.md). Os esclarecimentos marcados com _rev. 4_ vêm das correções da T29 e aguardam a aprovação da revisão 4 do design.
+Status: **Implementadas e testadas** (spec [001-authentication](../../specs/001-authentication/requirements.md)). Detalhes em [design.md](../../specs/001-authentication/design.md) e evidências em [tasks.md](../../specs/001-authentication/tasks.md). Os esclarecimentos marcados com _rev. 4_ vêm das correções da T29 (revisão 4 do design, aprovada em 2026-10-09).
 
 ### BR-011 — Política de senha
 

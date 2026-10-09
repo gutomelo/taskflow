@@ -659,5 +659,5 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
   - CA-17 não tinha teste com o ID; o teste da RF-15 na retenção foi renomeado.
 - **Observação de processo**: a primeira tentativa de reforçar o teste de tempo **não alterou o arquivo**, porque a substituição de texto não casou depois de o Prettier reindentar, e o script não verificava. A mutação "sobreviveu" por isso. Toda substituição passou a exigir que o trecho exista (`assert`).
 - **Verificação de links**: 73 arquivos (`docs/`, `specs/`, `.claude/`, `CLAUDE.md`, `README.md`), links relativos e âncoras: nenhum quebrado além de 2 placeholders intencionais em templates (`adr/0000-template.md`, `specs/templates/technical-plan.md`).
-- **Pendente para fechar a spec**: aprovação do usuário para a revisão 4 do design.
+- **Fechamento**: revisão 4 do design aprovada pelo usuário em 2026-10-09; spec 001 **concluída** (índice, roadmap e status atualizados).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 520 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (84); `pnpm e2e --skip-nx-cache` com banco descartável ✔ (17); `pnpm format:check` ✔.

@@ -1,6 +1,6 @@
 # 001 — Identity & Access (autenticação e sessões) · Requisitos
 
-- **Status**: Aprovado
+- **Status**: Concluído (2026-10-09 — critérios CA-01…CA-17 validados; evidências em [tasks.md](tasks.md) e [acceptance.md](acceptance.md))
 - **Fase do roadmap**: 1 — MVP
 - **Bounded contexts**: Identity & Access (`identity`); infraestrutura assíncrona compartilhada (outbox + worker)
 - **Autor / data**: Claude Code, 2026-10-08

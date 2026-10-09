@@ -213,4 +213,4 @@ Então é OpenAPI 3.1 válido e descreve todos os endpoints, schemas e respostas
 - [x] `/review-code` sem bloqueantes e `/security-audit` sem achados Críticos/Altos abertos
 - [x] BR-011…BR-016 em `docs/product/business-rules.md`; `docs/security/authentication.md` atualizado; ADRs 0005 e 0011 aceitos
 
-> Pendente para fechar a spec: aprovação do usuário para a **revisão 4** do design (correções da T29).
+> Revisão 4 do design (correções da T29) aprovada pelo usuário em 2026-10-09. **Spec concluída.**

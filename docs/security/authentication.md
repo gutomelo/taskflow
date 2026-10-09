@@ -1,6 +1,6 @@
 # Autenticação
 
-Status: **Implementado e testado** (spec [001-authentication](../../specs/001-authentication/requirements.md)). Decisões em [ADR 0005](../architecture/adr/0005-authentication-tokens-and-cookies.md) (tokens e cookies) e [ADR 0011](../architecture/adr/0011-early-worker-and-outbox-for-email.md) (e-mails pelo worker). Detalhes e justificativas no [design](../../specs/001-authentication/design.md); evidências de teste em [tasks.md](../../specs/001-authentication/tasks.md). Itens marcados _rev. 4_ vêm das correções da T29 e aguardam a aprovação da revisão 4 do design.
+Status: **Implementado e testado** (spec [001-authentication](../../specs/001-authentication/requirements.md)). Decisões em [ADR 0005](../architecture/adr/0005-authentication-tokens-and-cookies.md) (tokens e cookies) e [ADR 0011](../architecture/adr/0011-early-worker-and-outbox-for-email.md) (e-mails pelo worker). Detalhes e justificativas no [design](../../specs/001-authentication/design.md); evidências de teste em [tasks.md](../../specs/001-authentication/tasks.md). Itens marcados _rev. 4_ vêm das correções da T29 (revisão 4 do design, aprovada em 2026-10-09).
 
 Regras de negócio: BR-011…BR-018 em [business-rules.md](../product/business-rules.md#br-011--política-de-senha).
 

@@ -15,11 +15,11 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
 - Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
 
-## Fase 1 — MVP · Em andamento (spec 001 implementada)
+## Fase 1 — MVP · Em andamento (spec 001 concluída)
 
 | Ordem | Spec                 | Conteúdo                                                                                     |
 | ----- | -------------------- | -------------------------------------------------------------------------------------------- |
-| 1     | `001-authentication` | **Implementada.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.  |
+| 1     | `001-authentication` | **Concluída.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.     |
 | 2     | `002-organizations`  | Organizações (tenant), membros, convites, troca de organização ativa, equipes básicas.       |
 | 3     | `006-permissions`    | Papéis, matriz de permissões, políticas por recurso, testes de isolamento.                   |
 | 4     | `003-projects`       | Projetos, membros do projeto, configurações, arquivamento.                                   |

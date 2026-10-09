@@ -1,6 +1,6 @@
 # 001 — Identity & Access · Design técnico
 
-- **Status**: Aprovado (revisão 3 — decisões do usuário de 2026-10-08 sobre senhas comuns, contas não verificadas e MFA). **Revisão 4 (T29, correções da revisão de código e da auditoria de segurança) aguardando aprovação do usuário** — ver [Histórico de revisões](#histórico-de-revisões).
+- **Status**: Aprovado (revisão 3 — decisões do usuário de 2026-10-08 sobre senhas comuns, contas não verificadas e MFA). **Revisão 4 (T29, correções da revisão de código e da auditoria de segurança) aprovada pelo usuário em 2026-10-09** — ver [Histórico de revisões](#histórico-de-revisões).
 - **Requisitos**: [requirements.md](requirements.md)
 - **Revisão de arquitetura**: aprovado com ajustes → ajustes incorporados (ver [Histórico de revisões](#histórico-de-revisões))
 - **Revisão de segurança**: sem críticos; 1 alto e 6 médios → incorporados
