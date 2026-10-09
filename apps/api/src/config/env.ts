@@ -1,6 +1,11 @@
 import { z } from 'zod';
-
-const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
+import {
+  baseEnvironmentShape,
+  originSchema,
+  parseEnvironment,
+  portSchema,
+  type LogLevel,
+} from '@taskflow/backend/shared/infrastructure';
 
 const MIN_SECRET_BYTES = 32;
 
@@ -11,13 +16,6 @@ const secretSchema = z
   .string()
   .refine((value) => Buffer.byteLength(value, 'utf8') >= MIN_SECRET_BYTES, {
     message: `deve ter ao menos ${MIN_SECRET_BYTES} bytes`,
-  });
-
-/** Origem pura (esquema + host + porta), sem caminho nem barra final. */
-const originSchema = z
-  .url({ protocol: /^https?$/ })
-  .refine((value) => new URL(value).origin === value, {
-    message: 'deve ser apenas a origem, ex.: https://app.exemplo.com',
   });
 
 /** Mapa JSON `{ "kid": "segredo" }` usado para assinar e verificar access tokens. */
@@ -41,13 +39,9 @@ const accessTokenKeysSchema = z
 
 const environmentSchema = z
   .object({
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    ...baseEnvironmentShape,
     API_HOST: z.string().min(1).default('0.0.0.0'),
-    API_PORT: z.coerce.number().int().min(1).max(65_535).default(3333),
-    LOG_LEVEL: logLevelSchema.default('info'),
-    DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).describe('URL de conexão PostgreSQL'),
-    REDIS_URL: z.url({ protocol: /^rediss?$/ }).describe('URL de conexão Redis'),
-    HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(2_000),
+    API_PORT: portSchema.default(3333),
     TRUST_PROXY: z
       .union([
         z.literal('false').transform(() => false as const),
@@ -99,7 +93,7 @@ export type AppConfig = Readonly<{
   environment: 'development' | 'test' | 'production';
   host: string;
   port: number;
-  logLevel: z.infer<typeof logLevelSchema>;
+  logLevel: LogLevel;
   databaseUrl: string;
   redisUrl: string;
   healthCheckTimeoutMs: number;
@@ -113,34 +107,9 @@ export type AppConfig = Readonly<{
   passwordHashConcurrency: number;
 }>;
 
-export class InvalidConfigurationError extends Error {
-  constructor(readonly invalidVariables: ReadonlyArray<{ name: string; message: string }>) {
-    super(
-      `Configuração inválida: ${invalidVariables
-        .map(({ name, message }) => `${name} (${message})`)
-        .join(', ')}`,
-    );
-    this.name = 'InvalidConfigurationError';
-  }
-}
-
-/**
- * Único ponto do backend que lê `process.env`. Falha cedo com a lista de variáveis
- * inválidas — sem incluir os valores recebidos, que podem conter segredos.
- */
+/** Configuração da API; `main.ts` é o único ponto que lê `process.env` e a repassa aqui. */
 export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
-  const result = environmentSchema.safeParse(environment);
-
-  if (!result.success) {
-    throw new InvalidConfigurationError(
-      result.error.issues.map((issue) => ({
-        name: issue.path.join('.'),
-        message: issue.message,
-      })),
-    );
-  }
-
-  const variables = result.data;
+  const variables = parseEnvironment(environmentSchema, environment);
   return {
     environment: variables.NODE_ENV,
     host: variables.API_HOST,

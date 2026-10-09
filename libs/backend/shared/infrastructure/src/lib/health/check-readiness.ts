@@ -1,5 +1,17 @@
-import type { DependencyCheck, ReadinessReport } from '@taskflow/contracts';
-import type { DependencyProbe } from '@taskflow/backend/shared/infrastructure';
+import type { DependencyProbe } from './dependency-probe';
+
+// Tipos estruturalmente idênticos a `ReadinessReport` de `@taskflow/contracts`: a infraestrutura
+// não depende de contratos HTTP; cada app tipa a resposta com o contrato ao serializar.
+export interface DependencyCheck {
+  readonly name: string;
+  readonly status: 'up' | 'down';
+  readonly latencyMs: number;
+}
+
+export interface ReadinessReport {
+  readonly status: 'ready' | 'not_ready';
+  readonly checks: DependencyCheck[];
+}
 
 export interface ReadinessResult {
   readonly report: ReadinessReport;

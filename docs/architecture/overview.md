@@ -7,7 +7,7 @@ Estado: **Fase 0** — estrutura e fundação implementadas; módulos de negóci
 **Modular Monolith** organizado por bounded contexts, com Clean Architecture e DDD pragmático (ADR [0003](adr/0003-modular-monolith-clean-architecture.md)).
 
 - Um processo de API (Express) concentra os módulos de negócio, com limites explícitos verificados pelo Nx.
-- Um processo de worker (BullMQ) será adicionado quando houver a primeira fila real — mesmo código de módulos, outro composition root.
+- Um processo de worker (`apps/worker`) com composition root próprio, para processamento assíncrono (relay da outbox e filas BullMQ a partir da spec 001).
 - Um frontend Angular consome a API por contratos compartilhados (`libs/contracts`).
 - Um banco PostgreSQL compartilhado com isolamento lógico por `organizationId` (ADR [0004](adr/0004-multi-tenancy-shared-database.md)).
 
@@ -23,7 +23,7 @@ flowchart LR
 
     subgraph server[Backend — monólito modular]
         api["apps/api<br/>Express 5 · HTTP + Socket.IO*"]
-        worker["apps/worker*<br/>Consumidores BullMQ"]
+        worker["apps/worker<br/>Health · relay da outbox e BullMQ*"]
     end
 
     subgraph data[Dados]
@@ -39,12 +39,9 @@ flowchart LR
     worker --> pg
     worker --> redis
     api -. "jobs*" .-> redis
-
-    classDef planned stroke-dasharray: 5 5
-    class worker planned
 ```
 
-`*` = planejado. Implementado: `apps/web`, `apps/api` (health checks; módulos de negócio a partir da spec 001), PostgreSQL, Redis e Mailpit via Docker Compose. `apps/worker` é antecipado pela spec 001 (ADR [0011](adr/0011-early-worker-and-outbox-for-email.md)).
+`*` = planejado. Implementado: `apps/web`, `apps/api` (health checks; módulos de negócio a partir da spec 001), `apps/worker` (composition root, health e desligamento limpo; relay da outbox e filas em implementação na spec 001, ADR [0011](adr/0011-early-worker-and-outbox-for-email.md)), PostgreSQL, Redis e Mailpit via Docker Compose.
 
 ## Organização do monorepo
 
@@ -53,7 +50,7 @@ apps/
   api/            composition root HTTP (Express)       — implementado (fundação)
   web/            SPA Angular                            — implementado (shell + status)
   web-e2e/        testes Playwright                      — implementado
-  worker/         composition root de filas              — planejado (spec 001, tarefa T19; ADR 0011)
+  worker/         composition root de filas              — implementado (health); filas na spec 001 (T20–T22)
 libs/
   contracts/                      contratos HTTP compartilhados (Zod)        — implementado
   backend/shared/kernel/          DomainError, Clock, IdGenerator, EmailAddress — implementado
@@ -133,7 +130,7 @@ Event Sourcing e CQRS completo estão **fora** do escopo.
 | Item        | Fase 0 (implementado)                              | Planejado                                                                                                          |
 | ----------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Logs        | Pino estruturado, `requestId`, redação de segredos | `correlationId` propagado para jobs, `organizationId`/`userId` em logs autenticados                                |
-| Health      | `/health/live`, `/health/ready`                    | Healthchecks de worker                                                                                             |
+| Health      | `/health/live`, `/health/ready` (API e worker)     | Atraso da outbox e profundidade das filas no readiness do worker                                                   |
 | Métricas    | —                                                  | Latência p50/p95/p99, taxa de erro, throughput, filas, conexões WebSocket (OpenTelemetry, Fase 4)                  |
 | Tracing     | —                                                  | OpenTelemetry SDK com exportação OTLP opcional (Fase 4)                                                            |
 | Performance | Limite de payload JSON, timeouts de probe          | Paginação por cursor, índices por `organization_id`, prevenção de N+1, debounce de busca, cache apenas com medição |

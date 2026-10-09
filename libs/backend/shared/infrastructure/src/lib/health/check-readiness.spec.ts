@@ -1,4 +1,4 @@
-import type { DependencyProbe } from '@taskflow/backend/shared/infrastructure';
+import type { DependencyProbe } from './dependency-probe';
 import { checkReadiness } from './check-readiness';
 
 const healthyProbe = (name: string): DependencyProbe => ({ name, check: async () => undefined });

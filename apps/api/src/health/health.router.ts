@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import type { LivenessReport } from '@taskflow/contracts';
-import type { DependencyProbe } from '@taskflow/backend/shared/infrastructure';
-import { checkReadiness } from './check-readiness';
+import type { LivenessReport, ReadinessReport } from '@taskflow/contracts';
+import { checkReadiness, type DependencyProbe } from '@taskflow/backend/shared/infrastructure';
 
 export interface HealthRouterDependencies {
   readonly probes: ReadonlyArray<DependencyProbe>;
@@ -26,7 +25,7 @@ export function createHealthRouter({ probes, timeoutMs }: HealthRouterDependenci
     response
       .status(report.status === 'ready' ? 200 : 503)
       .set('Cache-Control', 'no-store')
-      .json(report);
+      .json(report satisfies ReadinessReport);
   });
 
   return router;

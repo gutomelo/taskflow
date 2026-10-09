@@ -4,8 +4,10 @@ import {
   createPostgresProbe,
   createPrismaClient,
   createRedisClient,
+  createLogger,
   createRedisProbe,
   HmacPseudonymizer,
+  InvalidConfigurationError,
   PrismaOutboxWriter,
   PrismaTransactionRunner,
   RedisRateLimiter,
@@ -13,8 +15,7 @@ import {
   UuidV7Generator,
 } from '@taskflow/backend/shared/infrastructure';
 import { createApp } from './app';
-import { InvalidConfigurationError, loadConfig } from './config/env';
-import { createLogger } from './http/logger';
+import { loadConfig } from './config/env';
 import { createIdentityModule } from './modules/identity.module';
 import { createTaskflowApiDocument } from './openapi';
 
@@ -39,7 +40,11 @@ function closeServer(server: Server): Promise<void> {
 async function bootstrap(): Promise<void> {
   loadLocalEnvFile();
   const config = loadConfig(process.env);
-  const logger = await createLogger(config);
+  const logger = await createLogger({
+    service: 'taskflow-api',
+    environment: config.environment,
+    level: config.logLevel,
+  });
 
   const prisma = createPrismaClient({ databaseUrl: config.databaseUrl });
   const redis = createRedisClient({ redisUrl: config.redisUrl, connectionName: 'taskflow-api' });

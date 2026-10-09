@@ -32,3 +32,17 @@ export type {
   UserToken as UserTokenRow,
 } from './generated/prisma/client';
 export { HmacPseudonymizer } from './lib/privacy/hmac-pseudonymizer';
+export {
+  checkReadiness,
+  type DependencyCheck,
+  type ReadinessReport,
+  type ReadinessResult,
+} from './lib/health/check-readiness';
+export { createLogger, type LoggerOptions, type LogLevel } from './lib/logging/create-logger';
+export {
+  baseEnvironmentShape,
+  InvalidConfigurationError,
+  originSchema,
+  parseEnvironment,
+  portSchema,
+} from './lib/config/environment';

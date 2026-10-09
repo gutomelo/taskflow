@@ -6,7 +6,7 @@ SaaS multi-tenant de gestão de projetos e tarefas (referências: Jira, Linear, 
 
 - **Monorepo**: Nx 23 + pnpm 11, Node.js 24 LTS, TypeScript 6.0 (strict). Path aliases `@taskflow/*` em `tsconfig.base.json`.
 - **Frontend** `apps/web`: Angular 22 (standalone, zoneless, Signals), Angular Material/CDK, Tailwind CSS 4, Vitest, Playwright.
-- **Backend** `apps/api`: Express 5, Prisma 7 + PostgreSQL, Zod, Pino, Redis. Planejados por spec: JWT + refresh rotativo, Argon2id, BullMQ (`apps/worker`), Socket.IO, OpenAPI 3.1.
+- **Backend** `apps/api`: Express 5, Prisma 7 + PostgreSQL, Zod, Pino, Redis. `apps/worker` (composition root e health; filas BullMQ nas próximas tarefas). Planejados por spec: Socket.IO.
 - **Infra**: Docker Compose (PostgreSQL + Redis), GitHub Actions, Testcontainers.
 
 ## Arquitetura (detalhes em `docs/architecture/`)
@@ -47,7 +47,7 @@ pnpm install                    # dependências (scripts de build liberados em p
 pnpm infra:up                   # PostgreSQL + Redis via Docker Compose
 pnpm db:generate                # gera o Prisma Client
 pnpm db:migrate                 # cria/aplica migrations em desenvolvimento
-pnpm dev                        # API (3333) + web (4200)
+pnpm dev                        # API (3333) + web (4200) + worker (health 3334)
 pnpm lint | pnpm typecheck | pnpm test | pnpm build
 pnpm test:integration           # Testcontainers (requer Docker)
 pnpm e2e                        # Playwright

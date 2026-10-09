@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
-import { InvalidConfigurationError, loadConfig } from './env';
+import { InvalidConfigurationError } from '@taskflow/backend/shared/infrastructure';
+import { loadConfig } from './env';
 
 const accessTokenSecret = 'k'.repeat(43);
 

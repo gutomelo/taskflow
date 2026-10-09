@@ -8,7 +8,7 @@
     "node": ">=24.15.0 <25"
   },
   "scripts": {
-    "dev": "nx run-many -t serve -p api web",
+    "dev": "nx run-many -t serve -p api web worker",
     "infra:up": "docker compose up -d --wait postgres redis mailpit",
     "infra:down": "docker compose down",
     "infra:ps": "docker compose ps",
