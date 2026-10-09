@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
-import { currentUserSchema, type CurrentUser } from '@taskflow/contracts';
+import type { CurrentUser, LoginRequest, RegisterRequest } from '@taskflow/contracts';
+import { ContractViolationError, isCurrentUser } from '../http/contract-guards';
 
 /** Tempo máximo do refresh: uma resposta presa não pode segurar o lock entre abas. */
 const REFRESH_TIMEOUT_MS = 10_000;
@@ -12,6 +13,8 @@ export const AUTH_API_PATHS = {
   csrf: '/api/v1/auth/csrf',
   refresh: '/api/v1/auth/refresh',
   currentUser: '/api/v1/me',
+  login: '/api/v1/auth/login',
+  register: '/api/v1/auth/register',
 } as const;
 
 /** Chamadas HTTP da sessão (contratos em `@taskflow/contracts`). */
@@ -27,10 +30,21 @@ export class AuthApi {
   }
 
   async currentUser(): Promise<CurrentUser> {
-    const body = await firstValueFrom(
+    const body: unknown = await firstValueFrom(
       this.http.get(AUTH_API_PATHS.currentUser).pipe(timeout(BOOTSTRAP_TIMEOUT_MS)),
     );
-    return currentUserSchema.parse(body);
+    return expectCurrentUser(body, AUTH_API_PATHS.currentUser);
+  }
+
+  /** Abre a sessão (cookies HttpOnly) e devolve o usuário; a API reemite o cookie CSRF. */
+  async login(request: LoginRequest): Promise<CurrentUser> {
+    const body: unknown = await firstValueFrom(this.http.post(AUTH_API_PATHS.login, request));
+    return expectCurrentUser(body, AUTH_API_PATHS.login);
+  }
+
+  /** 202 sempre que os dados são válidos, exista ou não conta com o e-mail (BR-014). */
+  register(request: RegisterRequest): Promise<void> {
+    return firstValueFrom(this.http.post<void>(AUTH_API_PATHS.register, request));
   }
 
   refreshSession(): Promise<void> {
@@ -38,4 +52,9 @@ export class AuthApi {
       this.http.post<void>(AUTH_API_PATHS.refresh, null).pipe(timeout(REFRESH_TIMEOUT_MS)),
     );
   }
+}
+
+function expectCurrentUser(body: unknown, endpoint: string): CurrentUser {
+  if (!isCurrentUser(body)) throw new ContractViolationError(endpoint);
+  return body;
 }

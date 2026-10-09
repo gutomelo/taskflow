@@ -50,7 +50,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------- | ------ |
 | T23 | Fonte Inter auto-hospedada; `Referrer-Policy: no-referrer` e CSP restrita (Nginx e dev server); `/status` movida                                                       | —            | build; headers verificados                           | [x]    |
 | T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [x]    |
-| T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [ ]    |
+| T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [x]    |
 | T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [ ]    |
 | T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [ ]    |
 | T28 | E2E: jornada completa lendo e-mail pela API do Mailpit (CA-14); CI sobe Mailpit e worker                                                                               | T21, T25–T27 | `pnpm e2e`                                           | [ ]    |
@@ -437,3 +437,56 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Correção de evidências anteriores**: os totais de testes unitários informados de T19 a T23 foram somados de uma saída com códigos ANSI e **omitiam os 6 testes do web**, que foram executados e passaram. Os totais corretos eram 6 a mais.
 - **Docs**: `docs/architecture/overview.md` (Frontend → Sessão).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 420 testes unitários, web incluído); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (7); `pnpm format:check` ✔.
+
+### T25 — 2026-10-09
+
+- **Entregue** (`apps/web/src/app/features/auth`, rotas `/login` e `/register` com `guestGuard`):
+  - **Login**:
+    - Reactive Form tipado, com validação no cliente e foco no primeiro campo inválido;
+    - sucesso ⇒ `AuthStore.signIn` e navegação para o `safeReturnUrl`;
+    - `INVALID_CREDENTIALS` ⇒ alerta genérico focado, sem dizer qual campo, e senha limpa;
+    - `RATE_LIMITED` ⇒ tempo do `Retry-After` (BR-018); rede, `SERVICE_BUSY` e CSRF com mensagens próprias;
+    - "Mostrar senha" com `aria-pressed`;
+    - link para o cadastro preservando `returnUrl`.
+  - **Cadastro**:
+    - a política de senha é validador do campo, revalidado quando o e-mail muda (`same_as_email`);
+    - `tf-password-requirements` (**CA-12**): lista atualizada a cada tecla, com ícone e texto de estado (não só cor); resumo anunciado num `aria-live` com debounce de 700 ms; `aria-describedby` no campo;
+    - 422 `PASSWORD_POLICY_VIOLATION` ⇒ regras recusadas pelo servidor (inclusive `common_password`, que só o backend conhece) viram erro do campo até a próxima edição;
+    - 202 ⇒ a mesma confirmação "Confira seu e-mail" para endereço novo ou existente (**BR-014**), com foco na mensagem.
+  - `password-policy.ts`: espelho de BR-011 com as mesmas regras do domínio (NFC, code points, categorias Unicode, símbolo = não letra/número/espaço).
+  - `auth.messages.ts`: textos pt-BR e `commonErrorMessage` por `code`.
+  - `core/http/api-problem.ts` (`toApiProblem`).
+  - `AuthApi.login`/`register`.
+- **Problema encontrado e corrigido: bundle inicial**:
+  - Desde a T24, o `AuthApi` importava `currentUserSchema` e trazia o Zod para o bundle inicial: **753 kB**, acima do orçamento de 500 kB. O build só emite _warning_, e **o relatório da T24 não percebeu**.
+  - Medido com `--stats-json`: o Zod respondia por 494 kB do `main`.
+  - Correção:
+    - contratos no web **só como tipos**;
+    - guards de forma em `core/http/contract-guards.ts` (`isCurrentUser`, `isProblemDetails`, `ContractViolationError`);
+    - regra `no-restricted-imports` (`allowTypeImports`) no `apps/web/eslint.config.mjs`.
+  - Resultado: **323 kB** (86 kB gzip), sem warning.
+- **Testes** (web: 57 → 95):
+  - `password-policy` 8;
+  - `contract-guards` 10;
+  - `api-problem` 3;
+  - login 7: validação e foco, sucesso com `returnUrl`, `returnUrl` externo ignorado, credenciais inválidas sem refresh, `Retry-After`, rede, visibilidade da senha;
+  - cadastro 10: requisitos em tempo real, estado em texto, **anúncio só após pausa**, `aria-describedby`, `same_as_email` visual, **troca de e-mail bloqueia o envio**, senha fraca no cliente, confirmação BR-014, `common_password` do servidor, `VALIDATION_FAILED`.
+- **E2E** (`auth-pages.spec.ts`, +5; envios com respostas simuladas para não gravar no banco local):
+  - cadastro com requisitos ao vivo e confirmação focada, sem violações de CSP;
+  - senha fraca barrada no cliente;
+  - login com alerta focado e sem violações de CSP;
+  - login com `returnUrl`;
+  - link de cadastro preservando `returnUrl`.
+- **Acessibilidade** (Lighthouse, mobile, dev server): `/register` e `/login` com **Accessibility 100**. Único item reprovado: `errors-in-console`, que são os 401 esperados do bootstrap anônimo (`/me` e refresh, T24).
+- **Mutation testing** (diff confirmado; arquivos restaurados e conferidos com `grep`), 8 de 8 detectadas:
+  - ignorar recusa do servidor ⇒ 1 falha;
+  - anúncio sem debounce ⇒ **sobreviveu à primeira versão do teste**; o teste foi reforçado (nada anunciado 200 ms após digitar) e passou a detectar;
+  - sem revalidar a senha ao mudar o e-mail ⇒ 4 falhas;
+  - manter a senha após erro ⇒ 1 falha;
+  - `returnUrl` sem validação ⇒ 1 falha;
+  - espaço contado como símbolo ⇒ 1 falha;
+  - contar unidades UTF-16 ⇒ 1 falha;
+  - import de valor de `@taskflow/contracts` ⇒ erro de lint.
+- **Pendente (tarefas seguintes)**: link "Esqueci minha senha" (rota na T26); home autenticada (T27; hoje `/` leva a `/status`); jornada real com Mailpit (T28).
+- **Docs**: `docs/architecture/overview.md` (Frontend: contratos só como tipos; telas de visitante).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 458 testes unitários; bundle inicial 323 kB); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (12); `pnpm format:check` ✔.
