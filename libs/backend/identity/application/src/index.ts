@@ -82,3 +82,24 @@ export {
   remainingLoginDelaySeconds,
   requiredLoginDelaySeconds,
 } from './lib/shared/progressive-login-delay';
+export type {
+  IdentityEmailRecipient,
+  IdentityEmailTemplates,
+} from './lib/ports/identity-email-templates';
+export type { EmailDeliveryOutcome } from './lib/shared/identity-email-links';
+export {
+  SendEmailVerificationUseCase,
+  type SendEmailVerificationCommand,
+  type SendEmailVerificationDependencies,
+} from './lib/use-cases/send-email-verification.use-case';
+export {
+  SendPasswordResetUseCase,
+  type SendPasswordResetCommand,
+  type SendPasswordResetDependencies,
+} from './lib/use-cases/send-password-reset.use-case';
+export {
+  SendAccountNoticeUseCase,
+  type AccountNotice,
+  type SendAccountNoticeCommand,
+  type SendAccountNoticeDependencies,
+} from './lib/use-cases/send-account-notice.use-case';

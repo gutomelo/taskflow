@@ -63,6 +63,14 @@
       "options": {
         "command": "tsc --noEmit -p apps/worker/tsconfig.app.json && tsc --noEmit -p apps/worker/tsconfig.spec.json"
       }
+    },
+    "integration-test": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "vitest run --config vitest.integration.config.mts",
+        "cwd": "{projectRoot}"
+      }
     }
   }
 }

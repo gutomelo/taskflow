@@ -23,3 +23,4 @@ export {
   LOGIN_FAILURE_TTL_SECONDS,
   RedisLoginAttemptTracker,
 } from './lib/security/redis-login-attempt-tracker';
+export { ptBrIdentityEmailTemplates } from './lib/email/pt-br-identity-email-templates';

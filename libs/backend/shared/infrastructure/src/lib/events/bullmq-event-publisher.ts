@@ -40,8 +40,16 @@ export const OUTBOX_JOB_OPTIONS = {
  * (`maxRetriesPerRequest: 1`, sem fila offline), como a documentação do BullMQ recomenda
  * para produtores: com Redis fora, a publicação falha e o relay tenta no próximo ciclo.
  */
-export function createEventQueue(name: string, connection: Redis): Queue<OutboxJobData> {
-  return new Queue<OutboxJobData>(name, { connection, defaultJobOptions: OUTBOX_JOB_OPTIONS });
+export function createEventQueue(
+  name: string,
+  connection: Redis,
+  /** Sobrescritas pontuais (ex.: backoff curto em testes); o padrão é `OUTBOX_JOB_OPTIONS`. */
+  jobOptions: JobsOptions = {},
+): Queue<OutboxJobData> {
+  return new Queue<OutboxJobData>(name, {
+    connection,
+    defaultJobOptions: { ...OUTBOX_JOB_OPTIONS, ...jobOptions },
+  });
 }
 
 /** Roteia cada tipo de evento para a sua fila BullMQ, com `jobId = event.id` (deduplicação). */

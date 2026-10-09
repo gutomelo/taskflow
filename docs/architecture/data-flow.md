@@ -105,7 +105,7 @@ Clientes nunca alteram estado via socket; o socket apenas distribui o resultado 
 
 ## 4. Comunicação assíncrona
 
-**Implementado (spec 001, ADR [0011](adr/0011-early-worker-and-outbox-for-email.md))**: Transactional Outbox para e-mails transacionais. O consumidor da fila `emails` está em implementação (T21).
+**Implementado (spec 001, ADR [0011](adr/0011-early-worker-and-outbox-for-email.md))**: Transactional Outbox para e-mails transacionais, do caso de uso na API até o SMTP.
 
 ```mermaid
 sequenceDiagram
@@ -113,6 +113,8 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant R as OutboxRelay (apps/worker)
     participant Q as BullMQ (fila emails)
+    participant C as Consumidor (apps/worker)
+    participant M as SMTP
 
     UC->>DB: alteração + INSERT outbox_events (mesma transação)
     loop a cada 1 s; lotes cheios em sequência
@@ -120,11 +122,16 @@ sequenceDiagram
         R->>Q: addBulk (jobId = id do evento)
         R->>DB: UPDATE published_at · COMMIT
     end
+    Q->>C: job (até 5 tentativas, backoff exponencial de 5 s)
+    C->>DB: upsert do token por evento (hash; novo a cada tentativa)
+    C->>M: e-mail pt-BR com link APP_URL/…#token=…
 ```
 
 - Relays concorrentes recebem lotes disjuntos (`SKIP LOCKED`). Se o commit falhar depois da publicação, o lote é republicado e o BullMQ ignora o `jobId` repetido, que fica retido por 24 h após a conclusão.
 - O relay só lê os tipos que sabe rotear. Um evento de um produtor mais novo fica pendente até um worker que o conheça, sem bloquear os demais.
 - Com o Redis indisponível, o lote falha, a transação é desfeita e o relay tenta de novo no ciclo seguinte.
+- O consumidor valida cada job com Zod. Job inválido falha sem retry (`UnrecoverableError`); falha de SMTP volta para a fila. Como o token é regravado a cada tentativa, só o link do último envio funciona, e um evento reprocessado nunca gera um segundo token. Se o link do evento já foi usado, o reenvio é descartado (não se envia link morto).
+- Avisos sem token (cadastro com e-mail existente, senha alterada) podem, raramente, chegar duplicados: entrega pelo menos uma vez.
 
 **Planejado (Fase 2–4)**: eventos em processo para Socket.IO e as demais filas.
 

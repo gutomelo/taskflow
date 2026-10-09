@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import type {
+  EmailMessage,
+  EmailSender,
   IntegrationEvent,
   OutboxWriter,
   Pseudonymizer,
@@ -28,6 +30,7 @@ import {
   type SessionSnapshot,
   type UserRepository,
   type UserSnapshot,
+  type UserTokenIssueResult,
   type UserTokenPurpose,
   type UserTokenRepository,
   type UserTokenSnapshot,
@@ -39,6 +42,10 @@ import type {
   AccessTokenVerifyOptions,
   IssuedAccessToken,
 } from '../lib/ports/access-tokens';
+import type {
+  IdentityEmailRecipient,
+  IdentityEmailTemplates,
+} from '../lib/ports/identity-email-templates';
 import type { LoginAttemptTracker, LoginFailureState } from '../lib/ports/login-attempt-tracker';
 import type { SecurityEvent, SecurityEventRecorder } from '../lib/ports/security-event-recorder';
 import type { SessionRevocationList } from '../lib/ports/session-revocation-list';
@@ -216,7 +223,7 @@ export class InMemoryUserTokenRepository implements UserTokenRepository, Transac
     this.rows = state as Map<string, UserTokenSnapshot>;
   }
 
-  async upsertForEvent(token: UserToken) {
+  async upsertForEvent(token: UserToken): Promise<UserTokenIssueResult> {
     const snapshot = token.toSnapshot();
     const existing = [...this.rows.values()].find(
       (row) => row.sourceEventId === snapshot.sourceEventId,
@@ -228,9 +235,10 @@ export class InMemoryUserTokenRepository implements UserTokenRepository, Transac
         tokenHash: snapshot.tokenHash,
         expiresAt: snapshot.expiresAt,
       });
-      return;
+      return existing.consumedAt === null ? 'issued' : 'already_consumed';
     }
     this.rows.set(snapshot.id, snapshot);
+    return 'issued';
   }
   async consume(
     tokenHash: string,
@@ -321,6 +329,52 @@ export class FakeSecretTokens implements SecretTokenGenerator {
   hash(token: string) {
     return createHash('sha256').update(token).digest('hex');
   }
+}
+
+/** Grava as mensagens enviadas; `failNext(n)` simula falhas de SMTP (o job faria retry). */
+export class RecordingEmailSender implements EmailSender {
+  readonly sent: EmailMessage[] = [];
+  readonly attempted: EmailMessage[] = [];
+  private failuresLeft = 0;
+
+  failNext(times = 1) {
+    this.failuresLeft = times;
+  }
+  async send(message: EmailMessage) {
+    this.attempted.push(message);
+    if (this.failuresLeft > 0) {
+      this.failuresLeft -= 1;
+      throw new Error('SMTP unavailable');
+    }
+    this.sent.push(message);
+  }
+}
+
+/** Templates que expõem os dados recebidos (o texto real é testado na infraestrutura). */
+export const fakeIdentityEmailTemplates: IdentityEmailTemplates = {
+  emailVerification: ({ recipient, link, validForHours }) =>
+    fakeMessage(recipient, 'emailVerification', { link, validForHours }),
+  passwordReset: ({ recipient, link, validForMinutes }) =>
+    fakeMessage(recipient, 'passwordReset', { link, validForMinutes }),
+  accountAlreadyExists: ({ recipient, loginLink, forgotPasswordLink }) =>
+    fakeMessage(recipient, 'accountAlreadyExists', { loginLink, forgotPasswordLink }),
+  passwordChanged: ({ recipient, forgotPasswordLink }) =>
+    fakeMessage(recipient, 'passwordChanged', { forgotPasswordLink }),
+};
+
+function fakeMessage(
+  recipient: IdentityEmailRecipient,
+  template: string,
+  data: Record<string, unknown>,
+): EmailMessage {
+  const text = JSON.stringify({ template, name: recipient.name, ...data });
+  return { to: recipient.email, subject: template, text, html: text };
+}
+
+/** Lê o JSON gravado por `fakeIdentityEmailTemplates`. */
+export function readFakeEmail(message: EmailMessage | undefined): Record<string, unknown> {
+  if (!message) throw new Error('No email was sent');
+  return JSON.parse(message.text) as Record<string, unknown>; // gerado por fakeMessage acima
 }
 
 /** Tokens legíveis com expiração real pelo relógio do teste (15 min), como o JWT. */
@@ -434,6 +488,9 @@ export function createIdentityTestbed() {
     securityEvents: new RecordingSecurityEvents(),
     loginAttempts: new InMemoryLoginAttemptTracker(),
     pseudonymizer: fakePseudonymizer,
+    emailSender: new RecordingEmailSender(),
+    templates: fakeIdentityEmailTemplates,
+    appUrl: 'https://app.taskflow.test',
     commonPasswords: { contains: (password: string) => password.toLowerCase() === 'password1!' },
   };
 }

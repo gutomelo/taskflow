@@ -41,7 +41,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | T19 | `apps/worker`: composition root, health (`WORKER_PORT`), graceful shutdown, `pnpm dev` sobe api + web + worker                                                                             | T5            | teste de health; start/stop limpo                                                                                                   | [x]    |
 | T20 | `OutboxRelay` (SKIP LOCKED, `addBulk` com `jobId`, `removeOnComplete` por idade)                                                                                                           | T19, T9       | integração PostgreSQL + Redis: publica uma vez; dois relays concorrentes não duplicam                                               | [x]    |
-| T21 | Casos de uso `SendEmailVerification`, `SendPasswordReset`, `SendAccountNotice` + templates pt-BR (sem conteúdo do usuário em contas não verificadas; HTML escapado) + mapeamento no worker | T20, T14, T15 | integração: e-mail no Mailpit; retry após falha SMTP gera novo link válido; worker parado → entrega ao voltar (CA-01, CA-02, CA-13) | [ ]    |
+| T21 | Casos de uso `SendEmailVerification`, `SendPasswordReset`, `SendAccountNotice` + templates pt-BR (sem conteúdo do usuário em contas não verificadas; HTML escapado) + mapeamento no worker | T20, T14, T15 | integração: e-mail no Mailpit; retry após falha SMTP gera novo link válido; worker parado → entrega ao voltar (CA-01, CA-02, CA-13) | [x]    |
 | T22 | `PurgeExpiredIdentityData` agendado (diário), incluindo contas não verificadas há > 7 dias (RF-15)                                                                                         | T19           | integração com dados expirados                                                                                                      | [ ]    |
 
 ## Bloco E — Frontend
@@ -283,3 +283,38 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Docs**: `docs/architecture/data-flow.md` (seção 4: fluxo implementado da outbox, garantias e falhas; antes estava como "Fase 4 — se justificado") e `docs/architecture/overview.md` (Backend → Outbox).
 - **Pendente**: consumidor da fila `emails` (T21); métrica do atraso da outbox (Fase 4). Com o Redis fora, o relay registra um `error` por segundo; o alerta e a métrica ficam para a Fase 4.
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 334 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (64); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.
+
+### T21 — 2026-10-09
+
+- **Entregue**:
+  - **Aplicação**: `SendEmailVerificationUseCase`, `SendPasswordResetUseCase` e `SendAccountNoticeUseCase`. Os dois primeiros emitem o token **por evento** (`upsertForEvent`, novo a cada tentativa) **antes** de enviar. Porta `IdentityEmailTemplates`. Links com o token no fragmento (`APP_URL/verify-email#token=…`, `/reset-password#token=…`). Resultado `EmailDeliveryOutcome` (`sent` ou `discarded` com motivo) para log, sem e-mail nem token.
+  - **Infraestrutura (identity)**: `ptBrIdentityEmailTemplates`, com texto e HTML gerados dos mesmos blocos; `escapeHtml` em todo dado dinâmico, inclusive atributos `href`; assuntos sem dados do usuário; HTML sem recursos externos.
+  - **Worker**: `createEmailDelivery` (relay → fila `emails` → consumidor → casos de uso), usado pelo `main.ts` e pelo teste de integração. `createEmailJobProcessor` valida o job com Zod (envelope e payload por tipo); job inválido ⇒ `UnrecoverableError`, sem retry. Logs com `eventId` como correlação; falha final ⇒ `error`, intermediária ⇒ `warn`. `describeJobError` omite a mensagem de erros SMTP/rede, que pode conter endereços.
+  - **Shared/infrastructure**: `createEventWorker`, com conexão própria (`maxRetriesPerRequest: null`, exigido pelo `Worker` do BullMQ; `close()` aguarda os jobs ativos e fecha a conexão). `createEventQueue` aceita sobrescrever opções dos jobs (testes usam backoff curto).
+  - **Desligamento**: consumidor e relay param primeiro e aguardam o trabalho em andamento; depois SMTP, health, Prisma e Redis. Falhas de qualquer etapa entram no log e no código de saída.
+- **Decisões tomadas na implementação**:
+  - **Conta não verificada recebe saudação genérica** em todos os e-mails, porque o nome pode ter sido escolhido por quem cadastrou o endereço de outra pessoa. Contas verificadas são saudadas pelo nome.
+  - **`UserTokenRepository.upsertForEvent` passa a devolver `'issued' | 'already_consumed'`** (domínio, Prisma e fake). Se o link do evento já foi usado (reentrega após envio confirmado), o caso de uso descarta o envio em vez de mandar um link morto.
+  - Avisos sem token podem chegar duplicados num retry após envio bem-sucedido. Isso já era aceito pelo design.
+- **Testes**:
+  - aplicação +11 (`send-identity-emails.use-cases.spec.ts`): CA-01, saudação genérica, retry com novo link (só o último vale), um token por evento (CA-13), não envia link morto, descartes por conta inexistente ou já verificada e por e-mail inválido, reset de 30 min com finalidade correta, CA-02 sem token, aviso de senha alterada;
+  - infraestrutura +5 (templates e escape);
+  - worker +11 (`email-jobs.spec.ts`: 4 tipos despachados, 4 jobs inválidos sem retry, falha de envio propagada, `describeJobError` ×2);
+  - integração do repositório: retorno de `upsertForEvent` asserido.
+- **Integração ponta a ponta** (`apps/worker/src/email-delivery.integration.spec.ts`; novo target `worker:integration-test`; PostgreSQL 18 + Redis 8 + Mailpit 1.31 via Testcontainers; produtores reais `RegisterUserUseCase` e `RequestPasswordResetUseCase` sobre Prisma; SMTP real), 5 casos:
+  - **CA-01**: o link chega ao Mailpit, o token pertence ao usuário e o nome do cadastro não aparece;
+  - **retry após falha SMTP**: 2 tentativas, 1 e-mail, link da falha inválido e link entregue válido;
+  - **CA-13**: com o worker parado, nada é enviado e o evento fica pendente; ao iniciar, exatamente 1 e-mail; a republicação pelo relay não duplica, e o reprocessamento direto mantém 1 token por evento;
+  - **CA-02**: aviso sem token e uma única conta;
+  - **reset**: link de 30 min válido para `password_reset`; endereço desconhecido ⇒ job concluído como `discarded/user_not_found` e nenhum e-mail.
+- **Mutation testing** (diff confirmado em cada mutação; arquivos restaurados e conferidos com `grep`), 7 de 7 detectadas:
+  - ignorar token já consumido ⇒ 1 falha;
+  - nome em conta não verificada ⇒ 2 falhas;
+  - sem escape de HTML ⇒ 3 falhas;
+  - `userId` sem validação de UUID ⇒ 1 falha;
+  - finalidade errada no reset ⇒ 1 falha;
+  - token na query string em vez do fragmento ⇒ 4 falhas;
+  - mensagem SMTP no log ⇒ 1 falha.
+- **Não executado**: smoke test manual com `pnpm dev` (cadastro via HTTP → Mailpit). Ele gravaria usuários e tokens no banco local e processaria os 8 eventos pendentes ali. A integração acima cobre o worker com componentes reais; a jornada HTTP completa entra no E2E da T28 (CA-14).
+- **Docs**: `docs/architecture/data-flow.md` (seção 4: consumidor, retry, token por evento, descartes e duplicidade aceita nos avisos).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 361 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (3 projetos, 69); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.

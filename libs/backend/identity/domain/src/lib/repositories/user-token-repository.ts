@@ -1,12 +1,15 @@
 import type { UserToken, UserTokenPurpose } from '../token/user-token';
 
+/** `already_consumed`: o link do evento já foi usado; reenviá-lo entregaria um link morto. */
+export type UserTokenIssueResult = 'issued' | 'already_consumed';
+
 export interface UserTokenRepository {
   /**
    * Grava o token do evento; se o evento já tiver token (retry do worker), substitui hash e
    * validade — vale o link da última tentativa (ADR 0011). Um token já consumido permanece
    * consumido (reentregas nunca reativam links usados).
    */
-  upsertForEvent(token: UserToken): Promise<void>;
+  upsertForEvent(token: UserToken): Promise<UserTokenIssueResult>;
   /**
    * Consome atomicamente (uso único mesmo sob concorrência). Retorna o dono do token ou
    * `null` se inexistente, de outra finalidade, expirado ou já consumido — sem distinção.

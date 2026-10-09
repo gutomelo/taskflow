@@ -1,5 +1,6 @@
 import type {
   UserToken,
+  UserTokenIssueResult,
   UserTokenPurpose,
   UserTokenRepository,
 } from '@taskflow/backend/identity/domain';
@@ -8,9 +9,9 @@ import type { PrismaTransactionRunner } from '@taskflow/backend/shared/infrastru
 export class PrismaUserTokenRepository implements UserTokenRepository {
   constructor(private readonly transactions: PrismaTransactionRunner) {}
 
-  async upsertForEvent(token: UserToken): Promise<void> {
+  async upsertForEvent(token: UserToken): Promise<UserTokenIssueResult> {
     const snapshot = token.toSnapshot();
-    await this.transactions.client().userToken.upsert({
+    const row = await this.transactions.client().userToken.upsert({
       where: { sourceEventId: snapshot.sourceEventId },
       create: { ...snapshot },
       // Retry do worker: novo token substitui o anterior do mesmo evento (ADR 0011).
@@ -20,7 +21,9 @@ export class PrismaUserTokenRepository implements UserTokenRepository {
         expiresAt: snapshot.expiresAt,
         createdAt: snapshot.createdAt,
       },
+      select: { consumedAt: true },
     });
+    return row.consumedAt === null ? 'issued' : 'already_consumed';
   }
 
   async consume(

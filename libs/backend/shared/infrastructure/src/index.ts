@@ -55,3 +55,8 @@ export {
   type OutboxJobData,
 } from './lib/events/bullmq-event-publisher';
 export { OutboxRelay, type OutboxRelayOptions } from './lib/events/outbox-relay';
+export {
+  createEventWorker,
+  type EventWorker,
+  type EventWorkerOptions,
+} from './lib/events/bullmq-event-worker';

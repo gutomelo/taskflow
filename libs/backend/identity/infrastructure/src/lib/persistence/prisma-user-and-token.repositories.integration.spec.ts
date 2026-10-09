@@ -172,8 +172,8 @@ describe('Identity repositories (integration)', () => {
       const eventId = randomUUID();
       const firstAttempt = issue(owner, 'email_verification', { eventId });
       const retry = issue(owner, 'email_verification', { eventId });
-      await tokens.upsertForEvent(firstAttempt);
-      await tokens.upsertForEvent(retry);
+      expect(await tokens.upsertForEvent(firstAttempt)).toBe('issued');
+      expect(await tokens.upsertForEvent(retry)).toBe('issued');
 
       expect(await prisma.userToken.count({ where: { sourceEventId: eventId } })).toBe(1);
       expect(
@@ -192,7 +192,7 @@ describe('Identity repositories (integration)', () => {
       await tokens.consume(delivered.toSnapshot().tokenHash, 'password_reset', new Date());
 
       const redelivered = issue(owner, 'password_reset', { eventId });
-      await tokens.upsertForEvent(redelivered);
+      expect(await tokens.upsertForEvent(redelivered)).toBe('already_consumed');
 
       expect(
         await tokens.consume(redelivered.toSnapshot().tokenHash, 'password_reset', new Date()),
