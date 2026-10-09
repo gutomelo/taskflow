@@ -46,3 +46,12 @@ export {
   parseEnvironment,
   portSchema,
 } from './lib/config/environment';
+export {
+  BullMqEventPublisher,
+  createEventQueue,
+  OUTBOX_JOB_OPTIONS,
+  type OutboxEventPublisher,
+  type OutboxEventRecord,
+  type OutboxJobData,
+} from './lib/events/bullmq-event-publisher';
+export { OutboxRelay, type OutboxRelayOptions } from './lib/events/outbox-relay';

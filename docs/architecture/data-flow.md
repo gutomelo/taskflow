@@ -103,7 +103,30 @@ sequenceDiagram
 
 Clientes nunca alteram estado via socket; o socket apenas distribui o resultado de casos de uso HTTP autorizados.
 
-## 4. Comunicação assíncrona planejada (Fase 2–4)
+## 4. Comunicação assíncrona
+
+**Implementado (spec 001, ADR [0011](adr/0011-early-worker-and-outbox-for-email.md))**: Transactional Outbox para e-mails transacionais. O consumidor da fila `emails` está em implementação (T21).
+
+```mermaid
+sequenceDiagram
+    participant UC as Caso de uso (apps/api)
+    participant DB as PostgreSQL
+    participant R as OutboxRelay (apps/worker)
+    participant Q as BullMQ (fila emails)
+
+    UC->>DB: alteração + INSERT outbox_events (mesma transação)
+    loop a cada 1 s; lotes cheios em sequência
+        R->>DB: BEGIN · SELECT … tipos roteados … LIMIT 50 FOR UPDATE SKIP LOCKED
+        R->>Q: addBulk (jobId = id do evento)
+        R->>DB: UPDATE published_at · COMMIT
+    end
+```
+
+- Relays concorrentes recebem lotes disjuntos (`SKIP LOCKED`). Se o commit falhar depois da publicação, o lote é republicado e o BullMQ ignora o `jobId` repetido, que fica retido por 24 h após a conclusão.
+- O relay só lê os tipos que sabe rotear. Um evento de um produtor mais novo fica pendente até um worker que o conheça, sem bloquear os demais.
+- Com o Redis indisponível, o lote falha, a transação é desfeita e o relay tenta de novo no ciclo seguinte.
+
+**Planejado (Fase 2–4)**: eventos em processo para Socket.IO e as demais filas.
 
 ```mermaid
 flowchart LR
@@ -113,7 +136,7 @@ flowchart LR
         disp --> sock[Socket.IO gateway]
         disp --> enq[Enfileirar job]
     end
-    subgraph fase4[Fase 4 — se justificado]
+    subgraph outboxflow[Outbox — implementada para e-mails]
         uc -->|mesma tx| outbox[(tabela outbox)]
         relay[Outbox relay] --> outbox
         relay --> q

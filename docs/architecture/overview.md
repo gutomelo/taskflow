@@ -94,7 +94,7 @@ Detalhes e restrições verificáveis em [dependency-rules.md](dependency-rules.
 - **`createApp(deps)`**: sem efeitos colaterais; recebe dependências prontas — testável com Supertest.
 - **Erros**: `application/problem+json` (RFC 9457) com `code` estável e `requestId`; `DomainError` mapeado por `code` no error handler de `libs/backend/shared/http`.
 - **Transações**: casos de uso delimitam a transação via `TransactionRunner`; a implementação Prisma guarda o cliente da transação em `AsyncLocalStorage` (restrito à infraestrutura) e chamadas aninhadas reutilizam a transação externa.
-- **Outbox**: eventos de integração gravados em `outbox_events` na mesma transação (ADR 0011); publicação pelo worker.
+- **Outbox**: eventos de integração gravados em `outbox_events` na mesma transação (ADR 0011); o `OutboxRelay` do worker publica-os no BullMQ (`FOR UPDATE SKIP LOCKED`, `jobId` = id do evento). Fluxo em [data-flow.md](data-flow.md#4-comunicação-assíncrona).
 - **Logs**: Pino com `requestId` (aceita `x-request-id` válido do proxy ou gera UUID), redação de credenciais e serializers mínimos (sem headers completos nem query string).
 - **Health**: `/health/live` (processo vivo) e `/health/ready` (PostgreSQL + Redis com timeout).
 

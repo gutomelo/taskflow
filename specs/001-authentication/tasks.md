@@ -40,7 +40,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | ID  | Tarefa                                                                                                                                                                                     | Depende de    | Verificação                                                                                                                         | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | T19 | `apps/worker`: composition root, health (`WORKER_PORT`), graceful shutdown, `pnpm dev` sobe api + web + worker                                                                             | T5            | teste de health; start/stop limpo                                                                                                   | [x]    |
-| T20 | `OutboxRelay` (SKIP LOCKED, `addBulk` com `jobId`, `removeOnComplete` por idade)                                                                                                           | T19, T9       | integração PostgreSQL + Redis: publica uma vez; dois relays concorrentes não duplicam                                               | [ ]    |
+| T20 | `OutboxRelay` (SKIP LOCKED, `addBulk` com `jobId`, `removeOnComplete` por idade)                                                                                                           | T19, T9       | integração PostgreSQL + Redis: publica uma vez; dois relays concorrentes não duplicam                                               | [x]    |
 | T21 | Casos de uso `SendEmailVerification`, `SendPasswordReset`, `SendAccountNotice` + templates pt-BR (sem conteúdo do usuário em contas não verificadas; HTML escapado) + mapeamento no worker | T20, T14, T15 | integração: e-mail no Mailpit; retry após falha SMTP gera novo link válido; worker parado → entrega ao voltar (CA-01, CA-02, CA-13) | [ ]    |
 | T22 | `PurgeExpiredIdentityData` agendado (diário), incluindo contas não verificadas há > 7 dias (RF-15)                                                                                         | T19           | integração com dados expirados                                                                                                      | [ ]    |
 
@@ -251,3 +251,35 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Pendente (tarefas seguintes)**: serviço `worker` no Docker Compose/Dockerfile e job do worker no CI (T28); filas, relay e envio (T20–T22).
 - **Docs**: `CLAUDE.md` (stack e `pnpm dev`), `docs/development/setup.md`, `docs/architecture/overview.md` (worker implementado, diagrama e observabilidade).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 334 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (58); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.
+
+### T20 — 2026-10-09
+
+- **Entregue** (`libs/backend/shared/infrastructure/src/lib/events`):
+  - `OutboxRelay`: cada lote é uma transação curta no `PrismaTransactionRunner` (timeout de 5 s): `SELECT … WHERE published_at IS NULL AND type = ANY(tipos roteados) ORDER BY occurred_at, id LIMIT 50 FOR UPDATE SKIP LOCKED`, depois `publish`, depois `published_at = clock.now()`. Polling a cada 1 s; lotes cheios são drenados em sequência. Falhas são logadas e repetidas no ciclo seguinte. `stop()` aguarda o lote em andamento.
+  - `BullMqEventPublisher` roteia por tipo para a fila e faz `addBulk` com `jobId = event.id`, `name = type` e `data = { eventId, type, occurredAt, payload }`.
+  - `createEventQueue` aplica `OUTBOX_JOB_OPTIONS`: 5 tentativas, backoff exponencial de 5 s, `removeOnComplete { age: 86400 }`, `removeOnFail { age: 604800 }`.
+- **Refinamento do design**: o relay só lê os tipos que o publicador sabe rotear. Eventos de um produtor mais novo ficam pendentes até um worker que os conheça, sem bloquear o lote (deploy gradual). Sem esse filtro, 50 eventos sem rota travariam a fila inteira.
+- **Worker**: a fila `emails` recebe os 4 tipos de `IdentityEventType` (`apps/worker/src/queues/email-queue.ts`). O relay inicia depois do health. No desligamento, ele para antes de fechar fila, banco e Redis. O listener de `error` da fila é obrigatório e fica em `debug`, porque o cliente Redis já registra a falha de conexão.
+- **Dependência**: `bullmq` 6.3.11. Os peers (`ioredis`, `pg`, `redis`, `bullmq-otel`) são todos opcionais, e o ioredis 6 do projeto atende `>=5`. Não há script de instalação novo (`msgpackr-extract` já estava bloqueado). API conferida na documentação da 6.3.11 via Context7: `jobId` duplicado é ignorado; IDs sem `:` e não numéricos; fail-fast recomendado para produtores.
+- **Testes de integração** (`outbox-relay.integration.spec.ts`, PostgreSQL 18 + Redis 8 via Testcontainers, 6 casos):
+  - publica cada evento uma vez, com `jobId`, dados e opções corretos;
+  - **dois relays concorrentes**, com clientes Prisma distintos, recebem lotes disjuntos (50 + 70, sem interseção, 120 jobs). O primeiro segura o lock de forma determinística enquanto o segundo drena;
+  - falha na publicação mantém o lote pendente;
+  - republicação após commit perdido não duplica jobs;
+  - tipos sem rota ficam pendentes sem bloquear;
+  - o polling continua até `stop()`.
+- **Mutation testing** (mutação confirmada antes de ler o resultado; arquivos restaurados e conferidos com `grep`):
+  - sem `FOR UPDATE SKIP LOCKED` ⇒ falha o teste de concorrência;
+  - só `FOR UPDATE` ⇒ falha o teste de concorrência por timeout de 5 s;
+  - sem `jobId` ⇒ 2 falhas;
+  - sem filtro de tipo ⇒ falha o teste de tipos sem rota;
+  - marcar sem publicar ⇒ 5 falhas.
+- **Smoke test manual** (build de produção; banco descartável `taskflow_smoke` e índice 1 do Redis, **sem alterar o banco local**; os 8 eventos foram copiados dele):
+  - 8 eventos reais da API viram 8 jobs na fila `emails`, com `jobId` = id do evento e as opções acima;
+  - `published_at` zerado ⇒ republicados, e a fila continua com 8 jobs;
+  - Redis parado ⇒ o processo continua vivo e o evento fica pendente; Redis de volta ⇒ publicado em cerca de 4 s;
+  - SIGTERM ⇒ saída 0;
+  - banco descartável removido e chaves do índice 1 apagadas depois do teste.
+- **Docs**: `docs/architecture/data-flow.md` (seção 4: fluxo implementado da outbox, garantias e falhas; antes estava como "Fase 4 — se justificado") e `docs/architecture/overview.md` (Backend → Outbox).
+- **Pendente**: consumidor da fila `emails` (T21); métrica do atraso da outbox (Fase 4). Com o Redis fora, o relay registra um `error` por segundo; o alerta e a métrica ficam para a Fase 4.
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 334 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (64); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.

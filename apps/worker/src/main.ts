@@ -1,18 +1,24 @@
 import { existsSync } from 'node:fs';
 import type { Server } from 'node:http';
 import {
+  BullMqEventPublisher,
+  createEventQueue,
   createLogger,
   createPostgresProbe,
   createPrismaClient,
   createRedisClient,
   createRedisProbe,
   InvalidConfigurationError,
+  OutboxRelay,
+  PrismaTransactionRunner,
+  SystemClock,
 } from '@taskflow/backend/shared/infrastructure';
 import { loadWorkerConfig } from './config/env';
 import { createHealthServer } from './health/health-server';
+import { EMAIL_EVENT_TYPES, EMAIL_QUEUE_NAME } from './queues/email-queue';
 
 // Composition root do worker: único lugar que lê o ambiente, cria clientes externos e liga
-// os processadores. Relay da outbox (T20), envio de e-mails (T21) e limpeza (T22) entram aqui.
+// os processadores. Envio de e-mails (T21) e limpeza agendada (T22) entram aqui.
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -62,6 +68,21 @@ async function bootstrap(): Promise<void> {
   });
   logger.info({ host: config.host, port: config.port }, 'TaskFlow worker health listening');
 
+  const emailQueue = createEventQueue(EMAIL_QUEUE_NAME, redis);
+  // Listener obrigatório (EventEmitter sem 'error' derruba o processo); a falha de conexão já
+  // é registrada pelo cliente Redis, então aqui fica em debug para não duplicar o log.
+  emailQueue.on('error', (error) => logger.debug({ err: error }, 'Email queue error'));
+  const relay = new OutboxRelay({
+    transactions: new PrismaTransactionRunner(prisma),
+    publisher: new BullMqEventPublisher(
+      new Map(EMAIL_EVENT_TYPES.map((type) => [type, emailQueue])),
+    ),
+    clock: new SystemClock(),
+    logger,
+  });
+  relay.start();
+  logger.info({ eventTypes: EMAIL_EVENT_TYPES.length }, 'Outbox relay started');
+
   let isShuttingDown = false;
   const shutdown = async (signal: NodeJS.Signals) => {
     if (isShuttingDown) return;
@@ -74,7 +95,10 @@ async function bootstrap(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
+    // O relay para primeiro: o lote em andamento termina antes de fila e conexões fecharem.
+    await relay.stop();
     const results = await Promise.allSettled([
+      emailQueue.close(),
       closeServer(healthServer),
       prisma.$disconnect(),
       // quit() envia QUIT e exige conexão ativa; sem ela, apenas descarta o cliente.
