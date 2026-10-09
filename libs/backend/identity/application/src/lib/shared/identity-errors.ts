@@ -26,3 +26,11 @@ export class TokenBelongsToAnotherAccountError extends DomainError {
     super('Verification token belongs to another account');
   }
 }
+
+/** Troca de senha autenticada com a senha atual errada (RF-09). */
+export class CurrentPasswordIncorrectError extends DomainError {
+  readonly code = 'CURRENT_PASSWORD_INCORRECT';
+  constructor() {
+    super('Current password is incorrect');
+  }
+}

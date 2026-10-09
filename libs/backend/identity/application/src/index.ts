@@ -58,3 +58,20 @@ export {
   type ConfirmEmailVerificationDependencies,
 } from './lib/use-cases/confirm-email-verification.use-case';
 export { GetUserVerificationStatusUseCase } from './lib/use-cases/get-user-verification-status.use-case';
+export { CurrentPasswordIncorrectError } from './lib/shared/identity-errors';
+export {
+  ChangePasswordUseCase,
+  type ChangePasswordCommand,
+  type ChangePasswordDependencies,
+  type ChangePasswordResult,
+} from './lib/use-cases/change-password.use-case';
+export {
+  RequestPasswordResetUseCase,
+  type RequestPasswordResetCommand,
+  type RequestPasswordResetDependencies,
+} from './lib/use-cases/request-password-reset.use-case';
+export {
+  ResetPasswordUseCase,
+  type ResetPasswordCommand,
+  type ResetPasswordDependencies,
+} from './lib/use-cases/reset-password.use-case';
