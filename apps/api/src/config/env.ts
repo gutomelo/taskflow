@@ -63,7 +63,6 @@ const environmentSchema = z
     AUTH_ACCESS_TOKEN_ACTIVE_KID: z.string().min(1),
     CSRF_SECRET: secretSchema,
     LOG_PSEUDONYMIZATION_KEY: secretSchema,
-    COOKIE_SECURE: z.stringbool().default(true),
     PASSWORD_HASH_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
   })
   .superRefine((variables, context) => {
@@ -77,13 +76,6 @@ const environmentSchema = z
 
     if (variables.NODE_ENV !== 'production') return;
 
-    if (!variables.COOKIE_SECURE) {
-      context.addIssue({
-        code: 'custom',
-        path: ['COOKIE_SECURE'],
-        message: 'deve ser true em produção',
-      });
-    }
     const secrets: Array<[string, string]> = [
       ['CSRF_SECRET', variables.CSRF_SECRET],
       ['LOG_PSEUDONYMIZATION_KEY', variables.LOG_PSEUDONYMIZATION_KEY],
@@ -118,7 +110,6 @@ export type AppConfig = Readonly<{
   activeAccessTokenKid: string;
   csrfSecret: string;
   logPseudonymizationKey: string;
-  cookieSecure: boolean;
   passwordHashConcurrency: number;
 }>;
 
@@ -165,7 +156,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     activeAccessTokenKid: variables.AUTH_ACCESS_TOKEN_ACTIVE_KID,
     csrfSecret: variables.CSRF_SECRET,
     logPseudonymizationKey: variables.LOG_PSEUDONYMIZATION_KEY,
-    cookieSecure: variables.COOKIE_SECURE,
     passwordHashConcurrency: variables.PASSWORD_HASH_CONCURRENCY,
   };
 }

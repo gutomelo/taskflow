@@ -297,7 +297,6 @@ Eventos de segurança acima; `eventId` como `correlationId` no worker; readiness
 | `APP_ORIGIN`, `APP_URL`                   | CSRF e links de e-mail                                                               |
 | `AUTH_ACCESS_TOKEN_KEYS`                  | mapa `kid → segredo` (JSON), cada segredo ≥ 32 bytes; `AUTH_ACCESS_TOKEN_ACTIVE_KID` |
 | `CSRF_SECRET`, `LOG_PSEUDONYMIZATION_KEY` | HMACs (≥ 32 bytes)                                                                   |
-| `COOKIE_SECURE`                           | `true` por padrão                                                                    |
 | `PASSWORD_HASH_CONCURRENCY`               | semáforo do Argon2 (padrão 4)                                                        |
 | `SMTP_URL`, `EMAIL_FROM`                  | Mailpit local: `smtp://localhost:51025`                                              |
 | `WORKER_PORT`                             | health do worker (3334)                                                              |

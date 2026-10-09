@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
@@ -7,6 +7,7 @@ import {
   createErrorHandler,
   httpLogSerializers,
   notFoundHandler,
+  type DomainErrorMapping,
 } from '@taskflow/backend/shared/http';
 import type { AppConfig } from './config/env';
 import { createHealthRouter } from './health/health.router';
@@ -16,13 +17,23 @@ export interface AppDependencies {
   readonly config: Pick<AppConfig, 'trustProxy' | 'jsonBodyLimit' | 'healthCheckTimeoutMs'>;
   readonly logger: Logger;
   readonly probes: ReadonlyArray<DependencyProbe>;
+  /** Rotas de negócio montadas em `/api/v1` (módulos dos bounded contexts). */
+  readonly apiRouters?: ReadonlyArray<Router>;
+  /** Mapeamentos `code → HTTP` dos erros de domínio de todos os módulos. */
+  readonly domainErrors?: Readonly<Record<string, DomainErrorMapping>>;
 }
 
 /**
  * Monta a aplicação HTTP sem efeitos colaterais (sem listen nem conexões),
  * permitindo testes com Supertest e dependências falsas.
  */
-export function createApp({ config, logger, probes }: AppDependencies): Express {
+export function createApp({
+  config,
+  logger,
+  probes,
+  apiRouters = [],
+  domainErrors = {},
+}: AppDependencies): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -47,10 +58,12 @@ export function createApp({ config, logger, probes }: AppDependencies): Express 
   app.use(express.json({ limit: config.jsonBodyLimit }));
 
   app.use('/health', createHealthRouter({ probes, timeoutMs: config.healthCheckTimeoutMs }));
-  // Rotas de negócio serão montadas em /api/v1 pelos módulos (spec 001 em diante).
+  for (const router of apiRouters) {
+    app.use('/api/v1', router);
+  }
 
   app.use(notFoundHandler);
-  app.use(createErrorHandler());
+  app.use(createErrorHandler({ domainErrors }));
 
   return app;
 }

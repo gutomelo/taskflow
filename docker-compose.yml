@@ -68,12 +68,19 @@ services:
       dockerfile: infra/docker/api.Dockerfile
       target: runtime
     environment:
-      NODE_ENV: production
+      # NODE_ENV=test: o perfil local usa segredos dev-only, recusados em produção.
+      NODE_ENV: test
       API_PORT: 3333
       LOG_LEVEL: info
       TRUST_PROXY: 1
       DATABASE_URL: postgresql://${POSTGRES_USER:-taskflow}:${POSTGRES_PASSWORD:-taskflow}@postgres:5432/${POSTGRES_DB:-taskflow}
       REDIS_URL: redis://redis:6379
+      # Perfil local "app" (simulação de produção na máquina): valores dev-only, nunca reais.
+      APP_ORIGIN: http://localhost:${WEB_PORT:-8080}
+      AUTH_ACCESS_TOKEN_KEYS: '{"compose-1":"dev-only-compose-access-token-key-0000000000"}'
+      AUTH_ACCESS_TOKEN_ACTIVE_KID: compose-1
+      CSRF_SECRET: dev-only-compose-csrf-secret-000000000000000
+      LOG_PSEUDONYMIZATION_KEY: dev-only-compose-log-key-00000000000000000000
     depends_on:
       migrate:
         condition: service_completed_successfully

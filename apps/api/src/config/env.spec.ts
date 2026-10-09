@@ -26,7 +26,6 @@ describe('loadConfig', () => {
       healthCheckTimeoutMs: 2000,
       trustProxy: false,
       jsonBodyLimit: '100kb',
-      cookieSecure: true,
       passwordHashConcurrency: 4,
     });
   });
@@ -100,25 +99,23 @@ describe('loadConfig', () => {
       expect(variableNames(error)).toEqual(['AUTH_ACCESS_TOKEN_ACTIVE_KID']);
     });
 
-    it('rejects development placeholders and insecure cookies in production', () => {
+    it('rejects development placeholders in production', () => {
       const error = captureConfigurationError({
         ...validEnvironment,
         NODE_ENV: 'production',
-        COOKIE_SECURE: 'false',
         CSRF_SECRET: `dev-only-${'x'.repeat(40)}`,
       });
 
-      expect(variableNames(error)).toEqual(['COOKIE_SECURE', 'CSRF_SECRET']);
+      expect(variableNames(error)).toEqual(['CSRF_SECRET']);
     });
 
     it('accepts development placeholders outside production', () => {
       const config = loadConfig({
         ...validEnvironment,
         CSRF_SECRET: `dev-only-${'x'.repeat(40)}`,
-        COOKIE_SECURE: 'false',
       });
 
-      expect(config.cookieSecure).toBe(false);
+      expect(config.csrfSecret).toContain('dev-only');
     });
   });
 

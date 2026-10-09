@@ -15,6 +15,13 @@ class TaskHasPendingSubtasksError extends DomainError {
   }
 }
 
+class WeakSecretError extends DomainError {
+  readonly code = 'WEAK_SECRET';
+  constructor(readonly rules: string[]) {
+    super('Weak secret');
+  }
+}
+
 class UnmappedRuleError extends DomainError {
   readonly code = 'UNMAPPED_RULE';
   constructor() {
@@ -29,6 +36,9 @@ function buildApp() {
     (app) => {
       app.get('/mapped', () => {
         throw new TaskHasPendingSubtasksError();
+      });
+      app.get('/weak', () => {
+        throw new WeakSecretError(['uppercase', 'digit']);
       });
       app.get('/unmapped', () => {
         throw new UnmappedRuleError();
@@ -53,6 +63,14 @@ function buildApp() {
           status: 409,
           title: 'Há subtarefas obrigatórias pendentes',
         },
+        WEAK_SECRET: {
+          status: 422,
+          title: 'Senha fraca',
+          violations: (error) =>
+            error instanceof WeakSecretError
+              ? error.rules.map((rule) => ({ field: 'password', message: rule }))
+              : [],
+        },
       },
     },
   );
@@ -67,6 +85,15 @@ describe('error handling', () => {
       code: 'TASK_HAS_PENDING_REQUIRED_SUBTASKS',
       title: 'Há subtarefas obrigatórias pendentes',
     });
+  });
+
+  it('adds structured violations extracted from the domain error', async () => {
+    const response = await request(buildApp()).get('/weak').expect(422);
+
+    expect(problemDetailsSchema.parse(response.body).violations).toEqual([
+      { field: 'password', message: 'uppercase' },
+      { field: 'password', message: 'digit' },
+    ]);
   });
 
   it('defaults unmapped domain errors to 422 without leaking the technical message', async () => {

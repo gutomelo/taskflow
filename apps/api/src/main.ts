@@ -5,10 +5,17 @@ import {
   createPrismaClient,
   createRedisClient,
   createRedisProbe,
+  HmacPseudonymizer,
+  PrismaOutboxWriter,
+  PrismaTransactionRunner,
+  RedisRateLimiter,
+  SystemClock,
+  UuidV7Generator,
 } from '@taskflow/backend/shared/infrastructure';
 import { createApp } from './app';
 import { InvalidConfigurationError, loadConfig } from './config/env';
 import { createLogger } from './http/logger';
+import { createIdentityModule } from './modules/identity.module';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
 
@@ -36,11 +43,32 @@ async function bootstrap(): Promise<void> {
   const prisma = createPrismaClient({ databaseUrl: config.databaseUrl });
   const redis = createRedisClient({ redisUrl: config.redisUrl, connectionName: 'taskflow-api' });
   redis.on('error', (error) => logger.warn({ err: error }, 'Redis connection error'));
+  // Conecta antes de aceitar requisições: com a fila offline desligada (fail-fast), comandos
+  // emitidos durante a conexão preguiçosa falhariam, degradando revogação e rate limit.
+  // Redis indisponível não impede o start (readiness reporta); o cliente segue reconectando.
+  await redis.connect().catch((error: unknown) => {
+    logger.warn({ err: error }, 'Redis unavailable at startup; continuing with fallbacks');
+  });
+
+  const transactions = new PrismaTransactionRunner(prisma);
+  const identity = await createIdentityModule({
+    config,
+    logger,
+    redis,
+    transactions,
+    outbox: new PrismaOutboxWriter(transactions),
+    rateLimiter: new RedisRateLimiter(redis),
+    pseudonymizer: new HmacPseudonymizer(config.logPseudonymizationKey),
+    idGenerator: new UuidV7Generator(),
+    clock: new SystemClock(),
+  });
 
   const app = createApp({
     config,
     logger,
     probes: [createPostgresProbe(prisma), createRedisProbe(redis)],
+    apiRouters: [identity.router],
+    domainErrors: { ...identity.domainErrors },
   });
 
   const server = app.listen(config.port, config.host, () => {

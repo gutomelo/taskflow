@@ -1,7 +1,11 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { ServiceBusyError } from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
-import { PROBLEM_CONTENT_TYPE, type ProblemDetails } from '@taskflow/contracts';
+import {
+  PROBLEM_CONTENT_TYPE,
+  type FieldViolation,
+  type ProblemDetails,
+} from '@taskflow/contracts';
 import { HttpError } from './http-error';
 
 const PROBLEM_TYPE_BASE = 'https://taskflow.dev/problems/';
@@ -26,8 +30,13 @@ export const notFoundHandler: RequestHandler = (_request, response) => {
   sendProblem(response, { status: 404, code: 'ROUTE_NOT_FOUND', title: 'Recurso não encontrado' });
 };
 
-/** Mapeamento de um código de `DomainError` para status e título exibível (pt-BR). */
-export type DomainErrorMapping = Readonly<{ status: number; title: string }>;
+/** Mapeamento de um código de `DomainError` para status, título exibível (pt-BR) e detalhes. */
+export type DomainErrorMapping = Readonly<{
+  status: number;
+  title: string;
+  /** Detalhes estruturados seguros para o cliente (ex.: regras de senha violadas). */
+  violations?: (error: DomainError) => ReadonlyArray<FieldViolation>;
+}>;
 
 export interface ErrorHandlerOptions {
   /** Registro `code → mapeamento`, composto pelos contextos no composition root. */
@@ -81,10 +90,12 @@ export function createErrorHandler({
 
     if (error instanceof DomainError) {
       const mapping = domainErrors[error.code];
+      const violations = mapping?.violations?.(error);
       sendProblem(response, {
         status: mapping?.status ?? DEFAULT_DOMAIN_ERROR_STATUS,
         code: error.code,
         title: mapping?.title ?? 'Operação não permitida',
+        ...(violations && violations.length > 0 ? { violations: [...violations] } : {}),
       });
       return;
     }

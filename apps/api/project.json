@@ -23,7 +23,14 @@
             ".js": ".js"
           }
         },
-        "thirdParty": false
+        "thirdParty": false,
+        "assets": [
+          {
+            "input": "libs/backend/identity/infrastructure/src/assets",
+            "glob": "common-passwords.txt",
+            "output": "assets"
+          }
+        ]
       },
       "configurations": {
         "development": {},

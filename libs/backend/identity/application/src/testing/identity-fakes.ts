@@ -36,6 +36,7 @@ import type {
   AccessTokenIssuer,
   AccessTokenSubject,
   AccessTokenVerifier,
+  AccessTokenVerifyOptions,
   IssuedAccessToken,
 } from '../lib/ports/access-tokens';
 import type { SecurityEvent, SecurityEventRecorder } from '../lib/ports/security-event-recorder';
@@ -312,7 +313,8 @@ export class FakeSecretTokens implements SecretTokenGenerator {
   private next = 0;
   generate(): GeneratedSecret {
     this.next += 1;
-    const token = `secret-token-${this.next}`;
+    // Mesmo tamanho dos tokens reais (43 caracteres base64url), aceito pelos contratos HTTP.
+    const token = `fake-secret-token-${String(this.next).padStart(25, '0')}`;
     return { token, tokenHash: this.hash(token) };
   }
   hash(token: string) {
@@ -320,19 +322,24 @@ export class FakeSecretTokens implements SecretTokenGenerator {
   }
 }
 
+/** Tokens legíveis com expiração real pelo relógio do teste (15 min), como o JWT. */
 export class FakeAccessTokens implements AccessTokenIssuer, AccessTokenVerifier {
   issued: AccessTokenSubject[] = [];
   constructor(private readonly clock: Clock) {}
   async issue(subject: AccessTokenSubject): Promise<IssuedAccessToken> {
     this.issued.push(subject);
+    const expiresAt = new Date(this.clock.now().getTime() + 15 * 60 * 1000);
     return {
-      token: `access(${subject.userId},${subject.sessionId})`,
-      expiresAt: new Date(this.clock.now().getTime() + 15 * 60 * 1000),
+      token: `access(${subject.userId},${subject.sessionId},${expiresAt.getTime()})`,
+      expiresAt,
     };
   }
-  async verify(token: string) {
-    const match = /^access\(([^,]+),([^)]+)\)$/.exec(token);
-    return match?.[1] && match[2] ? { userId: match[1], sessionId: match[2] } : null;
+  async verify(token: string, options: AccessTokenVerifyOptions = {}) {
+    const match = /^access\(([^,]+),([^,]+),(\d+)\)$/.exec(token);
+    if (!match?.[1] || !match[2] || !match[3]) return null;
+    const expired = this.clock.now().getTime() >= Number(match[3]);
+    if (expired && !options.ignoreExpiration) return null;
+    return { userId: match[1], sessionId: match[2] };
   }
 }
 

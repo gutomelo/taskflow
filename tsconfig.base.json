@@ -22,6 +22,16 @@
     "skipDefaultLibCheck": true,
     "importHelpers": true,
     "paths": {
+      "@taskflow/backend/identity/application": [
+        "./libs/backend/identity/application/src/index.ts"
+      ],
+      "@taskflow/backend/identity/application/testing": [
+        "./libs/backend/identity/application/src/testing.ts"
+      ],
+      "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
+      "@taskflow/backend/identity/infrastructure": [
+        "./libs/backend/identity/infrastructure/src/index.ts"
+      ],
       "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"],
       "@taskflow/backend/shared/http": ["./libs/backend/shared/http/src/index.ts"],
       "@taskflow/backend/shared/infrastructure": [
@@ -32,11 +42,7 @@
       ],
       "@taskflow/backend/shared/kernel": ["./libs/backend/shared/kernel/src/index.ts"],
       "@taskflow/contracts": ["./libs/contracts/src/index.ts"],
-      "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
-      "@taskflow/backend/identity/infrastructure": [
-        "./libs/backend/identity/infrastructure/src/index.ts"
-      ],
-      "@taskflow/backend/identity/application": ["./libs/backend/identity/application/src/index.ts"]
+      "@taskflow/backend/identity/http": ["./libs/backend/identity/http/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
