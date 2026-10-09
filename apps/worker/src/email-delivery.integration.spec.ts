@@ -149,7 +149,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
       outbox: new PrismaOutboxWriter(runner),
       idGenerator: new UuidV7Generator(),
       clock: new SystemClock(),
-    }).execute({ email });
+    }).execute({ email, client: { ipAddress: '203.0.113.10', userAgent: null } });
   }
 
   const uniqueEmail = () => `pessoa-${randomUUID()}@exemplo.com`;

@@ -1,4 +1,10 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpXsrfTokenExtractor,
+  provideHttpClient,
+  withInterceptors,
+  withXsrfConfiguration,
+} from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -7,10 +13,19 @@ import { sessionRefreshInterceptor } from './session-refresh.interceptor';
 import { WEB_LOCKS } from './session-refresher';
 
 /** Ambiente de teste com o interceptor real e o backend simulado pelo HttpTestingController. */
+/** Cookie CSRF simulado (jsdom não aceita cookies `__Host-` em http). */
+export const csrfCookie = { value: 'csrf-1' as string | null };
+
 export function setupAuthTesting() {
+  csrfCookie.value = 'csrf-1';
   TestBed.configureTestingModule({
     providers: [
-      provideHttpClient(withInterceptors([sessionRefreshInterceptor])),
+      // Mesma ordem de produção: o interceptor de XSRF do Angular roda antes do nosso.
+      provideHttpClient(
+        withXsrfConfiguration({ cookieName: '__Host-tf_csrf', headerName: 'X-CSRF-Token' }),
+        withInterceptors([sessionRefreshInterceptor]),
+      ),
+      { provide: HttpXsrfTokenExtractor, useValue: { getToken: () => csrfCookie.value } },
       provideHttpClientTesting(),
       provideRouter([]),
       { provide: WEB_LOCKS, useValue: null },

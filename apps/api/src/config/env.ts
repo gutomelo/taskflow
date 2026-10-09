@@ -70,6 +70,15 @@ const environmentSchema = z
 
     if (variables.NODE_ENV !== 'production') return;
 
+    // Cookies `Secure` e CSRF por origem pressupõem HTTPS em produção (T29/B5).
+    if (!variables.APP_ORIGIN.startsWith('https://')) {
+      context.addIssue({
+        code: 'custom',
+        path: ['APP_ORIGIN'],
+        message: 'deve usar https em produção',
+      });
+    }
+
     const secrets: Array<[string, string]> = [
       ['CSRF_SECRET', variables.CSRF_SECRET],
       ['LOG_PSEUDONYMIZATION_KEY', variables.LOG_PSEUDONYMIZATION_KEY],

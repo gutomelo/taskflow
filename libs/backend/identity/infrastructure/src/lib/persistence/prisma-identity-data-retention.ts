@@ -38,10 +38,10 @@ export class PrismaIdentityDataRetention implements IdentityDataRetention {
 
   deleteUnverifiedUsers({
     createdBefore,
-    noLoginSince,
+    noActivitySince,
   }: {
     readonly createdBefore: Date;
-    readonly noLoginSince: Date;
+    readonly noActivitySince: Date;
   }): Promise<number> {
     // A condição externa é reavaliada pelo PostgreSQL na linha atual: uma conta verificada
     // entre a seleção e a remoção não é apagada.
@@ -52,7 +52,7 @@ export class PrismaIdentityDataRetention implements IdentityDataRetention {
         WHERE u.email_verified_at IS NULL
           AND u.created_at < ${createdBefore}
           AND NOT EXISTS (
-            SELECT 1 FROM sessions s WHERE s.user_id = u.id AND s.created_at >= ${noLoginSince})
+            SELECT 1 FROM sessions s WHERE s.user_id = u.id AND s.last_used_at >= ${noActivitySince})
         LIMIT ${limit})`,
     );
   }

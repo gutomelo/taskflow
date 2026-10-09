@@ -15,12 +15,13 @@ const USER_AGENT_MAX_LENGTH = 256;
  */
 export function toSessionClient({ ipAddress, userAgent }: ClientInfo): SessionClient {
   return {
-    ipPrefix: ipAddress ? ipPrefix(ipAddress) : null,
+    ipPrefix: ipAddress ? networkPrefix(ipAddress) : null,
     userAgent: userAgent ? userAgent.slice(0, USER_AGENT_MAX_LENGTH) : null,
   };
 }
 
-function ipPrefix(ipAddress: string): string | null {
+/** Prefixo da rede (IPv4 /24, IPv6 /64); `null` se o endereço não for IP. */
+export function networkPrefix(ipAddress: string): string | null {
   const address = ipAddress.startsWith('::ffff:') ? ipAddress.slice('::ffff:'.length) : ipAddress;
   if (isIPv4(address)) {
     return `${address.split('.').slice(0, 3).join('.')}.0/24`;

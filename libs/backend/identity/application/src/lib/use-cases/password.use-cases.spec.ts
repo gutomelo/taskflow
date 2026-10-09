@@ -157,6 +157,9 @@ describe('ChangePasswordUseCase (RF-09, BR-016)', () => {
 });
 
 describe('RequestPasswordResetUseCase (RF-10, BR-014)', () => {
+  const fromHome = { ipAddress: '203.0.113.10', userAgent: null };
+  const fromElsewhere = { ipAddress: '198.51.100.7', userAgent: null };
+
   function useCase(bed: IdentityTestbed) {
     return new RequestPasswordResetUseCase({
       ...bed,
@@ -168,8 +171,8 @@ describe('RequestPasswordResetUseCase (RF-10, BR-014)', () => {
     const { bed } = await seed();
     const findByEmail = vi.spyOn(bed.users, 'findByEmail');
 
-    await useCase(bed).execute({ email: ' ANA@exemplo.com ' });
-    await useCase(bed).execute({ email: 'ninguem@exemplo.com' });
+    await useCase(bed).execute({ email: ' ANA@exemplo.com ', client: fromHome });
+    await useCase(bed).execute({ email: 'ninguem@exemplo.com', client: fromHome });
 
     expect(findByEmail).not.toHaveBeenCalled();
     expect(bed.outbox.events.map(({ type, payload }) => ({ type, payload }))).toEqual([
@@ -181,16 +184,42 @@ describe('RequestPasswordResetUseCase (RF-10, BR-014)', () => {
   it('silently suppresses repeated requests for the same address', async () => {
     const { bed } = await seed();
 
-    await useCase(bed).execute({ email: 'ana@exemplo.com' });
-    await expect(useCase(bed).execute({ email: 'ana@exemplo.com' })).resolves.toBeUndefined();
+    await useCase(bed).execute({ email: 'ana@exemplo.com', client: fromHome });
+    await expect(
+      useCase(bed).execute({ email: 'ana@exemplo.com', client: fromHome }),
+    ).resolves.toBeUndefined();
 
     expect(bed.outbox.events).toHaveLength(1);
+  });
+
+  it("T29/M4: requests from one network do not exhaust the owner's recovery from another", async () => {
+    const { bed } = await seed();
+    const attacker = { ipAddress: '192.0.2.50', userAgent: null };
+
+    await useCase(bed).execute({ email: 'ana@exemplo.com', client: attacker });
+    await useCase(bed).execute({ email: 'ana@exemplo.com', client: attacker }); // suprimido
+    await useCase(bed).execute({ email: 'ana@exemplo.com', client: fromElsewhere });
+
+    expect(bed.outbox.events).toHaveLength(2);
+  });
+
+  it('T29/M4: caps recovery e-mails per address across all networks (20 per day)', async () => {
+    const { bed } = await seed();
+
+    for (let network = 0; network < 25; network += 1) {
+      await useCase(bed).execute({
+        email: 'ana@exemplo.com',
+        client: { ipAddress: `10.0.${network}.1`, userAgent: null },
+      });
+    }
+
+    expect(bed.outbox.events).toHaveLength(20);
   });
 
   it('rejects malformed emails (format only — reveals nothing about accounts)', async () => {
     const { bed } = await seed();
 
-    await expect(useCase(bed).execute({ email: 'ana@' })).rejects.toBeInstanceOf(
+    await expect(useCase(bed).execute({ email: 'ana@', client: fromHome })).rejects.toBeInstanceOf(
       InvalidEmailAddressError,
     );
   });

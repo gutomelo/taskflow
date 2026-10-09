@@ -25,6 +25,8 @@ export interface SendPasswordResetCommand {
   readonly eventId: string;
   /** E-mail informado no pedido (a API não consulta a conta: trabalho constante, BR-014). */
   readonly email: string;
+  /** Instante do pedido (evento da outbox): pedidos anteriores à última troca de senha caducam. */
+  readonly occurredAt: Date;
 }
 
 export interface SendPasswordResetDependencies {
@@ -45,11 +47,20 @@ export interface SendPasswordResetDependencies {
 export class SendPasswordResetUseCase {
   constructor(private readonly deps: SendPasswordResetDependencies) {}
 
-  async execute({ eventId, email }: SendPasswordResetCommand): Promise<EmailDeliveryOutcome> {
+  async execute({
+    eventId,
+    email,
+    occurredAt,
+  }: SendPasswordResetCommand): Promise<EmailDeliveryOutcome> {
     const address = parseAddress(email);
     if (!address) return discarded('invalid_email');
     const user = await this.deps.users.findByEmail(address);
     if (!user) return discarded('user_not_found');
+    // BR-016 (T29/I3): a troca ou redefinição de senha invalida pedidos pendentes, inclusive
+    // os que ainda estavam na fila (worker parado, backoff) e não tinham token emitido.
+    if (user.toSnapshot().passwordChangedAt.getTime() > occurredAt.getTime()) {
+      return discarded('superseded');
+    }
 
     const secret = this.deps.secretTokens.generate();
     const issued = await this.deps.userTokens.upsertForEvent(

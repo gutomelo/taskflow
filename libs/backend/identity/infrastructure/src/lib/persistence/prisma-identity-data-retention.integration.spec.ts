@@ -56,6 +56,7 @@ describe('PrismaIdentityDataRetention (integration)', () => {
     userId: string,
     options: {
       createdDaysAgo: number;
+      lastUsedDaysAgo?: number;
       idleExpiresAt?: Date;
       absoluteExpiresAt?: Date;
       revokedDaysAgo?: number;
@@ -68,7 +69,7 @@ describe('PrismaIdentityDataRetention (integration)', () => {
         id,
         userId,
         createdAt: daysAgo(options.createdDaysAgo),
-        lastUsedAt: daysAgo(options.createdDaysAgo),
+        lastUsedAt: daysAgo(options.lastUsedDaysAgo ?? options.createdDaysAgo),
         idleExpiresAt: options.idleExpiresAt ?? absoluteExpiresAt,
         absoluteExpiresAt,
         ...(options.revokedDaysAgo === undefined
@@ -170,17 +171,20 @@ describe('PrismaIdentityDataRetention (integration)', () => {
     await userToken(abandoned, { expiresAt: daysAhead(1) });
     const recentLogin = await user({ createdDaysAgo: 8, verified: false });
     await session(recentLogin, { createdDaysAgo: 2 });
+    // T29/I4: entrou há 8 dias e segue usando a mesma sessão (renovada pelo refresh).
+    const activeSinceLogin = await user({ createdDaysAgo: 8, verified: false });
+    await session(activeSinceLogin, { createdDaysAgo: 8, lastUsedDaysAgo: 0 });
     const young = await user({ createdDaysAgo: 6, verified: false });
     const verified = await user({ createdDaysAgo: 30, verified: true });
 
     const deleted = await new PrismaIdentityDataRetention(transactions).deleteUnverifiedUsers({
       createdBefore: daysAgo(7),
-      noLoginSince: daysAgo(7),
+      noActivitySince: daysAgo(7),
     });
 
     expect(deleted).toBe(1);
     const remaining = (await prisma.user.findMany({ select: { id: true } })).map((row) => row.id);
-    expect(remaining.sort()).toEqual([recentLogin, young, verified].sort());
+    expect(remaining.sort()).toEqual([recentLogin, activeSinceLogin, young, verified].sort());
     // Cascata: nada da conta removida sobra, e o e-mail fica livre para o titular real.
     expect(await prisma.session.count({ where: { userId: abandoned } })).toBe(0);
     expect(await prisma.userToken.count({ where: { userId: abandoned } })).toBe(0);
@@ -194,7 +198,7 @@ describe('PrismaIdentityDataRetention (integration)', () => {
 
     const deleted = await new PrismaIdentityDataRetention(transactions, 2).deleteUnverifiedUsers({
       createdBefore: daysAgo(7),
-      noLoginSince: daysAgo(7),
+      noActivitySince: daysAgo(7),
     });
 
     expect(deleted).toBe(5);

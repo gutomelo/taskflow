@@ -1,7 +1,5 @@
 import type { Request } from 'express';
 import type { Pseudonymizer, RateLimitPolicy } from '@taskflow/backend/shared/application';
-import { readCookie } from '@taskflow/backend/shared/http';
-import { REFRESH_TOKEN_COOKIE } from './session-cookies';
 
 const HOUR = 60 * 60;
 
@@ -9,7 +7,10 @@ const HOUR = 60 * 60;
 export const IDENTITY_RATE_LIMITS = {
   registerByIp: { name: 'auth.register.ip', points: 5, durationSeconds: HOUR },
   loginByIp: { name: 'auth.login.ip', points: 30, durationSeconds: 15 * 60 },
-  refreshBySession: { name: 'auth.refresh.session', points: 60, durationSeconds: 60 },
+  // Por IP (T29/B3): a chave pelo refresh token mudava a cada rotação e nunca limitava nada.
+  // Folgado para várias pessoas atrás do mesmo NAT (cada aba renova a cada ~15 min).
+  refreshByIp: { name: 'auth.refresh.ip', points: 120, durationSeconds: 60 },
+  logoutByIp: { name: 'auth.logout.ip', points: 60, durationSeconds: 60 },
   confirmVerificationByUser: {
     name: 'auth.verification-confirm.user',
     points: 20,
@@ -35,14 +36,6 @@ export function emailKey(pseudonymizer: Pseudonymizer) {
         ? body.email.trim().toLowerCase()
         : '';
     return email ? `email:${pseudonymizer.pseudonymize(email)}` : undefined;
-  };
-}
-
-/** Chave pela sessão do refresh token (pseudonimizado); sem cookie, o handler já responde 401. */
-export function refreshTokenKey(pseudonymizer: Pseudonymizer) {
-  return (request: Request): string | undefined => {
-    const refreshToken = readCookie(request, REFRESH_TOKEN_COOKIE);
-    return refreshToken ? `refresh:${pseudonymizer.pseudonymize(refreshToken)}` : undefined;
   };
 }
 

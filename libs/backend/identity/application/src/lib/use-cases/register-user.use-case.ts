@@ -46,7 +46,7 @@ export class RegisterUserUseCase {
     });
     // Hash sempre, antes de consultar a conta: o tempo de resposta não revela se ela existe.
     const passwordHash = await this.deps.passwordHasher.hash(password);
-    const deliveryAllowed = await this.deps.emailThrottle.allow(email);
+    const deliveryAllowed = await this.deps.emailThrottle.allowVerification(email);
 
     await this.deps.transactions.run(async () => {
       const existing = await this.deps.users.findByEmail(email);

@@ -20,7 +20,10 @@ export function setSessionCookies(response: Response, credentials: SessionCreden
     secure: true,
     sameSite: 'lax',
     path: '/',
-    expires: credentials.accessTokenExpiresAt,
+    // O cookie vive tanto quanto a sessão; o JWT dentro dele continua expirando em 15 min
+    // (verificado no servidor). Se o navegador o apagasse junto com o JWT, refresh e logout
+    // perderiam o `sid` que vincula o token CSRF e responderiam 403 (T29/B1).
+    expires: credentials.refreshTokenExpiresAt,
   });
   response.cookie(REFRESH_TOKEN_COOKIE, credentials.refreshToken, {
     httpOnly: true,

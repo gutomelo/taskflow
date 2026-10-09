@@ -68,7 +68,11 @@ async function bootstrap(): Promise<void> {
   logger.info({ host: config.host, port: config.port }, 'TaskFlow worker health listening');
 
   const clock = new SystemClock();
-  const emailSender = new SmtpEmailSender({ smtpUrl: config.smtpUrl, from: config.emailFrom });
+  const emailSender = new SmtpEmailSender({
+    smtpUrl: config.smtpUrl,
+    from: config.emailFrom,
+    requireTls: config.environment === 'production',
+  });
   const emailDelivery = createEmailDelivery({
     prisma,
     redis,

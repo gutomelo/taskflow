@@ -9,6 +9,11 @@ export interface SessionRepository {
    */
   findByRefreshTokenHashForUpdate(tokenHash: string): Promise<Session | null>;
   findById(sessionId: string): Promise<Session | null>;
+  /**
+   * Como `findById`, mas **bloqueia** a sessão até o fim da transação: logout e revogação
+   * gravam sobre o estado mais recente, sem corrida com um refresh concorrente (T29/I1).
+   */
+  findByIdForUpdate(sessionId: string): Promise<Session | null>;
   /** Sessões não revogadas e não expiradas do usuário, mais recentes primeiro. */
   listActiveByUser(userId: string, now: Date): Promise<ReadonlyArray<Session>>;
   /** Persiste estado da sessão e de seus tokens (rotação, tolerância, revogação). */

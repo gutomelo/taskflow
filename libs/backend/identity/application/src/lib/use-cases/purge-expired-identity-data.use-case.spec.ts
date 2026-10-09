@@ -34,7 +34,7 @@ describe('PurgeExpiredIdentityDataUseCase', () => {
     // RF-15: criadas há mais de 7 dias e sem login nesses 7 dias.
     expect(retention.deleteUnverifiedUsers).toHaveBeenCalledWith({
       createdBefore: daysBefore(7),
-      noLoginSince: daysBefore(7),
+      noActivitySince: daysBefore(7),
     });
     expect(retention.deleteSessionsEndedBefore).toHaveBeenCalledWith(daysBefore(30));
     expect(retention.deleteUserTokensEndedBefore).toHaveBeenCalledWith(daysBefore(7));

@@ -22,7 +22,7 @@ export class RevokeSessionUseCase {
 
   async execute(context: RequestContext, sessionId: string): Promise<void> {
     const revoked = await this.deps.transactions.run(async () => {
-      const session = await this.deps.sessions.findById(sessionId);
+      const session = await this.deps.sessions.findByIdForUpdate(sessionId);
       if (!session || session.userId !== context.actor.userId) {
         throw new SessionNotFoundError();
       }

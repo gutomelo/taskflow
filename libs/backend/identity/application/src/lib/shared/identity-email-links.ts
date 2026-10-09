@@ -6,7 +6,12 @@ export type EmailDeliveryOutcome =
   | Readonly<{ status: 'sent' }>
   | Readonly<{
       status: 'discarded';
-      reason: 'user_not_found' | 'email_already_verified' | 'token_already_used' | 'invalid_email';
+      reason:
+        | 'user_not_found'
+        | 'email_already_verified'
+        | 'token_already_used'
+        | 'invalid_email'
+        | 'superseded';
     }>;
 
 export const SENT: EmailDeliveryOutcome = { status: 'sent' };

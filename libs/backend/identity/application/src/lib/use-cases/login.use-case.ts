@@ -54,29 +54,40 @@ export interface LoginDependencies {
   readonly pseudonymizer: Pseudonymizer;
 }
 
+/** Cobre a espera do semáforo do Argon2 (até 2 s) e o hash; expira se o processo cair. */
+export const LOGIN_ATTEMPT_LEASE_MS = 10_000;
+
 /** RF-05. Login permitido sem e-mail verificado (BR-013 atua só em organizações). */
 export class LoginUseCase {
   constructor(private readonly deps: LoginDependencies) {}
 
   async execute(command: LoginCommand): Promise<LoginResult> {
     const accountKey = `login:${this.deps.pseudonymizer.pseudonymize(command.email.trim().toLowerCase())}`;
-    // BR-018: durante a espera nem a senha correta é verificada (sem oráculo e sem custo de Argon2).
-    const failures = await this.deps.loginAttempts.get(accountKey);
-    const waitSeconds = remainingLoginDelaySeconds(failures, this.deps.clock.now());
-    if (waitSeconds > 0) {
-      throw new RateLimitedError(waitSeconds);
-    }
+    // BR-018 (T29/I2): uma tentativa por conta de cada vez. Sem isso, palpites paralelos leriam
+    // o mesmo contador antes de qualquer falha ser gravada e passariam todos pelo atraso.
+    const lease = await this.deps.loginAttempts.beginAttempt(accountKey, LOGIN_ATTEMPT_LEASE_MS);
+    if (!lease) throw new RateLimitedError(1);
 
     let user: User;
     try {
-      user = await this.authenticate(command.email, command.password);
-    } catch (error) {
-      if (error instanceof InvalidCredentialsError) {
-        await this.deps.loginAttempts.recordFailure(accountKey, this.deps.clock.now());
+      // Durante a espera nem a senha correta é verificada (sem oráculo e sem custo de Argon2).
+      const failures = await this.deps.loginAttempts.get(accountKey);
+      const waitSeconds = remainingLoginDelaySeconds(failures, this.deps.clock.now());
+      if (waitSeconds > 0) {
+        throw new RateLimitedError(waitSeconds);
       }
-      throw error;
+      try {
+        user = await this.authenticate(command.email, command.password);
+      } catch (error) {
+        if (error instanceof InvalidCredentialsError) {
+          await this.deps.loginAttempts.recordFailure(accountKey, this.deps.clock.now());
+        }
+        throw error;
+      }
+      await this.deps.loginAttempts.reset(accountKey);
+    } finally {
+      await lease.release();
     }
-    await this.deps.loginAttempts.reset(accountKey);
     await this.rehashIfOutdated(user, command.password);
 
     const now = this.deps.clock.now();

@@ -21,7 +21,7 @@ export class LogoutUseCase {
   async execute({ sessionId, refreshToken }: LogoutCommand): Promise<void> {
     await this.deps.transactions.run(async () => {
       const session = sessionId
-        ? await this.deps.sessions.findById(sessionId)
+        ? await this.deps.sessions.findByIdForUpdate(sessionId)
         : refreshToken
           ? await this.deps.sessions.findByRefreshTokenHashForUpdate(
               this.deps.secretTokens.hash(refreshToken),

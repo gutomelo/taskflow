@@ -61,6 +61,17 @@ export class PrismaSessionRepository implements SessionRepository {
     return this.load(sessionId);
   }
 
+  async findByIdForUpdate(sessionId: string): Promise<Session | null> {
+    const transaction = this.transactions.transactionalClient(
+      'SessionRepository.findByIdForUpdate',
+    );
+    // O lock vem antes da leitura dos tokens: um refresh em andamento termina primeiro e o
+    // estado carregado já inclui a rotação dele.
+    const locked = await transaction.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM sessions WHERE id = ${sessionId}::uuid FOR UPDATE`;
+    return locked.length === 0 ? null : this.load(sessionId);
+  }
+
   async listActiveByUser(userId: string, now: Date): Promise<ReadonlyArray<Session>> {
     const rows = await this.transactions.client().session.findMany({
       where: {

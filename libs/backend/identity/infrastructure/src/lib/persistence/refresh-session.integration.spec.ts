@@ -15,7 +15,9 @@ import {
   SessionRevokedError,
 } from '@taskflow/backend/identity/domain';
 import {
+  LogoutUseCase,
   RefreshSessionUseCase,
+  RevokeSessionUseCase,
   type SecurityEvent,
   type SessionRevocationList,
 } from '@taskflow/backend/identity/application';
@@ -39,6 +41,7 @@ describe('RefreshSessionUseCase with PostgreSQL (integration, CA-05)', () => {
   let users: PrismaUserRepository;
   let clock: MutableClock;
   let refresh: RefreshSessionUseCase;
+  let transactions: PrismaTransactionRunner;
   const secretTokens = new CryptoSecretTokenGenerator();
   const revoked = new Set<string>();
   const securityEvents: SecurityEvent[] = [];
@@ -47,7 +50,7 @@ describe('RefreshSessionUseCase with PostgreSQL (integration, CA-05)', () => {
   beforeAll(async () => {
     database = await startPostgresTestDatabase();
     prisma = createPrismaClient({ databaseUrl: database.connectionUri });
-    const transactions = new PrismaTransactionRunner(prisma);
+    transactions = new PrismaTransactionRunner(prisma);
     sessions = new PrismaSessionRepository(transactions);
     users = new PrismaUserRepository(transactions);
     clock = new MutableClock();
@@ -160,4 +163,74 @@ describe('RefreshSessionUseCase with PostgreSQL (integration, CA-05)', () => {
     expect(reasons).toEqual(['RefreshInProgressError', 'SessionRevokedError']);
     expect((await sessions.findById(sessionId))?.isRevoked).toBe(true);
   });
+
+  /**
+   * Lista de revogação que segura o chamador até `release()`: pausa logout/revogação depois de
+   * lerem a sessão e antes de gravarem, abrindo espaço para um refresh concorrente (T29/I1).
+   */
+  function gatedRevocationList() {
+    let release: () => void = () => undefined;
+    let paused: () => void = () => undefined;
+    const isPaused = new Promise<void>((resolve) => (paused = resolve));
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const list: SessionRevocationList = {
+      revoke: async (ids) => {
+        ids.forEach((id) => revoked.add(id));
+        paused();
+        await gate;
+      },
+      isRevoked: async (id) => revoked.has(id),
+    };
+    return { list, isPaused, release };
+  }
+
+  it.each([
+    [
+      'logout',
+      (list: SessionRevocationList, sessionId: string) =>
+        new LogoutUseCase({
+          sessions,
+          revocationList: list,
+          secretTokens,
+          transactions,
+          clock,
+        }).execute({
+          sessionId,
+          refreshToken: null,
+        }),
+    ],
+    [
+      'revoking it from the session list',
+      async (list: SessionRevocationList, sessionId: string) => {
+        const owner = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+        await new RevokeSessionUseCase({
+          sessions,
+          revocationList: list,
+          securityEvents: { record: () => undefined },
+          transactions,
+          clock,
+        }).execute(
+          { requestId: 'r', actor: { userId: owner.userId, sessionId: 'other' } },
+          sessionId,
+        );
+      },
+    ],
+  ])(
+    'T29/I1: %s racing a refresh ends the session (no stale write, no 500)',
+    async (_case, end) => {
+      const { sessionId, refreshToken } = await startSession();
+      const gated = gatedRevocationList();
+
+      const ending = end(gated.list, sessionId);
+      await gated.isPaused; // leu a sessão e está prestes a gravar
+      const refreshing = refresh.execute({ refreshToken, client });
+      // Dá ao refresh a chance de concluir antes da gravação (é o que acontecia sem o lock).
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      gated.release();
+
+      await expect(ending).resolves.toBeUndefined();
+      await expect(refreshing).rejects.toBeInstanceOf(SessionRevokedError);
+      expect((await sessions.findById(sessionId))?.isRevoked).toBe(true);
+    },
+  );
 });

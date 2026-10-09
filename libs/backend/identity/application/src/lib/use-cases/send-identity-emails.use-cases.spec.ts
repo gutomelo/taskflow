@@ -138,6 +138,7 @@ describe('SendPasswordResetUseCase', () => {
     await new SendPasswordResetUseCase(bed).execute({
       eventId: 'event-1',
       email: 'ana@exemplo.com',
+      occurredAt: bed.clock.now(),
     });
 
     const email = readFakeEmail(bed.emailSender.sent[0]);
@@ -163,15 +164,48 @@ describe('SendPasswordResetUseCase', () => {
     ).toBeNull();
   });
 
+  it('BR-016 (T29/I3): discards a request queued before the password was changed', async () => {
+    const bed = createIdentityTestbed();
+    await addUser(bed, 'ana@exemplo.com', { verified: true });
+    const requestedAt = bed.clock.now();
+    bed.clock.advance(60_000);
+    const user = await bed.users.findByEmail(EmailAddress.create('ana@exemplo.com'));
+    user?.changePassword('fake-hash:Nova-Senha-1', bed.clock.now());
+    if (user) await bed.users.save(user);
+    bed.clock.advance(60_000); // worker processa o evento atrasado
+
+    const outcome = await new SendPasswordResetUseCase(bed).execute({
+      eventId: 'event-1',
+      email: 'ana@exemplo.com',
+      occurredAt: requestedAt,
+    });
+
+    expect(outcome).toEqual({ status: 'discarded', reason: 'superseded' });
+    expect(bed.emailSender.attempted).toHaveLength(0);
+    expect(bed.userTokens.rows.size).toBe(0);
+  });
+
   it('silently discards requests for addresses without an account (BR-014)', async () => {
     const bed = createIdentityTestbed();
     const send = new SendPasswordResetUseCase(bed);
 
-    expect(await send.execute({ eventId: 'event-1', email: 'ninguem@exemplo.com' })).toEqual({
+    expect(
+      await send.execute({
+        eventId: 'event-1',
+        email: 'ninguem@exemplo.com',
+        occurredAt: bed.clock.now(),
+      }),
+    ).toEqual({
       status: 'discarded',
       reason: 'user_not_found',
     });
-    expect(await send.execute({ eventId: 'event-2', email: 'not an email' })).toEqual({
+    expect(
+      await send.execute({
+        eventId: 'event-2',
+        email: 'not an email',
+        occurredAt: bed.clock.now(),
+      }),
+    ).toEqual({
       status: 'discarded',
       reason: 'invalid_email',
     });

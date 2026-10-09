@@ -34,7 +34,7 @@ export class ResendEmailVerificationUseCase {
     const user = await this.deps.users.findById(context.actor.userId);
     if (!user) throw new SessionRevokedError();
     if (user.isEmailVerified) throw new EmailAlreadyVerifiedError();
-    if (!(await this.deps.emailThrottle.allow(user.email))) return;
+    if (!(await this.deps.emailThrottle.allowVerification(user.email))) return;
 
     await this.deps.transactions.run(() =>
       this.deps.outbox.append([

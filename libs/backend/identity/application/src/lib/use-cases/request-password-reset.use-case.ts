@@ -4,10 +4,11 @@ import {
   type TransactionRunner,
 } from '@taskflow/backend/shared/application';
 import { EmailAddress, type Clock, type IdGenerator } from '@taskflow/backend/shared/kernel';
+import type { ClientInfo } from '../shared/client-info';
 import type { EmailDeliveryThrottle } from '../shared/email-delivery-throttle';
 import { IdentityEventType } from '../shared/identity-events';
 
-export type RequestPasswordResetCommand = Readonly<{ email: string }>;
+export type RequestPasswordResetCommand = Readonly<{ email: string; client: ClientInfo }>;
 
 export interface RequestPasswordResetDependencies {
   readonly emailThrottle: EmailDeliveryThrottle;
@@ -25,9 +26,9 @@ export interface RequestPasswordResetDependencies {
 export class RequestPasswordResetUseCase {
   constructor(private readonly deps: RequestPasswordResetDependencies) {}
 
-  async execute({ email: rawEmail }: RequestPasswordResetCommand): Promise<void> {
+  async execute({ email: rawEmail, client }: RequestPasswordResetCommand): Promise<void> {
     const email = EmailAddress.create(rawEmail);
-    if (!(await this.deps.emailThrottle.allow(email))) return;
+    if (!(await this.deps.emailThrottle.allowPasswordReset(email, client))) return;
 
     await this.deps.transactions.run(() =>
       this.deps.outbox.append([

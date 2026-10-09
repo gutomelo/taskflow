@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ana, problem, settle, setupAuthTesting } from './auth.testing';
+import { ana, csrfCookie, problem, settle, setupAuthTesting } from './auth.testing';
 
 const SESSIONS = '/api/v1/me/sessions';
 const REFRESH = '/api/v1/auth/refresh';
@@ -141,5 +141,88 @@ describe('sessionRefreshInterceptor', () => {
     expect((await response).status).toBe(403);
     await settle();
     env.backend.expectNone(REFRESH);
+  });
+
+  describe('CSRF (T29/B1)', () => {
+    const PASSWORD = '/api/v1/me/password';
+    const CSRF = '/api/v1/auth/csrf';
+    const post = () =>
+      firstValueFrom(env.http.post(PASSWORD, { currentPassword: 'a', newPassword: 'b' }));
+    const csrfProblem = problem('CSRF_VALIDATION_FAILED');
+    const forbidden = { status: 403, statusText: 'Forbidden' };
+
+    it('retries a mutation after refresh with the CSRF token the refresh just re-issued', async () => {
+      env.store.signIn(ana);
+      const response = post();
+
+      const original = env.backend.expectOne(PASSWORD);
+      expect(original.request.headers.get('X-CSRF-Token')).toBe('csrf-1');
+      original.flush(problem('UNAUTHENTICATED'), unauthorized);
+      await settle();
+      csrfCookie.value = 'csrf-2'; // Set-Cookie da resposta do refresh
+      env.backend.expectOne(REFRESH).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+      const retry = env.backend.expectOne(PASSWORD);
+      expect(retry.request.headers.get('X-CSRF-Token')).toBe('csrf-2');
+      retry.flush(null, { status: 204, statusText: 'No Content' });
+
+      await response;
+    });
+
+    it('recovers once from a desynchronized CSRF cookie by asking for a new token', async () => {
+      env.store.signIn(ana);
+      const response = post();
+
+      env.backend.expectOne(PASSWORD).flush(csrfProblem, forbidden);
+      await settle();
+      csrfCookie.value = 'csrf-new';
+      env.backend.expectOne(CSRF).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+      const retry = env.backend.expectOne(PASSWORD);
+      expect(retry.request.headers.get('X-CSRF-Token')).toBe('csrf-new');
+      retry.flush(null, { status: 204, statusText: 'No Content' });
+
+      await response;
+    });
+
+    it('does not loop when the CSRF failure persists', async () => {
+      env.store.signIn(ana);
+      const response = failure(post());
+
+      env.backend.expectOne(PASSWORD).flush(csrfProblem, forbidden);
+      await settle();
+      env.backend.expectOne(CSRF).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+      env.backend.expectOne(PASSWORD).flush(csrfProblem, forbidden);
+
+      expect((await response).status).toBe(403);
+      await settle();
+      env.backend.expectNone(CSRF);
+    });
+
+    it('also recovers refresh and logout calls (no access cookie, other tab signed out)', async () => {
+      const response = firstValueFrom(env.http.post('/api/v1/auth/logout', null));
+
+      env.backend.expectOne('/api/v1/auth/logout').flush(csrfProblem, forbidden);
+      await settle();
+      env.backend.expectOne(CSRF).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+      env.backend
+        .expectOne('/api/v1/auth/logout')
+        .flush(null, { status: 204, statusText: 'No Content' });
+
+      await response;
+    });
+
+    it('leaves other 403 errors alone', async () => {
+      env.store.signIn(ana);
+      const response = failure(post());
+
+      env.backend.expectOne(PASSWORD).flush(problem('CURRENT_PASSWORD_INCORRECT'), forbidden);
+
+      expect((await response).status).toBe(403);
+      await settle();
+      env.backend.expectNone(CSRF);
+    });
   });
 });

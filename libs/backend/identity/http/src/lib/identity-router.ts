@@ -40,7 +40,7 @@ import {
   type CurrentUser,
   type SessionList,
 } from '@taskflow/contracts';
-import { emailKey, IDENTITY_RATE_LIMITS, refreshTokenKey, userKey } from './identity-rate-limits';
+import { emailKey, IDENTITY_RATE_LIMITS, userKey } from './identity-rate-limits';
 import {
   ACCESS_TOKEN_COOKIE,
   clearSessionCookies,
@@ -111,8 +111,10 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
   router.use(noStore);
   router.use(deps.authenticateOptional);
 
-  router.get('/auth/csrf', (request, response) => {
-    csrf.issue(response, request.actor?.sessionId);
+  // Mesmo vínculo de refresh/logout: com access token expirado, o token CSRF já sai ligado
+  // à sessão e o refresh do bootstrap passa (T29/B1).
+  router.get('/auth/csrf', async (request, response) => {
+    csrf.issue(response, await sessionBinding(request));
     response.status(204).end();
   });
 
@@ -161,7 +163,7 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
   router.post(
     '/auth/refresh',
     csrf.require(sessionBinding),
-    limit(limits.refreshBySession, refreshTokenKey(deps.pseudonymizer)),
+    limit(limits.refreshByIp, clientIpKey),
     async (request, response) => {
       const refreshToken = readCookie(request, REFRESH_TOKEN_COOKIE);
       if (!refreshToken) {
@@ -173,6 +175,11 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
           client: clientInfo(request),
         });
         setSessionCookies(response, result);
+        // Sem cookie de access (apagado ou vindo de outro navegador), o CSRF estava ligado a
+        // "anon": religa à sessão para as mutações seguintes não falharem com 403 (T29/B1).
+        if ((await sessionBinding(request)) !== result.sessionId) {
+          csrf.issue(response, result.sessionId);
+        }
         response.status(204).end();
       } catch (error) {
         // Sessão definitivamente inválida: remove cookies para o cliente voltar ao login.
@@ -182,13 +189,18 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     },
   );
 
-  router.post('/auth/logout', csrf.require(sessionBinding), async (request, response) => {
-    await useCases.logout.execute({
-      sessionId: request.actor?.sessionId ?? null,
-      refreshToken: readCookie(request, REFRESH_TOKEN_COOKIE) ?? null,
-    });
-    endSession(response);
-  });
+  router.post(
+    '/auth/logout',
+    csrf.require(sessionBinding),
+    limit(limits.logoutByIp, clientIpKey),
+    async (request, response) => {
+      await useCases.logout.execute({
+        sessionId: request.actor?.sessionId ?? null,
+        refreshToken: readCookie(request, REFRESH_TOKEN_COOKIE) ?? null,
+      });
+      endSession(response);
+    },
+  );
 
   router.post(
     '/auth/email-verification/resend',
@@ -221,7 +233,8 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     limit(limits.forgotPasswordByIp, clientIpKey),
     limit(limits.forgotPasswordByEmail, byEmail),
     async (request, response) => {
-      await useCases.requestPasswordReset.execute(parseBody(request, forgotPasswordRequestSchema));
+      const { email } = parseBody(request, forgotPasswordRequestSchema);
+      await useCases.requestPasswordReset.execute({ email, client: clientInfo(request) });
       response.status(202).end();
     },
   );

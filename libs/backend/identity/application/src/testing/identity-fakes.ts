@@ -179,6 +179,13 @@ export class InMemorySessionRepository implements SessionRepository, Transaction
     const row = this.rows.get(sessionId);
     return row ? Session.restore(row) : null;
   }
+  /** Sem concorrência no fake: equivale a `findById`, mas exige transação como o Prisma. */
+  async findByIdForUpdate(sessionId: string) {
+    if (!this.transactions.inTransaction) {
+      throw new Error('findByIdForUpdate requires a transaction');
+    }
+    return this.findById(sessionId);
+  }
   async listActiveByUser(userId: string, now: Date) {
     return [...this.rows.values()]
       .filter((row) => row.userId === userId)
@@ -443,6 +450,12 @@ export class RecordingSecurityEvents implements SecurityEventRecorder {
 
 export class InMemoryLoginAttemptTracker implements LoginAttemptTracker {
   state = new Map<string, LoginFailureState>();
+  readonly leased = new Set<string>();
+  async beginAttempt(accountKey: string) {
+    if (this.leased.has(accountKey)) return null;
+    this.leased.add(accountKey);
+    return { release: async () => void this.leased.delete(accountKey) };
+  }
   async get(accountKey: string): Promise<LoginFailureState> {
     return this.state.get(accountKey) ?? { consecutiveFailures: 0, lastFailureAt: null };
   }

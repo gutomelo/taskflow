@@ -22,6 +22,7 @@ export {
   type RegisterUserDependencies,
 } from './lib/use-cases/register-user.use-case';
 export {
+  LOGIN_ATTEMPT_LEASE_MS,
   LoginUseCase,
   type LoginCommand,
   type LoginDependencies,
@@ -75,7 +76,11 @@ export {
   type ResetPasswordCommand,
   type ResetPasswordDependencies,
 } from './lib/use-cases/reset-password.use-case';
-export type { LoginAttemptTracker, LoginFailureState } from './lib/ports/login-attempt-tracker';
+export type {
+  LoginAttemptLease,
+  LoginAttemptTracker,
+  LoginFailureState,
+} from './lib/ports/login-attempt-tracker';
 export {
   FREE_LOGIN_FAILURES,
   MAX_LOGIN_DELAY_SECONDS,

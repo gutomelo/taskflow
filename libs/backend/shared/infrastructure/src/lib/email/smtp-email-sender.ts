@@ -6,6 +6,11 @@ export interface SmtpEmailSenderOptions {
   readonly smtpUrl: string;
   /** Remetente, ex.: `TaskFlow <nao-responda@taskflow.app>`. */
   readonly from: string;
+  /**
+   * Exige TLS (STARTTLS obrigatório em `smtp:`). Ligado em produção (T29/B4): sem isso, um
+   * atacante na rede pode suprimir o STARTTLS e ler links de recuperação e credenciais SMTP.
+   */
+  readonly requireTls?: boolean;
 }
 
 /** Transporte SMTP genérico (ADR 0011). Falhas são lançadas para o job aplicar retry. */
@@ -21,8 +26,9 @@ export class SmtpEmailSender implements EmailSender {
     this.transporter = createTransport({
       host: url.hostname,
       port: url.port ? Number(url.port) : secure ? 465 : 587,
-      // smtps: TLS implícito; smtp: STARTTLS quando o servidor oferecer.
+      // smtps: TLS implícito; smtp: STARTTLS quando o servidor oferecer, ou sempre (`requireTls`).
       secure,
+      requireTLS: options.requireTls ?? false,
       ...(url.username
         ? {
             auth: {

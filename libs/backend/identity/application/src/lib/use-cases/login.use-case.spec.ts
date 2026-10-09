@@ -166,6 +166,36 @@ describe('LoginUseCase', () => {
       expect(bed.passwordHasher.verifyCalls).toHaveLength(verifyCallsBefore);
     });
 
+    it('BR-018 (T29/I2): parallel guesses after the wait cannot bypass it — only one reaches Argon2', async () => {
+      const { bed, useCase } = await setup();
+      await failTimes(useCase, 5);
+      bed.clock.advance(1_000);
+      const verifyCallsBefore = bed.passwordHasher.verifyCalls.length;
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, () => attempt(useCase, 'Senha-Errada1!')),
+      );
+
+      expect(bed.passwordHasher.verifyCalls.length - verifyCallsBefore).toBe(1);
+      const reasons = results.map((result) =>
+        result.status === 'rejected' ? (result.reason as Error).constructor.name : 'fulfilled',
+      );
+      expect(reasons.filter((name) => name === 'InvalidCredentialsError')).toHaveLength(1);
+      expect(reasons.filter((name) => name === 'RateLimitedError')).toHaveLength(9);
+    });
+
+    it('BR-018 (T29/I2): the account is free again after an attempt finishes, success or failure', async () => {
+      const { useCase } = await setup();
+
+      await failTimes(useCase, 1);
+      await expect(attempt(useCase, 'Tr0ca-de-Senha')).resolves.toMatchObject({
+        sessionId: expect.any(String),
+      });
+      await expect(attempt(useCase, 'Tr0ca-de-Senha')).resolves.toMatchObject({
+        sessionId: expect.any(String),
+      });
+    });
+
     it('BR-018: doubles the wait on each further failure', async () => {
       const { bed, useCase } = await setup();
       await failTimes(useCase, 5);

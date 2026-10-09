@@ -27,6 +27,7 @@ const emailJobSchema = z.discriminatedUnion('type', [
   z.object({
     eventId: z.uuid(),
     type: z.literal(IdentityEventType.passwordResetRequested),
+    occurredAt: z.iso.datetime(),
     payload: z.object({ email: z.string().min(3).max(254) }),
   }),
   z.object({
@@ -78,7 +79,11 @@ function dispatch(
     case IdentityEventType.emailVerificationRequested:
       return sendEmailVerification.execute({ eventId: job.eventId, userId: job.payload.userId });
     case IdentityEventType.passwordResetRequested:
-      return sendPasswordReset.execute({ eventId: job.eventId, email: job.payload.email });
+      return sendPasswordReset.execute({
+        eventId: job.eventId,
+        email: job.payload.email,
+        occurredAt: new Date(job.occurredAt),
+      });
     case IdentityEventType.accountAlreadyExistsNotice:
       return sendAccountNotice.execute({
         userId: job.payload.userId,

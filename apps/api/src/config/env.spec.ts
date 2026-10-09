@@ -104,6 +104,7 @@ describe('loadConfig', () => {
       const error = captureConfigurationError({
         ...validEnvironment,
         NODE_ENV: 'production',
+        APP_ORIGIN: 'https://app.taskflow.dev',
         CSRF_SECRET: `dev-only-${'x'.repeat(40)}`,
       });
 
@@ -134,10 +135,23 @@ describe('loadConfig', () => {
     const error = captureConfigurationError({ ...exampleEnvironment, NODE_ENV: 'production' });
 
     expect(variableNames(error)).toEqual([
+      'APP_ORIGIN',
       'AUTH_ACCESS_TOKEN_KEYS',
       'CSRF_SECRET',
       'LOG_PSEUDONYMIZATION_KEY',
     ]);
+  });
+
+  it('T29/B5: requires an https APP_ORIGIN in production only', () => {
+    const productionSecrets = {
+      ...validEnvironment,
+      NODE_ENV: 'production',
+      APP_ORIGIN: 'http://app.taskflow.dev',
+    };
+    expect(variableNames(captureConfigurationError(productionSecrets))).toEqual(['APP_ORIGIN']);
+    expect(() =>
+      loadConfig({ ...productionSecrets, APP_ORIGIN: 'https://app.taskflow.dev' }),
+    ).not.toThrow();
   });
 
   it('requires APP_ORIGIN to be a bare origin', () => {

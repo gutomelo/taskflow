@@ -61,6 +61,28 @@ describe('SmtpEmailSender (integration with Mailpit)', () => {
     ).rejects.toThrow();
   });
 
+  it('T29/B4: refuses to send in clear text when TLS is required (server without STARTTLS)', async () => {
+    const smtpUrl = `smtp://${mailpit.getHost()}:${mailpit.getMappedPort(1025)}`;
+    const strict = new SmtpEmailSender({
+      smtpUrl,
+      from: 'TaskFlow <nao-responda@taskflow.local>',
+      requireTls: true,
+    });
+    senders.push(strict);
+
+    await expect(
+      strict.send({
+        to: EmailAddress.create('ana@exemplo.com'),
+        subject: 'Link secreto',
+        text: 'x',
+        html: '<p>x</p>',
+      }),
+    ).rejects.toThrow();
+    const response = await fetch(`${mailpitApi()}/messages`);
+    const body = (await response.json()) as { messages: MailpitMessage[] };
+    expect(body.messages.some((message) => message.Subject === 'Link secreto')).toBe(false);
+  });
+
   it('refuses non-SMTP URLs at construction time', () => {
     expect(() => sender('http://localhost:1025')).toThrow('smtp: or smtps:');
   });

@@ -36,7 +36,7 @@ export class PurgeExpiredIdentityDataUseCase {
     const unverifiedCutoff = daysAgo(IDENTITY_RETENTION_DAYS.unverifiedAccounts);
     const unverifiedUsers = await retention.deleteUnverifiedUsers({
       createdBefore: unverifiedCutoff,
-      noLoginSince: unverifiedCutoff,
+      noActivitySince: unverifiedCutoff,
     });
     const sessions = await retention.deleteSessionsEndedBefore(
       daysAgo(IDENTITY_RETENTION_DAYS.endedSessions),

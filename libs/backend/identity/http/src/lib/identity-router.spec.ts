@@ -86,22 +86,60 @@ function buildApp(bed: IdentityTestbed) {
   return app;
 }
 
-/** Navegador de teste: guarda cookies e envia Origin + X-CSRF-Token como o Angular fará. */
+/**
+ * Navegador de teste: guarda cookies e envia Origin + X-CSRF-Token como o Angular fará.
+ * Respeita `Expires` pelo relógio do teste e simula o fechamento do navegador (cookies de sessão
+ * somem): sem isso, um cookie vencido continuaria sendo enviado e esconderia falhas reais (T29/B1).
+ */
 class Browser {
-  readonly cookies = new Map<string, string>();
+  private readonly jar = new Map<string, { value: string; expiresAt: Date | null }>();
   lastSetCookies: string[] = [];
 
-  constructor(private readonly app: express.Express) {}
+  constructor(
+    private readonly app: express.Express,
+    private readonly clock: { now(): Date },
+  ) {}
+
+  /** Cookies ainda válidos neste instante, como o navegador os enviaria. */
+  get cookies(): Map<string, string> {
+    const now = this.clock.now().getTime();
+    return new Map(
+      [...this.jar]
+        .filter(([, cookie]) => cookie.expiresAt === null || cookie.expiresAt.getTime() > now)
+        .map(([name, cookie]) => [name, cookie.value]),
+    );
+  }
+
+  /** Coloca um cookie à mão (ex.: refresh token roubado usado por outro cliente). */
+  plant(name: string, value: string): void {
+    this.jar.set(name, { value, expiresAt: null });
+  }
+
+  /** Remove um cookie à mão. */
+  forget(name: string): void {
+    this.jar.delete(name);
+  }
+
+  /** Fecha o navegador: cookies sem `Expires` (de sessão) são descartados. */
+  restart(): void {
+    for (const [name, cookie] of this.jar) if (cookie.expiresAt === null) this.jar.delete(name);
+  }
 
   private remember(response: Response): Response {
+    // `Clear-Site-Data: "cookies"` (logout): o navegador apaga todos os cookies da origem.
+    if (String(response.headers['clear-site-data'] ?? '').includes('"cookies"')) this.jar.clear();
     const raw = response.headers['set-cookie'];
     this.lastSetCookies = Array.isArray(raw) ? raw : raw ? [raw] : [];
     for (const cookie of this.lastSetCookies) {
       const [pair = ''] = cookie.split(';');
       const [name = '', ...value] = pair.split('=');
-      const expired = /Expires=Thu, 01 Jan 1970/i.test(cookie) || /Max-Age=0/i.test(cookie);
-      if (expired) this.cookies.delete(name);
-      else this.cookies.set(name, value.join('='));
+      const expires = /;\s*Expires=([^;]+)/i.exec(cookie)?.[1];
+      const expiresAt = expires ? new Date(expires) : null;
+      const expired =
+        /Max-Age=0/i.test(cookie) ||
+        (expiresAt !== null && expiresAt.getTime() <= this.clock.now().getTime());
+      if (expired) this.jar.delete(name);
+      else this.jar.set(name, { value: value.join('='), expiresAt });
     }
     return response;
   }
@@ -157,7 +195,7 @@ async function setup() {
   });
   await bed.users.add(user);
   const app = buildApp(bed);
-  const browser = new Browser(app);
+  const browser = new Browser(app, bed.clock);
   const login = () => browser.post('/auth/login', { email: 'ana@exemplo.com', password: PASSWORD });
   return { bed, user, app, browser, login };
 }
@@ -296,14 +334,62 @@ describe('Identity HTTP API', () => {
       expect((await browser.get('/me')).status).toBe(200);
     });
 
+    it('T29/B1: refreshes after the access cookie expired and keeps mutations working', async () => {
+      const { bed, browser, login } = await setup();
+      await login();
+      bed.clock.advance(16 * 60 * 1000);
+      expect((await browser.get('/me')).status).toBe(401);
+
+      expect((await browser.post('/auth/refresh')).status).toBe(204);
+
+      expect((await browser.get('/me')).status).toBe(200);
+      expect((await browser.post('/auth/email-verification/resend')).status).toBe(202);
+    });
+
+    it('T29/B1: signs out after 16 minutes idle (shared computer)', async () => {
+      const { bed, browser, login } = await setup();
+      await login();
+      bed.clock.advance(16 * 60 * 1000);
+
+      expect((await browser.post('/auth/logout')).status).toBe(204);
+
+      expect((await browser.post('/auth/refresh')).status).toBe(401);
+    });
+
+    it('T29/B1: resumes the session after the browser restarts (session cookies gone)', async () => {
+      const { bed, browser, login } = await setup();
+      await login();
+      bed.clock.advance(60 * 60 * 1000);
+      browser.restart();
+
+      // Bootstrap da SPA: novo cookie CSRF, /me 401, refresh e então uma mutação.
+      expect((await browser.get('/auth/csrf')).status).toBe(204);
+      expect((await browser.get('/me')).status).toBe(401);
+      expect((await browser.post('/auth/refresh')).status).toBe(204);
+      expect((await browser.post('/auth/email-verification/resend')).status).toBe(202);
+    });
+
+    it('T29/B1: re-binds the CSRF token to the session when the access cookie is gone entirely', async () => {
+      const { browser, login } = await setup();
+      await login();
+      browser.forget('__Host-tf_at');
+      browser.forget('__Host-tf_csrf');
+
+      // Bootstrap sem nenhum vínculo: token CSRF "anon"; o refresh precisa religá-lo à sessão.
+      expect((await browser.get('/auth/csrf')).status).toBe(204);
+      expect((await browser.post('/auth/refresh')).status).toBe(204);
+      expect(browser.setCookieFor('__Host-tf_csrf')).toBeDefined();
+      expect((await browser.post('/auth/email-verification/resend')).status).toBe(202);
+    });
+
     it('revokes the session on refresh token reuse and clears the cookies', async () => {
       const { bed, app, browser, login } = await setup();
       await login();
       const stolenRefresh = browser.cookies.get('__Secure-tf_rt') ?? '';
       await browser.post('/auth/refresh');
       bed.clock.advance(60_000);
-      const attacker = new Browser(app);
-      attacker.cookies.set('__Secure-tf_rt', stolenRefresh);
+      const attacker = new Browser(app, bed.clock);
+      attacker.plant('__Secure-tf_rt', stolenRefresh);
 
       const response = await attacker.post('/auth/refresh');
 
@@ -311,6 +397,19 @@ describe('Identity HTTP API', () => {
       expect(response.body.code).toBe('SESSION_REVOKED');
       expect(attacker.cookies.has('__Secure-tf_rt')).toBe(false);
       expect((await browser.get('/me')).status).toBe(401);
+    });
+
+    it('T29/B3: limits refresh attempts per IP, even with random tokens', async () => {
+      const { browser } = await setup();
+
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < 121; attempt += 1) {
+        browser.plant('__Secure-tf_rt', `forjado-${attempt}`);
+        statuses.push((await browser.post('/auth/refresh')).status);
+      }
+
+      expect(statuses.slice(0, 120).every((status) => status === 401)).toBe(true);
+      expect(statuses[120]).toBe(429);
     });
 
     it('answers 401 when there is no refresh cookie', async () => {

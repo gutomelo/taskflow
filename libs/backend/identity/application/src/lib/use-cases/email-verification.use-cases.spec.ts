@@ -211,3 +211,18 @@ describe('GetUserVerificationStatusUseCase (BR-013, for spec 002)', () => {
     expect(await status.execute('ghost')).toBeNull();
   });
 });
+
+describe('EmailDeliveryThrottle budgets (T29/M4)', () => {
+  it('keeps verification and password recovery budgets apart', async () => {
+    const bed = createIdentityTestbed();
+    const throttle = new EmailDeliveryThrottle(bed.rateLimiter, bed.pseudonymizer);
+    const ana = EmailAddress.create('ana@exemplo.com');
+    const attacker = { ipAddress: '192.0.2.50', userAgent: null };
+
+    expect(await throttle.allowPasswordReset(ana, attacker)).toBe(true);
+    expect(await throttle.allowPasswordReset(ana, attacker)).toBe(false);
+
+    expect(await throttle.allowVerification(ana)).toBe(true);
+    expect(await throttle.allowVerification(ana)).toBe(false);
+  });
+});
