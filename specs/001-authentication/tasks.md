@@ -42,7 +42,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T19 | `apps/worker`: composition root, health (`WORKER_PORT`), graceful shutdown, `pnpm dev` sobe api + web + worker                                                                             | T5            | teste de health; start/stop limpo                                                                                                   | [x]    |
 | T20 | `OutboxRelay` (SKIP LOCKED, `addBulk` com `jobId`, `removeOnComplete` por idade)                                                                                                           | T19, T9       | integração PostgreSQL + Redis: publica uma vez; dois relays concorrentes não duplicam                                               | [x]    |
 | T21 | Casos de uso `SendEmailVerification`, `SendPasswordReset`, `SendAccountNotice` + templates pt-BR (sem conteúdo do usuário em contas não verificadas; HTML escapado) + mapeamento no worker | T20, T14, T15 | integração: e-mail no Mailpit; retry após falha SMTP gera novo link válido; worker parado → entrega ao voltar (CA-01, CA-02, CA-13) | [x]    |
-| T22 | `PurgeExpiredIdentityData` agendado (diário), incluindo contas não verificadas há > 7 dias (RF-15)                                                                                         | T19           | integração com dados expirados                                                                                                      | [ ]    |
+| T22 | `PurgeExpiredIdentityData` agendado (diário), incluindo contas não verificadas há > 7 dias (RF-15)                                                                                         | T19           | integração com dados expirados                                                                                                      | [x]    |
 
 ## Bloco E — Frontend
 
@@ -318,3 +318,46 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Não executado**: smoke test manual com `pnpm dev` (cadastro via HTTP → Mailpit). Ele gravaria usuários e tokens no banco local e processaria os 8 eventos pendentes ali. A integração acima cobre o worker com componentes reais; a jornada HTTP completa entra no E2E da T28 (CA-14).
 - **Docs**: `docs/architecture/data-flow.md` (seção 4: consumidor, retry, token por evento, descartes e duplicidade aceita nos avisos).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 361 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (3 projetos, 69); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.
+
+### T22 — 2026-10-09
+
+- **Entregue**:
+  - **Aplicação**: `PurgeExpiredIdentityDataUseCase` com prazos explícitos (`IDENTITY_RETENTION_DAYS`):
+    - contas não verificadas: 7 dias sem login (RF-15);
+    - sessões encerradas: 30 dias;
+    - tokens de e-mail consumidos ou expirados: 7 dias.
+
+    Remove as contas primeiro, e as sessões e tokens delas caem por cascata. Porta `IdentityDataRetention`.
+
+  - **Infraestrutura (identity)**: `PrismaIdentityDataRetention`, SQL em lotes de 1.000 linhas (instruções autocommit, locks curtos):
+    - sessão "encerrada" = revogada, expirada por inatividade ou expirada pelo limite absoluto;
+    - na remoção de contas, o `DELETE` externo repete `email_verified_at IS NULL`, e o PostgreSQL reavalia a condição se a conta for verificada durante a limpeza.
+  - **Shared/infrastructure**: `PrismaOutboxRetention`. Remove eventos publicados há mais de 7 dias, inclusive o payload de recuperação com e-mail; eventos pendentes nunca são removidos. `createEventWorker` passou a ser genérico no tipo do job.
+  - **Worker** (`maintenance.ts`):
+    - fila `maintenance` com job scheduler do BullMQ (`0 0 3 * * *`, `tz: UTC`): o `upsert` no start é idempotente, e com vários workers há uma única execução por ocorrência;
+    - consumidor com concorrência 1; job com 3 tentativas (backoff exponencial de 60 s);
+    - se o Redis estiver fora no start, o registro do agendamento é tentado de novo a cada 60 s;
+    - o relatório da limpeza vai para o log `info`;
+    - integrado ao `main.ts`, inclusive ao desligamento limpo.
+- **Decisões tomadas na implementação**:
+  - A limpeza da outbox ficou fora do contexto `identity`, porque a tabela é da `shared/infrastructure`. O design a listava dentro de `PurgeExpiredIdentityData`; ela roda no mesmo job diário.
+  - "Sem login no período" (RF-15) = nenhuma sessão criada nos últimos 7 dias. Quem cadastrou o e-mail de outra pessoa pode manter a conta fazendo login, mas o titular real recupera o endereço pela redefinição de senha, que marca o e-mail como verificado e revoga as sessões (BR-016/BR-017).
+  - Sem índices novos: a busca de contas usa o índice parcial `users_unverified_created_at_idx`; sessões, tokens e outbox são varridos uma vez por dia, o que é aceitável no volume do MVP. Se o volume crescer, medir e criar índices por data.
+- **Testes**:
+  - aplicação +2: prazos, ordem e relatório;
+  - integração `PrismaIdentityDataRetention` (4): sessões nos três modos de encerramento × recentes × ativa, com refresh tokens por cascata; tokens consumidos ou expirados × recentes × pendente; **RF-15** (abandonada removida com sessões e tokens; login recente, conta nova e conta verificada mantidas); vários lotes;
+  - integração `PrismaOutboxRetention` (1): publicados antigos removidos em lotes; recente e pendente antigo mantidos;
+  - integração do worker (`maintenance.integration.spec.ts`, 2): dois workers ⇒ um agendamento (`0 0 3 * * *`, UTC) e um job agendado para 03:00 UTC; job executado ⇒ relatório `{ unverifiedUsers: 1, sessions: 0, userTokens: 0, outboxEvents: 1 }` e dados removidos.
+- **Mutation testing** (diff confirmado em cada mutação; arquivos restaurados e conferidos com `grep`):
+  - sem `NOT EXISTS` de login recente ⇒ 1 falha;
+  - sem expiração por inatividade ⇒ 1 falha;
+  - só o primeiro lote ⇒ 1 falha;
+  - retenção de sessões de 7 dias ⇒ 1 falha;
+  - remover só a condição `email_verified_at IS NULL` da subconsulta **sobrevive**, porque a condição externa cobre o caso; remover as duas ⇒ 1 falha;
+  - não mutada: `published_at IS NOT NULL` na outbox, redundante porque `NULL < data` já é falso.
+
+  A proteção contra a corrida "verificação durante a limpeza" não tem teste determinístico próprio.
+
+- **Smoke test** (build de produção; banco descartável e índice 1 do Redis, removidos depois; banco local intacto): start ⇒ "Daily data purge scheduled" (`0 0 3 * * *`, UTC) e próximo job em 10/10/2026 03:00 UTC; SIGTERM ⇒ saída 0.
+- **Docs**: `docs/architecture/overview.md` (Backend → Retenção).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 363 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (3 projetos, 76); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.

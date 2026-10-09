@@ -24,3 +24,4 @@ export {
   RedisLoginAttemptTracker,
 } from './lib/security/redis-login-attempt-tracker';
 export { ptBrIdentityEmailTemplates } from './lib/email/pt-br-identity-email-templates';
+export { PrismaIdentityDataRetention } from './lib/persistence/prisma-identity-data-retention';

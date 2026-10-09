@@ -103,3 +103,9 @@ export {
   type SendAccountNoticeCommand,
   type SendAccountNoticeDependencies,
 } from './lib/use-cases/send-account-notice.use-case';
+export type { IdentityDataRetention } from './lib/ports/identity-data-retention';
+export {
+  IDENTITY_RETENTION_DAYS,
+  PurgeExpiredIdentityDataUseCase,
+  type IdentityPurgeReport,
+} from './lib/use-cases/purge-expired-identity-data.use-case';

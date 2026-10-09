@@ -60,3 +60,4 @@ export {
   type EventWorker,
   type EventWorkerOptions,
 } from './lib/events/bullmq-event-worker';
+export { PrismaOutboxRetention } from './lib/events/prisma-outbox-retention';

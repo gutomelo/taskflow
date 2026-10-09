@@ -14,9 +14,10 @@ import {
 import { loadWorkerConfig } from './config/env';
 import { createEmailDelivery } from './email-delivery';
 import { createHealthServer } from './health/health-server';
+import { createMaintenance } from './maintenance';
 
 // Composition root do worker: único lugar que lê o ambiente, cria clientes externos e liga
-// os processadores (relay da outbox e envio de e-mails). A limpeza agendada (T22) entra aqui.
+// os processadores: relay da outbox, envio de e-mails e limpeza diária de dados vencidos.
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -66,6 +67,7 @@ async function bootstrap(): Promise<void> {
   });
   logger.info({ host: config.host, port: config.port }, 'TaskFlow worker health listening');
 
+  const clock = new SystemClock();
   const emailSender = new SmtpEmailSender({ smtpUrl: config.smtpUrl, from: config.emailFrom });
   const emailDelivery = createEmailDelivery({
     prisma,
@@ -74,10 +76,18 @@ async function bootstrap(): Promise<void> {
     emailSender,
     appUrl: config.appUrl,
     idGenerator: new UuidV7Generator(),
-    clock: new SystemClock(),
+    clock,
     logger,
   });
   emailDelivery.start();
+  const maintenance = createMaintenance({
+    prisma,
+    redis,
+    redisUrl: config.redisUrl,
+    clock,
+    logger,
+  });
+  maintenance.start();
 
   let isShuttingDown = false;
   const shutdown = async (signal: NodeJS.Signals) => {
@@ -91,8 +101,8 @@ async function bootstrap(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
-    // Envios e lote da outbox em andamento terminam antes de SMTP e conexões fecharem.
-    const failures = await emailDelivery.stop();
+    // Envios, lote da outbox e limpeza em andamento terminam antes de SMTP e conexões fecharem.
+    const failures = (await Promise.all([emailDelivery.stop(), maintenance.stop()])).flat();
     emailSender.close();
     const results = await Promise.allSettled([
       closeServer(healthServer),

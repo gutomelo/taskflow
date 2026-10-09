@@ -2,16 +2,16 @@ import { Redis } from 'ioredis';
 import { Worker, type Job } from 'bullmq';
 import type { OutboxJobData } from './bullmq-event-publisher';
 
-export interface EventWorkerOptions<TResult> {
+export interface EventWorkerOptions<TResult, TData = OutboxJobData> {
   readonly queueName: string;
   readonly redisUrl: string;
   readonly connectionName: string;
   readonly concurrency?: number;
-  readonly processor: (job: Job<OutboxJobData>) => Promise<TResult>;
+  readonly processor: (job: Job<TData>) => Promise<TResult>;
 }
 
-export interface EventWorker<TResult> {
-  readonly worker: Worker<OutboxJobData, TResult>;
+export interface EventWorker<TResult, TData = OutboxJobData> {
+  readonly worker: Worker<TData, TResult>;
   /** Para de buscar jobs, aguarda os ativos terminarem e fecha a conexão própria. */
   close(): Promise<void>;
 }
@@ -20,15 +20,15 @@ export interface EventWorker<TResult> {
  * Consumidor BullMQ com conexão própria. Diferente do produtor (fail-fast), o `Worker` exige
  * `maxRetriesPerRequest: null`: comandos bloqueantes esperam o Redis voltar em vez de falhar.
  */
-export function createEventWorker<TResult>({
+export function createEventWorker<TResult, TData = OutboxJobData>({
   queueName,
   redisUrl,
   connectionName,
   concurrency = 5,
   processor,
-}: EventWorkerOptions<TResult>): EventWorker<TResult> {
+}: EventWorkerOptions<TResult, TData>): EventWorker<TResult, TData> {
   const connection = new Redis(redisUrl, { connectionName, maxRetriesPerRequest: null });
-  const worker = new Worker<OutboxJobData, TResult>(queueName, processor, {
+  const worker = new Worker<TData, TResult>(queueName, processor, {
     connection,
     concurrency,
   });

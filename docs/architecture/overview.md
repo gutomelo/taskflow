@@ -95,6 +95,7 @@ Detalhes e restrições verificáveis em [dependency-rules.md](dependency-rules.
 - **Erros**: `application/problem+json` (RFC 9457) com `code` estável e `requestId`; `DomainError` mapeado por `code` no error handler de `libs/backend/shared/http`.
 - **Transações**: casos de uso delimitam a transação via `TransactionRunner`; a implementação Prisma guarda o cliente da transação em `AsyncLocalStorage` (restrito à infraestrutura) e chamadas aninhadas reutilizam a transação externa.
 - **Outbox**: eventos de integração gravados em `outbox_events` na mesma transação (ADR 0011); o `OutboxRelay` do worker publica-os no BullMQ (`FOR UPDATE SKIP LOCKED`, `jobId` = id do evento). Fluxo em [data-flow.md](data-flow.md#4-comunicação-assíncrona).
+- **Retenção**: job diário do worker (03:00 UTC, job scheduler do BullMQ: uma execução por ocorrência mesmo com vários workers) remove, em lotes, contas não verificadas há mais de 7 dias sem login (RF-15), sessões encerradas há mais de 30 dias, tokens de e-mail encerrados há mais de 7 dias e eventos da outbox publicados há mais de 7 dias.
 - **Logs**: Pino com `requestId` (aceita `x-request-id` válido do proxy ou gera UUID), redação de credenciais e serializers mínimos (sem headers completos nem query string).
 - **Health**: `/health/live` (processo vivo) e `/health/ready` (PostgreSQL + Redis com timeout).
 
