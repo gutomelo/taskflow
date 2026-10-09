@@ -105,6 +105,7 @@ Detalhes e restrições verificáveis em [dependency-rules.md](dependency-rules.
 - Organização por feature (`app/features/*`) e `app/core` para infraestrutura transversal; extração para `libs/frontend` quando houver reuso (ADR [0009](adr/0009-frontend-state-with-signals.md)).
 - Design System com tokens CSS consumidos por Tailwind e Angular Material ([design-system.md](../design-system.md), ADR [0010](adr/0010-tailwind-and-angular-material.md)).
 - Em desenvolvimento, o dev server faz proxy de `/api` e `/health` para a API: mesma origem, sem CORS, cookies `SameSite` funcionam como em produção atrás de um reverse proxy.
+- **Segurança do documento** (Nginx em produção, dev server em desenvolvimento — mesma política): CSP sem origens de terceiros com nonce por resposta (`$request_id` no Nginx, aplicado pelo Angular via `ngCspNonce`), `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff`; `index.html` com `no-store`. Configuração em `infra/docker/spa-document.conf` e `apps/web/project.json` (`serve.options.headers`).
 
 ## Padrões de projeto
 

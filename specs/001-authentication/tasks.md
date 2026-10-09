@@ -48,7 +48,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 
 | ID  | Tarefa                                                                                                                                                                 | Depende de   | Verificação                                          | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------- | ------ |
-| T23 | Fonte Inter auto-hospedada; `Referrer-Policy: no-referrer` e CSP restrita (Nginx e dev server); `/status` movida                                                       | —            | build; headers verificados                           | [ ]    |
+| T23 | Fonte Inter auto-hospedada; `Referrer-Policy: no-referrer` e CSP restrita (Nginx e dev server); `/status` movida                                                       | —            | build; headers verificados                           | [x]    |
 | T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [ ]    |
 | T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [ ]    |
 | T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [ ]    |
@@ -361,3 +361,36 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Smoke test** (build de produção; banco descartável e índice 1 do Redis, removidos depois; banco local intacto): start ⇒ "Daily data purge scheduled" (`0 0 3 * * *`, UTC) e próximo job em 10/10/2026 03:00 UTC; SIGTERM ⇒ saída 0.
 - **Docs**: `docs/architecture/overview.md` (Backend → Retenção).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 363 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (3 projetos, 76); `pnpm e2e --skip-nx-cache` ✔ (2); `pnpm format:check` ✔.
+
+### T23 — 2026-10-09
+
+- **Entregue**:
+  - **Fonte**: Inter auto-hospedada via `@fontsource-variable/inter` 5.3.0 (OFL 1.1), primeiro item de `styles` no build. Token `--tf-font-sans: 'Inter Variable', …`. Os 7 subconjuntos vão para `media/` e o navegador baixa só os usados (`unicode-range`). Removidos os `<link>` do Google Fonts.
+  - **CSP com nonce por resposta**:
+    - política: `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'nonce-…'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
+    - o `index.html` traz `ngCspNonce="__CSP_NONCE__"`. O Angular aplica o nonce aos estilos que injeta, e o build já o propaga ao _critical CSS_ (`<style nonce>`) e ao script de troca de `media` (sem `onload` inline).
+  - **Nginx** (`infra/docker/spa-document.conf`, incluído no `location /`): `sub_filter` troca o marcador por `$request_id` (128 bits por requisição), o mesmo valor do header; documento com `Cache-Control: no-store`. `security-headers.conf` com `Referrer-Policy: no-referrer` (antes `strict-origin-when-cross-origin`). O Dockerfile do web copia o novo snippet.
+  - **Dev server** (`serve.options.headers`): mesma política com o nonce fixo `__CSP_NONCE__` (só em desenvolvimento), mais `Referrer-Policy: no-referrer` e `nosniff`.
+  - **Rotas**: a página de status passou para `/status`; `''` e `**` redirecionam para ela até a home autenticada existir (T25–T27).
+  - `apps/web-e2e/tsconfig.json` ganhou `dom` no `lib`, porque as funções de `page.evaluate` rodam no navegador.
+- **Testes E2E** (`document-security.spec.ts`, +3; os 2 existentes migrados para `/status`):
+  - headers do documento (CSP com nonce, sem `unsafe-inline` nem origens `http(s)`, `no-referrer`);
+  - página sem violações de CSP no console e sem requisições a outras origens; `FontFace` "Inter Variable" `loaded` e `.woff2` da própria origem;
+  - estilos injetados em runtime: `/health/ready` simulado como degradado renderiza o `MatButton`; os `<style>` têm o nonce do documento e o botão fica `inline-flex` (CSS do Material aplicado);
+  - redirecionamento de `/` e de rota desconhecida para `/status`.
+- **Mutation testing** (alteração confirmada antes de ler o resultado; `project.json` restaurado e conferido):
+  - nonce do header diferente do documento ⇒ o teste de estilos injetados falha;
+  - fonte fora do build ⇒ a primeira versão do teste **não detectou**, porque `document.fonts.check()` é verdadeiro sem nenhum `@font-face` correspondente. O teste foi reforçado (`FontFace` carregado + `.woff2` da origem) e passou a detectar.
+- **Verificação do Nginx de produção** (imagem `nginx-unprivileged:1.29-alpine` com a config e o build de produção montados, sem construir a imagem por falta de espaço em disco):
+  - duas requisições geram nonces diferentes, idênticos entre header e documento, sem marcador remanescente;
+  - `no-store`, `no-referrer`, `DENY` e `nosniff` presentes;
+  - fonte `font/woff2` com `max-age=31536000, immutable`.
+
+  No Chrome, com a API ausente (estado "indisponível", que renderiza o `MatButton`):
+  - 5/5 `<style>` com o nonce e botão estilizado (`display: flex`, por estar num contêiner flex);
+  - Inter carregada (subconjunto latino) e 0 requisições de terceiros;
+  - console sem violações de CSP; o único erro é o 502 esperado.
+
+- **Docs**: `docs/design-system.md` (fonte auto-hospedada) e `docs/architecture/overview.md` (Frontend → segurança do documento).
+- **Pendente**: o build da imagem `web` completa não foi executado (97% de disco ocupado); o teste equivalente com a imagem base do Nginx está registrado acima.
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 363 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (6); `pnpm format:check` ✔.

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('System status page', () => {
   test('shows every dependency as operational when the infrastructure is up', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/status');
 
     await expect(page).toHaveTitle('Status do sistema · TaskFlow');
     await expect(page.getByRole('heading', { level: 1, name: 'Status do sistema' })).toBeVisible();
@@ -14,7 +14,7 @@ test.describe('System status page', () => {
   });
 
   test('offers a skip link to the main content for keyboard users', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/status');
 
     await page.keyboard.press('Tab');
     const skipLink = page.getByRole('link', { name: 'Pular para o conteúdo' });

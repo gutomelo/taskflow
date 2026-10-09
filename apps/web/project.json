@@ -21,6 +21,7 @@
           }
         ],
         "styles": [
+          "node_modules/@fontsource-variable/inter/index.css",
           "apps/web/src/styles/tokens.css",
           "apps/web/src/styles/tailwind.css",
           "apps/web/src/styles/material-theme.scss"
@@ -63,7 +64,12 @@
       },
       "options": {
         "port": 4200,
-        "proxyConfig": "apps/web/proxy.conf.json"
+        "proxyConfig": "apps/web/proxy.conf.json",
+        "headers": {
+          "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-__CSP_NONCE__'; style-src 'self' 'nonce-__CSP_NONCE__'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+          "Referrer-Policy": "no-referrer",
+          "X-Content-Type-Options": "nosniff"
+        }
       }
     },
     "lint": {

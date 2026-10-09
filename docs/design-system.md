@@ -88,7 +88,7 @@ Ao propor um token novo, calcule e registre o contraste nesta tabela.
 
 ## Tipografia
 
-- Família: **Inter** (SIL Open Font License 1.1 — uso livre), carregada do Google Fonts com `display=swap`; fallback `system-ui`. Auto-hospedar a fonte é uma melhoria planejada (privacidade e desempenho).
+- Família: **Inter** (SIL Open Font License 1.1 — uso livre), **auto-hospedada** pelo pacote `@fontsource-variable/inter` (fonte variável, eixo de peso; `font-family: 'Inter Variable'`; `display: swap`; o navegador só baixa os subconjuntos usados via `unicode-range`); fallback `system-ui`. Sem Google Fonts: a CSP do SPA não admite origens de terceiros (spec 001, T23).
 - Escala (rem): `0.75` legenda · `0.875` corpo compacto (listas, cards) · `1` corpo · `1.125` subtítulo · `1.25` título de seção · `1.5` título de página · `1.875` destaque.
 - Pesos: 400 corpo, 500 rótulos/botões, 600 títulos. Números tabulares (`font-variant-numeric: tabular-nums`) em métricas.
 
