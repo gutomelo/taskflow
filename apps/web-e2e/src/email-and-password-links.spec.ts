@@ -30,7 +30,8 @@ test('verification link: sign in first, keep the token out of every URL, confirm
 
   await page.getByRole('button', { name: 'Entrar para confirmar' }).click();
   await expect(page).toHaveURL(/\/login\?returnUrl=%2Fverify-email$/);
-  await page.getByLabel('E-mail').fill('ana@exemplo.com');
+  await expect(page.getByRole('heading', { level: 1, name: 'Entrar no TaskFlow' })).toBeVisible();
+  await page.getByLabel('E-mail', { exact: true }).fill('ana@exemplo.com');
   await page.getByLabel('Senha', { exact: true }).fill('Correct-Horse-9');
   await page.getByRole('button', { name: 'Entrar' }).click();
 

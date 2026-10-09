@@ -28,7 +28,9 @@ test('CA-14: register, confirm by e-mail, sign in, see the session and sign out'
   await expect(page.getByTestId('verify-email-state')).toHaveAttribute('data-state', 'needs_login');
   expect(page.url()).not.toContain('token=');
   await page.getByRole('button', { name: 'Entrar para confirmar' }).click();
-  await page.getByLabel('E-mail').fill(email);
+  // Espera o login renderizar: na transição, "Confirmar e-mail" (página anterior) também casaria.
+  await expect(page.getByRole('heading', { level: 1, name: 'Entrar no TaskFlow' })).toBeVisible();
+  await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Entrar' }).click();
 
