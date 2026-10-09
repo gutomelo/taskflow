@@ -1,6 +1,12 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express';
-import type { Pseudonymizer } from '@taskflow/backend/shared/application';
+import type {
+  Pseudonymizer,
+  RateLimiter,
+  RateLimitPolicy,
+} from '@taskflow/backend/shared/application';
 import {
+  clientIpKey,
+  createRateLimit,
   HttpError,
   parseBody,
   readCookie,
@@ -34,6 +40,7 @@ import {
   type CurrentUser,
   type SessionList,
 } from '@taskflow/contracts';
+import { emailKey, IDENTITY_RATE_LIMITS, refreshTokenKey, userKey } from './identity-rate-limits';
 import {
   ACCESS_TOKEN_COOKIE,
   clearSessionCookies,
@@ -65,6 +72,8 @@ export interface IdentityHttpDependencies {
   /** Para descobrir a sessão (vínculo CSRF) quando o access token já expirou. */
   readonly accessTokens: AccessTokenVerifier;
   readonly pseudonymizer: Pseudonymizer;
+  /** Limites por endpoint (RNF-05); BR-018 é aplicada pelo caso de uso de login. */
+  readonly rateLimiter: RateLimiter;
 }
 
 const clientInfo = (request: Request) => ({
@@ -84,6 +93,10 @@ const noStore: RequestHandler = (_request, response, next) => {
 export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
   const { useCases, csrf } = deps;
   const router = Router();
+  const limit = (policy: RateLimitPolicy, key: (request: Request) => string | undefined) =>
+    createRateLimit({ limiter: deps.rateLimiter, policy, key });
+  const limits = IDENTITY_RATE_LIMITS;
+  const byEmail = emailKey(deps.pseudonymizer);
 
   /** Vínculo CSRF pela sessão do access token, mesmo expirado (refresh e logout). */
   const sessionBinding = async (request: Request): Promise<string> => {
@@ -103,52 +116,71 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     response.status(204).end();
   });
 
-  router.post('/auth/register', csrf.require(), async (request, response) => {
-    await useCases.register.execute(parseBody(request, registerRequestSchema));
-    response.status(202).end();
-  });
+  router.post(
+    '/auth/register',
+    csrf.require(),
+    limit(limits.registerByIp, clientIpKey),
+    async (request, response) => {
+      await useCases.register.execute(parseBody(request, registerRequestSchema));
+      response.status(202).end();
+    },
+  );
 
-  router.post('/auth/login', csrf.require(), async (request, response) => {
-    const { email, password } = parseBody(request, loginRequestSchema);
-    try {
-      const result = await useCases.login.execute({ email, password, client: clientInfo(request) });
-      setSessionCookies(response, result);
-      csrf.issue(response, result.sessionId);
-      request.log.info({
-        event: 'auth.login_succeeded',
-        userId: result.user.id,
-        sessionId: result.sessionId,
-      });
-      response.status(200).json(result.user satisfies CurrentUser);
-    } catch (error) {
-      if (error instanceof InvalidCredentialsError) {
-        request.log.warn({
-          event: 'auth.login_failed',
-          emailPseudonym: deps.pseudonymizer.pseudonymize(email.trim().toLowerCase()),
+  router.post(
+    '/auth/login',
+    csrf.require(),
+    limit(limits.loginByIp, clientIpKey),
+    async (request, response) => {
+      const { email, password } = parseBody(request, loginRequestSchema);
+      try {
+        const result = await useCases.login.execute({
+          email,
+          password,
+          client: clientInfo(request),
         });
+        setSessionCookies(response, result);
+        csrf.issue(response, result.sessionId);
+        request.log.info({
+          event: 'auth.login_succeeded',
+          userId: result.user.id,
+          sessionId: result.sessionId,
+        });
+        response.status(200).json(result.user satisfies CurrentUser);
+      } catch (error) {
+        if (error instanceof InvalidCredentialsError) {
+          request.log.warn({
+            event: 'auth.login_failed',
+            emailPseudonym: deps.pseudonymizer.pseudonymize(email.trim().toLowerCase()),
+          });
+        }
+        throw error;
       }
-      throw error;
-    }
-  });
+    },
+  );
 
-  router.post('/auth/refresh', csrf.require(sessionBinding), async (request, response) => {
-    const refreshToken = readCookie(request, REFRESH_TOKEN_COOKIE);
-    if (!refreshToken) {
-      throw new HttpError(401, 'SESSION_REVOKED', 'Sessão encerrada. Entre novamente.');
-    }
-    try {
-      const result = await useCases.refreshSession.execute({
-        refreshToken,
-        client: clientInfo(request),
-      });
-      setSessionCookies(response, result);
-      response.status(204).end();
-    } catch (error) {
-      // Sessão definitivamente inválida: remove cookies para o cliente voltar ao login.
-      if (isTerminalSessionError(error)) clearSessionCookies(response);
-      throw error;
-    }
-  });
+  router.post(
+    '/auth/refresh',
+    csrf.require(sessionBinding),
+    limit(limits.refreshBySession, refreshTokenKey(deps.pseudonymizer)),
+    async (request, response) => {
+      const refreshToken = readCookie(request, REFRESH_TOKEN_COOKIE);
+      if (!refreshToken) {
+        throw new HttpError(401, 'SESSION_REVOKED', 'Sessão encerrada. Entre novamente.');
+      }
+      try {
+        const result = await useCases.refreshSession.execute({
+          refreshToken,
+          client: clientInfo(request),
+        });
+        setSessionCookies(response, result);
+        response.status(204).end();
+      } catch (error) {
+        // Sessão definitivamente inválida: remove cookies para o cliente voltar ao login.
+        if (isTerminalSessionError(error)) clearSessionCookies(response);
+        throw error;
+      }
+    },
+  );
 
   router.post('/auth/logout', csrf.require(sessionBinding), async (request, response) => {
     await useCases.logout.execute({
@@ -162,6 +194,7 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     '/auth/email-verification/resend',
     deps.authenticate,
     csrf.require(),
+    limit(limits.resendVerificationByUser, userKey),
     async (request, response) => {
       await useCases.resendEmailVerification.execute(requestContextFrom(request));
       response.status(202).end();
@@ -172,6 +205,7 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     '/auth/email-verification/confirm',
     deps.authenticate,
     csrf.require(),
+    limit(limits.confirmVerificationByUser, userKey),
     async (request, response) => {
       await useCases.confirmEmailVerification.execute(
         requestContextFrom(request),
@@ -181,34 +215,51 @@ export function createIdentityRouter(deps: IdentityHttpDependencies): Router {
     },
   );
 
-  router.post('/auth/password/forgot', csrf.require(), async (request, response) => {
-    await useCases.requestPasswordReset.execute(parseBody(request, forgotPasswordRequestSchema));
-    response.status(202).end();
-  });
+  router.post(
+    '/auth/password/forgot',
+    csrf.require(),
+    limit(limits.forgotPasswordByIp, clientIpKey),
+    limit(limits.forgotPasswordByEmail, byEmail),
+    async (request, response) => {
+      await useCases.requestPasswordReset.execute(parseBody(request, forgotPasswordRequestSchema));
+      response.status(202).end();
+    },
+  );
 
-  router.post('/auth/password/reset', csrf.require(), async (request, response) => {
-    await useCases.resetPassword.execute(parseBody(request, resetPasswordRequestSchema));
-    // Todas as sessões foram revogadas: limpa cookies eventualmente presentes neste navegador.
-    clearSessionCookies(response);
-    response.status(204).end();
-  });
+  router.post(
+    '/auth/password/reset',
+    csrf.require(),
+    limit(limits.resetPasswordByIp, clientIpKey),
+    async (request, response) => {
+      await useCases.resetPassword.execute(parseBody(request, resetPasswordRequestSchema));
+      // Todas as sessões foram revogadas: limpa cookies eventualmente presentes neste navegador.
+      clearSessionCookies(response);
+      response.status(204).end();
+    },
+  );
 
   router.get('/me', deps.authenticate, async (request, response) => {
     const user = await useCases.getCurrentUser.execute(requestContextFrom(request));
     response.json(user satisfies CurrentUser);
   });
 
-  router.post('/me/password', deps.authenticate, csrf.require(), async (request, response) => {
-    const { currentPassword, newPassword } = parseBody(request, changePasswordRequestSchema);
-    const result = await useCases.changePassword.execute(requestContextFrom(request), {
-      currentPassword,
-      newPassword,
-      client: clientInfo(request),
-    });
-    setSessionCookies(response, result);
-    csrf.issue(response, result.sessionId);
-    response.status(204).end();
-  });
+  router.post(
+    '/me/password',
+    deps.authenticate,
+    csrf.require(),
+    limit(limits.changePasswordByUser, userKey),
+    async (request, response) => {
+      const { currentPassword, newPassword } = parseBody(request, changePasswordRequestSchema);
+      const result = await useCases.changePassword.execute(requestContextFrom(request), {
+        currentPassword,
+        newPassword,
+        client: clientInfo(request),
+      });
+      setSessionCookies(response, result);
+      csrf.issue(response, result.sessionId);
+      response.status(204).end();
+    },
+  );
 
   router.get('/me/sessions', deps.authenticate, async (request, response) => {
     const sessions = await useCases.listSessions.execute(requestContextFrom(request));

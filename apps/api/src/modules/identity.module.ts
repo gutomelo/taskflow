@@ -41,6 +41,7 @@ import {
   PrismaSessionRepository,
   PrismaUserRepository,
   PrismaUserTokenRepository,
+  RedisLoginAttemptTracker,
   RedisSessionRevocationList,
 } from '@taskflow/backend/identity/infrastructure';
 import {
@@ -104,6 +105,9 @@ export async function createIdentityModule(
     record: (event) => logger.warn({ securityEvent: event }, event.type),
   };
   const emailThrottle = new EmailDeliveryThrottle(deps.rateLimiter, deps.pseudonymizer);
+  const loginAttempts = new RedisLoginAttemptTracker(deps.redis, (error) =>
+    logger.warn({ err: error }, 'Login attempt store unavailable; using in-memory fallback'),
+  );
   // Hash de custo real calculado no start: login de conta inexistente leva o mesmo tempo (RNF-06).
   const dummyPasswordHash = await passwordHasher.hash(
     Password.fromVerifiedCredential(randomBytes(32).toString('base64url')),
@@ -138,6 +142,8 @@ export async function createIdentityModule(
         secretTokens,
         accessTokens,
         dummyPasswordHash,
+        loginAttempts,
+        pseudonymizer: deps.pseudonymizer,
       }),
       getCurrentUser: new GetCurrentUserUseCase({ users }),
       logout: new LogoutUseCase({ ...shared, revocationList, secretTokens }),
@@ -184,6 +190,7 @@ export async function createIdentityModule(
     }),
     accessTokens,
     pseudonymizer: deps.pseudonymizer,
+    rateLimiter: deps.rateLimiter,
   });
 
   return {

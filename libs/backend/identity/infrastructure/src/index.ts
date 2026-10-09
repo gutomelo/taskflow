@@ -19,3 +19,7 @@ export {
   type RedisSessionRevocationListOptions,
 } from './lib/security/redis-session-revocation-list';
 export { CryptoSecretTokenGenerator } from './lib/security/crypto-secret-token-generator';
+export {
+  LOGIN_FAILURE_TTL_SECONDS,
+  RedisLoginAttemptTracker,
+} from './lib/security/redis-login-attempt-tracker';

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { z } from 'zod';
-import { ServiceBusyError } from '@taskflow/backend/shared/application';
+import { RateLimitedError, ServiceBusyError } from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import { problemDetailsSchema } from '@taskflow/contracts';
 import { createTestApp } from '../testing/test-app';
@@ -45,6 +45,9 @@ function buildApp() {
       });
       app.get('/busy', () => {
         throw new HttpError(503, 'SERVICE_BUSY', 'Serviço ocupado', { retryAfterSeconds: 3 });
+      });
+      app.get('/login-delay', () => {
+        throw new RateLimitedError(8);
       });
       app.get('/argon2-busy', () => {
         throw new ServiceBusyError('password-hasher', 2);
@@ -107,6 +110,13 @@ describe('error handling', () => {
     const response = await request(buildApp()).get('/busy').expect(503);
 
     expect(response.headers['retry-after']).toBe('3');
+  });
+
+  it('maps RateLimitedError to 429 RATE_LIMITED with Retry-After', async () => {
+    const response = await request(buildApp()).get('/login-delay').expect(429);
+
+    expect(response.headers['retry-after']).toBe('8');
+    expect(response.body.code).toBe('RATE_LIMITED');
   });
 
   it('maps ServiceBusyError to 503 SERVICE_BUSY with Retry-After', async () => {

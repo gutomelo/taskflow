@@ -39,6 +39,7 @@ import type {
   AccessTokenVerifyOptions,
   IssuedAccessToken,
 } from '../lib/ports/access-tokens';
+import type { LoginAttemptTracker, LoginFailureState } from '../lib/ports/login-attempt-tracker';
 import type { SecurityEvent, SecurityEventRecorder } from '../lib/ports/security-event-recorder';
 import type { SessionRevocationList } from '../lib/ports/session-revocation-list';
 
@@ -386,6 +387,23 @@ export class RecordingSecurityEvents implements SecurityEventRecorder {
   }
 }
 
+export class InMemoryLoginAttemptTracker implements LoginAttemptTracker {
+  state = new Map<string, LoginFailureState>();
+  async get(accountKey: string): Promise<LoginFailureState> {
+    return this.state.get(accountKey) ?? { consecutiveFailures: 0, lastFailureAt: null };
+  }
+  async recordFailure(accountKey: string, at: Date) {
+    const current = await this.get(accountKey);
+    this.state.set(accountKey, {
+      consecutiveFailures: current.consecutiveFailures + 1,
+      lastFailureAt: at,
+    });
+  }
+  async reset(accountKey: string) {
+    this.state.delete(accountKey);
+  }
+}
+
 export const fakePseudonymizer: Pseudonymizer = {
   pseudonymize: (value) =>
     `pseudo(${value.length})#${[...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)}`,
@@ -414,6 +432,7 @@ export function createIdentityTestbed() {
     revocationList: new FakeRevocationList(),
     rateLimiter: new InMemoryRateLimiter(),
     securityEvents: new RecordingSecurityEvents(),
+    loginAttempts: new InMemoryLoginAttemptTracker(),
     pseudonymizer: fakePseudonymizer,
     commonPasswords: { contains: (password: string) => password.toLowerCase() === 'password1!' },
   };

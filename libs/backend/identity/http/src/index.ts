@@ -8,3 +8,4 @@ export {
   setSessionCookies,
   type SessionCredentials,
 } from './lib/session-cookies';
+export { IDENTITY_RATE_LIMITS } from './lib/identity-rate-limits';

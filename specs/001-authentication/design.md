@@ -240,6 +240,8 @@ No 409 o cliente **não repete o refresh**: aguarda o lock entre abas (Web Locks
 
 - `rate-limiter-flexible` com Redis e `insuranceLimiter` em memória (Redis fora não desliga os limites nem derruba a API).
 - **Por conta (login)**: após 5 falhas consecutivas, atraso exigido dobra a cada falha (1 s → 15 min, teto), zerando no sucesso; durante o atraso, 429 com `Retry-After`. Não há bloqueio permanente (evita DoS de bloqueio da vítima).
+- **Implementação de BR-018**: política pura `requiredLoginDelaySeconds` na aplicação; estado (falhas consecutivas + instante da última) na porta `LoginAttemptTracker` (Redis, TTL 24 h desde a última falha, fallback em memória). A checagem ocorre **antes** do Argon2: durante a espera nem a senha correta é verificada (sem oráculo, sem custo). Chave = e-mail normalizado pseudonimizado (contas inexistentes recebem o mesmo tratamento). Excedido ⇒ `RateLimitedError` (429 + `Retry-After`).
+- **Limites por endpoint**: `IDENTITY_RATE_LIMITS` em `identity/http` (tabela de endpoints); refresh limitado por refresh token pseudonimizado.
 - **Argon2**: semáforo de concorrência (padrão 4 hashes simultâneos por processo, 19 MiB cada); fila de espera curta; excedente → 503 `SERVICE_BUSY` com `Retry-After`.
 - `TRUST_PROXY` deve ser exatamente o número de proxies confiáveis (valor maior permite forjar `X-Forwarded-For`) — validado e documentado.
 

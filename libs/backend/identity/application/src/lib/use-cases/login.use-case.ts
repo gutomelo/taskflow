@@ -1,4 +1,8 @@
-import type { TransactionRunner } from '@taskflow/backend/shared/application';
+import {
+  RateLimitedError,
+  type Pseudonymizer,
+  type TransactionRunner,
+} from '@taskflow/backend/shared/application';
 import {
   EmailAddress,
   VersionConflictError,
@@ -15,9 +19,11 @@ import {
   type User,
 } from '@taskflow/backend/identity/domain';
 import type { AccessTokenIssuer } from '../ports/access-tokens';
+import type { LoginAttemptTracker } from '../ports/login-attempt-tracker';
 import { toSessionClient, type ClientInfo } from '../shared/client-info';
 import { toCurrentUserView, type CurrentUserView } from '../shared/current-user-view';
 import { InvalidCredentialsError } from '../shared/identity-errors';
+import { remainingLoginDelaySeconds } from '../shared/progressive-login-delay';
 
 export type LoginCommand = Readonly<{ email: string; password: string; client: ClientInfo }>;
 
@@ -43,6 +49,9 @@ export interface LoginDependencies {
   readonly clock: Clock;
   /** Hash Argon2id de um valor aleatório, calculado no start: verificação de custo constante. */
   readonly dummyPasswordHash: string;
+  /** BR-018: falhas consecutivas por conta (chave pseudonimizada, vale também para contas inexistentes). */
+  readonly loginAttempts: LoginAttemptTracker;
+  readonly pseudonymizer: Pseudonymizer;
 }
 
 /** RF-05. Login permitido sem e-mail verificado (BR-013 atua só em organizações). */
@@ -50,7 +59,24 @@ export class LoginUseCase {
   constructor(private readonly deps: LoginDependencies) {}
 
   async execute(command: LoginCommand): Promise<LoginResult> {
-    const user = await this.authenticate(command.email, command.password);
+    const accountKey = `login:${this.deps.pseudonymizer.pseudonymize(command.email.trim().toLowerCase())}`;
+    // BR-018: durante a espera nem a senha correta é verificada (sem oráculo e sem custo de Argon2).
+    const failures = await this.deps.loginAttempts.get(accountKey);
+    const waitSeconds = remainingLoginDelaySeconds(failures, this.deps.clock.now());
+    if (waitSeconds > 0) {
+      throw new RateLimitedError(waitSeconds);
+    }
+
+    let user: User;
+    try {
+      user = await this.authenticate(command.email, command.password);
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        await this.deps.loginAttempts.recordFailure(accountKey, this.deps.clock.now());
+      }
+      throw error;
+    }
+    await this.deps.loginAttempts.reset(accountKey);
     await this.rehashIfOutdated(user, command.password);
 
     const now = this.deps.clock.now();

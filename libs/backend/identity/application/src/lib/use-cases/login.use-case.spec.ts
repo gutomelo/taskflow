@@ -1,3 +1,4 @@
+import { RateLimitedError } from '@taskflow/backend/shared/application';
 import { EmailAddress } from '@taskflow/backend/shared/kernel';
 import { PersonName, User } from '@taskflow/backend/identity/domain';
 import { createIdentityTestbed, type IdentityTestbed } from '../../testing/identity-fakes';
@@ -139,5 +140,73 @@ describe('LoginUseCase', () => {
     await expect(
       useCase.execute({ email: 'ana@exemplo.com', password: 'Old-Secret1', client }),
     ).resolves.toMatchObject({ sessionId: expect.any(String) });
+  });
+
+  describe('progressive delay (BR-018)', () => {
+    const attempt = (useCase: LoginUseCase, password: string, email = 'ana@exemplo.com') =>
+      useCase.execute({ email, password, client });
+
+    async function failTimes(useCase: LoginUseCase, times: number, email?: string) {
+      for (let index = 0; index < times; index += 1) {
+        await expect(attempt(useCase, 'Senha-Errada1!', email)).rejects.toBeInstanceOf(
+          InvalidCredentialsError,
+        );
+      }
+    }
+
+    it('BR-018: after 5 consecutive failures, even the correct password must wait 1 s (429)', async () => {
+      const { bed, useCase } = await setup();
+      await failTimes(useCase, 5);
+      const verifyCallsBefore = bed.passwordHasher.verifyCalls.length;
+
+      const blocked = attempt(useCase, 'Tr0ca-de-Senha');
+
+      await expect(blocked).rejects.toBeInstanceOf(RateLimitedError);
+      await expect(blocked).rejects.toMatchObject({ retryAfterSeconds: 1 });
+      expect(bed.passwordHasher.verifyCalls).toHaveLength(verifyCallsBefore);
+    });
+
+    it('BR-018: doubles the wait on each further failure', async () => {
+      const { bed, useCase } = await setup();
+      await failTimes(useCase, 5);
+      bed.clock.advance(1_000);
+      await failTimes(useCase, 1);
+
+      await expect(attempt(useCase, 'Tr0ca-de-Senha')).rejects.toMatchObject({
+        retryAfterSeconds: 2,
+      });
+    });
+
+    it('BR-018: allows the attempt once the wait is over, and a success resets the counter', async () => {
+      const { bed, useCase } = await setup();
+      await failTimes(useCase, 5);
+      bed.clock.advance(1_000);
+
+      await expect(attempt(useCase, 'Tr0ca-de-Senha')).resolves.toMatchObject({
+        sessionId: expect.any(String),
+      });
+      await failTimes(useCase, 4);
+      await expect(attempt(useCase, 'Tr0ca-de-Senha')).resolves.toBeDefined();
+    });
+
+    it('BR-014 / BR-018: treats unknown accounts the same way (no enumeration through the delay)', async () => {
+      const { useCase } = await setup();
+      await failTimes(useCase, 5, 'ninguem@exemplo.com');
+
+      await expect(attempt(useCase, 'Qualquer-1!', 'ninguem@exemplo.com')).rejects.toBeInstanceOf(
+        RateLimitedError,
+      );
+    });
+
+    it('keys the counter by a pseudonym of the normalized email, never the plain address', async () => {
+      const { bed, useCase } = await setup();
+      await failTimes(useCase, 1, ' ANA@Exemplo.com ');
+      await failTimes(useCase, 1, 'ana@exemplo.com');
+
+      const keys = [...bed.loginAttempts.state.keys()];
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).not.toContain('ana@exemplo.com');
+      expect(bed.loginAttempts.state.get(keys[0] ?? '')?.consecutiveFailures).toBe(2);
+    });
   });
 });

@@ -75,3 +75,10 @@ export {
   type ResetPasswordCommand,
   type ResetPasswordDependencies,
 } from './lib/use-cases/reset-password.use-case';
+export type { LoginAttemptTracker, LoginFailureState } from './lib/ports/login-attempt-tracker';
+export {
+  FREE_LOGIN_FAILURES,
+  MAX_LOGIN_DELAY_SECONDS,
+  remainingLoginDelaySeconds,
+  requiredLoginDelaySeconds,
+} from './lib/shared/progressive-login-delay';

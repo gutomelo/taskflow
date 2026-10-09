@@ -74,6 +74,7 @@ function buildApp(bed: IdentityTestbed) {
     }),
     accessTokens: bed.accessTokens,
     pseudonymizer: bed.pseudonymizer,
+    rateLimiter: bed.rateLimiter,
   });
   const app = express();
   app.set('trust proxy', 1);
@@ -513,6 +514,80 @@ describe('Identity HTTP API', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.code).toBe('INVALID_OR_EXPIRED_TOKEN');
+    });
+  });
+
+  describe('rate limits (CA-10, BR-018)', () => {
+    it('CA-10: limits registrations per IP and answers 429 with Retry-After', async () => {
+      const { browser } = await setup();
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const response = await browser.post(
+          '/auth/register',
+          { name: 'Bia', email: `bia${attempt}@exemplo.com`, password: PASSWORD },
+          { 'X-Forwarded-For': '198.51.100.20' },
+        );
+        statuses.push(response.status);
+        if (response.status === 429) {
+          expect(response.headers['retry-after']).toBe('3600');
+          expect(response.body.code).toBe('RATE_LIMITED');
+        }
+      }
+
+      expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
+    });
+
+    it('CA-10: limits forgot-password per email regardless of IP, before touching any account', async () => {
+      const { browser } = await setup();
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const response = await browser.post(
+          '/auth/password/forgot',
+          { email: ' ANA@exemplo.com ' },
+          { 'X-Forwarded-For': `203.0.113.${attempt + 1}` },
+        );
+        statuses.push(response.status);
+      }
+
+      expect(statuses).toEqual([202, 202, 202, 429]);
+    });
+
+    it('CA-10 / BR-018: after 5 failures on an account, even the right password gets 429', async () => {
+      const { browser } = await setup();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const failure = await browser.post('/auth/login', {
+          email: 'ana@exemplo.com',
+          password: 'Errada-123!',
+        });
+        expect(failure.status).toBe(401);
+      }
+
+      const blocked = await browser.post('/auth/login', {
+        email: 'ana@exemplo.com',
+        password: PASSWORD,
+      });
+
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers['retry-after']).toBe('1');
+      expect(blocked.body.code).toBe('RATE_LIMITED');
+    });
+
+    it('limits password changes per user', async () => {
+      const { browser, login } = await setup();
+      await login();
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        statuses.push(
+          (
+            await browser.post('/me/password', {
+              currentPassword: 'Errada-123!',
+              newPassword: 'Nova-Senha-2026!',
+            })
+          ).status,
+        );
+      }
+
+      expect(statuses).toEqual([403, 403, 403, 403, 403, 429]);
     });
   });
 });

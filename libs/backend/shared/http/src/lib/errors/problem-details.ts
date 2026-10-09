@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
-import { ServiceBusyError } from '@taskflow/backend/shared/application';
+import { RateLimitedError, ServiceBusyError } from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import {
   PROBLEM_CONTENT_TYPE,
@@ -74,6 +74,16 @@ export function createErrorHandler({
         title: error.title,
         ...(error.detail === undefined ? {} : { detail: error.detail }),
         ...(error.violations === undefined ? {} : { violations: [...error.violations] }),
+      });
+      return;
+    }
+
+    if (error instanceof RateLimitedError) {
+      response.set('Retry-After', String(error.retryAfterSeconds));
+      sendProblem(response, {
+        status: 429,
+        code: error.code,
+        title: 'Muitas tentativas. Tente novamente mais tarde.',
       });
       return;
     }

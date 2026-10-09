@@ -32,7 +32,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T14 | Casos de uso: `ResendEmailVerification`, `ConfirmEmailVerification` (BR-017), `GetUserVerificationStatus`                                                      | T12         | fakes (CA-03, CA-16)                                                                                             | [x]    |
 | T15 | Casos de uso: `ChangePassword` (rotação da sessão atual), `RequestPasswordReset` (trabalho constante), `ResetPassword`                                         | T13         | fakes (CA-08, CA-09)                                                                                             | [x]    |
 | T16 | Contratos em `libs/contracts/auth`; `identity/http` routers `/auth` e `/me`; cookies; `Cache-Control: no-store`; wiring em `apps/api` (`createIdentityModule`) | T12–T15, T4 | Supertest: status, contratos, atributos de cookie, 401/404, CSRF, rate limit (CA-04, CA-07, CA-10, CA-11, CA-12) | [x]    |
-| T17 | Atraso progressivo por conta (BR-018) e limites por IP/e-mail conforme tabela                                                                                  | T16         | Supertest com Redis real (CA-10)                                                                                 | [ ]    |
+| T17 | Atraso progressivo por conta (BR-018) e limites por IP/e-mail conforme tabela                                                                                  | T16         | Supertest com Redis real (CA-10)                                                                                 | [x]    |
 | T18 | OpenAPI 3.1 com `zod-openapi`; `/api/docs` (Swagger UI) e `/api/docs/openapi.json` fora de produção                                                            | T16         | validação do documento (CA-15)                                                                                   | [ ]    |
 
 ## Bloco D — Worker e e-mails
@@ -219,3 +219,13 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Mutação**: login sem rotacionar CSRF ⇒ 10 testes falham.
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (12 projetos); `pnpm test:integration` 20 + 35 ✔; `pnpm e2e` 2/2 ✔; `pnpm format:check` ✔.
 - **Ambiente**: a validação Docker foi interrompida por disco cheio (liberado pelo usuário); removidas apenas as imagens criadas nesta sessão.
+
+### T17 — 2026-10-09
+
+- **BR-018**: política pura `requiredLoginDelaySeconds`/`remainingLoginDelaySeconds` (livre até 5 falhas; depois 1, 2, 4… s, teto 15 min — sem bloqueio permanente) em `identity/application`; porta `LoginAttemptTracker` + `RedisLoginAttemptTracker` (hash com falhas e último instante, TTL 24 h, fallback em memória); `LoginUseCase` checa **antes** do Argon2, registra falha só em `INVALID_CREDENTIALS` e zera no sucesso; chave pelo e-mail normalizado pseudonimizado (contas inexistentes tratadas igual).
+- **Erro genérico** `RateLimitedError` (`shared/application`) ⇒ 429 `RATE_LIMITED` + `Retry-After` no error handler.
+- **Limites por endpoint** (`IDENTITY_RATE_LIMITS`, `identity/http`): cadastro 5/h IP; login 30/15 min IP; refresh 60/min por refresh pseudonimizado; confirmar 20/h e reenviar 3/h por usuário; esqueci a senha 3/h por e-mail (antes de qualquer consulta) e 10/h por IP; redefinir 10/h IP; trocar senha 5/h por usuário. Ligados no composition root com `RedisRateLimiter`.
+- **Testes**: política 12; login BR-018 5 (inclui "nenhum `verify` durante a espera" e conta inexistente); tracker Redis 3 (integração: TTL, compartilhamento entre instâncias, fallback); HTTP 4 novos (CA-10: 6º cadastro por IP ⇒ 429 com `Retry-After: 3600`; esqueci a senha por e-mail com IPs diferentes; 6º login com senha certa ⇒ 429 `Retry-After: 1`; troca de senha por usuário). Erro 429 no `shared/http`.
+- **Execução real** (API + PostgreSQL + Redis): cadastros 202×5 → 429; 5 logins 401 → senha certa 429 (`Retry-After: 1`) → após 1 s 200; contadores em `rate-limit:*` no Redis; contador de falhas zerado no sucesso. Observação: foi executado `FLUSHDB` no Redis **local de desenvolvimento** antes da verificação (apenas dados efêmeros de teste).
+- **Mutação**: remoção da checagem de BR-018 ⇒ 3 testes falham; remoção do limite de cadastro por IP ⇒ 1 teste falha.
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (12 projetos); `pnpm test:integration` 20 + 38 ✔; `pnpm e2e` 2/2 ✔; `pnpm format:check` ✔.
