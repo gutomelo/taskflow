@@ -14,3 +14,4 @@ export type {
   RateLimiter,
 } from './lib/rate-limiting/rate-limiter';
 export { ServiceBusyError } from './lib/errors/service-busy-error';
+export type { Pseudonymizer } from './lib/privacy/pseudonymizer';

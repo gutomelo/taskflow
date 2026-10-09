@@ -70,6 +70,15 @@ describe('User', () => {
     expect(user.toSnapshot().passwordChangedAt).toEqual(later);
   });
 
+  it('rehashes the password without recording a password change', () => {
+    const user = registerUser();
+
+    user.rehashPassword('$argon2id$stronger-parameters');
+
+    expect(user.passwordHash).toBe('$argon2id$stronger-parameters');
+    expect(user.toSnapshot().passwordChangedAt).toEqual(registeredAt);
+  });
+
   it('restores persisted state without revalidating creation rules', () => {
     const snapshot = { ...registerUser().toSnapshot(), emailVerifiedAt: later, version: 7 };
 

@@ -86,4 +86,11 @@ describe('Password (BR-011)', () => {
     expect(attempt).toThrow(expect.objectContaining({ code: 'PASSWORD_POLICY_VIOLATION' }));
     expect(attempt).not.toThrow(/segredo/);
   });
+
+  it('builds a verified credential for rehash without applying BR-011, normalized to NFC', () => {
+    const legacy = Password.fromVerifiedCredential('Sa\u0303o');
+
+    expect(legacy.reveal()).toBe('S\u00e3o');
+    expect(String(legacy)).toBe('[REDACTED]');
+  });
 });

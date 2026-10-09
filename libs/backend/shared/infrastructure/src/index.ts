@@ -31,3 +31,4 @@ export type {
   User as UserRow,
   UserToken as UserTokenRow,
 } from './generated/prisma/client';
+export { HmacPseudonymizer } from './lib/privacy/hmac-pseudonymizer';

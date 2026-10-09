@@ -97,6 +97,14 @@ export class User {
     this.state = { ...this.state, passwordHash: newPasswordHash, passwordChangedAt: now };
   }
 
+  /**
+   * Atualiza apenas o algoritmo/parâmetros do hash da mesma senha (rehash no login).
+   * Não é troca de senha: não altera `passwordChangedAt` nem afeta sessões.
+   */
+  rehashPassword(newPasswordHash: string): void {
+    this.state = { ...this.state, passwordHash: newPasswordHash };
+  }
+
   toSnapshot(): UserSnapshot {
     return this.state;
   }

@@ -60,6 +60,15 @@ export class Password {
     return new Password(normalized);
   }
 
+  /**
+   * Senha já autenticada contra o hash armazenado, usada **apenas** para refazer o hash com
+   * parâmetros atuais no login. Não aplica BR-011: senhas antigas válidas podem não atender
+   * à política vigente e não devem impedir o rehash.
+   */
+  static fromVerifiedCredential(raw: string): Password {
+    return new Password(raw.normalize('NFC'));
+  }
+
   /** Único acesso ao texto puro: usado exclusivamente pelo `PasswordHasher`. */
   reveal(): string {
     return this.plainText;

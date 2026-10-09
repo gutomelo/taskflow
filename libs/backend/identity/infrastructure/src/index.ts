@@ -18,3 +18,4 @@ export {
   REVOCATION_TTL_SECONDS,
   type RedisSessionRevocationListOptions,
 } from './lib/security/redis-session-revocation-list';
+export { CryptoSecretTokenGenerator } from './lib/security/crypto-secret-token-generator';

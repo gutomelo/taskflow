@@ -46,3 +46,4 @@ export { EmailAlreadyRegisteredError } from './lib/user/user-errors';
 export type { UserRepository } from './lib/repositories/user-repository';
 export type { SessionRepository } from './lib/repositories/session-repository';
 export type { UserTokenRepository } from './lib/repositories/user-token-repository';
+export type { GeneratedSecret, SecretTokenGenerator } from './lib/token/secret-token-generator';
