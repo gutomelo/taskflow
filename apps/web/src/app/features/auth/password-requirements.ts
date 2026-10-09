@@ -12,8 +12,8 @@ const ALWAYS_SHOWN: ReadonlyArray<PasswordRule> = [
   'lowercase',
   'digit',
   'symbol',
-  'same_as_email',
 ];
+const SHOWN_WHEN_VIOLATED: ReadonlyArray<PasswordRule> = ['max_length', 'common_password'];
 
 /** Intervalo sem digitação antes de anunciar: anunciar a cada tecla seria ruído. */
 export const ANNOUNCE_DEBOUNCE_MS = 700;
@@ -62,6 +62,8 @@ export const ANNOUNCE_DEBOUNCE_MS = 700;
 export class PasswordRequirements {
   readonly password = input.required<string>();
   readonly email = input<string>('');
+  /** Sem e-mail na tela (ex.: redefinição por link), `same_as_email` só aparece se o servidor recusar. */
+  readonly checksEmail = input(true);
   /** Regras recusadas pelo servidor para a senha enviada (inclui `common_password`). */
   readonly serverViolations = input<ReadonlyArray<PasswordRule>>([]);
 
@@ -77,7 +79,8 @@ export class PasswordRequirements {
     const unmet = this.unmet();
     const shown = [
       ...ALWAYS_SHOWN,
-      ...(['max_length', 'common_password'] as const).filter((rule) => unmet.has(rule)),
+      ...(this.checksEmail() || unmet.has('same_as_email') ? (['same_as_email'] as const) : []),
+      ...SHOWN_WHEN_VIOLATED.filter((rule) => unmet.has(rule)),
     ];
     return shown.map((id) => ({ id, label: this.messages.rules[id], met: !unmet.has(id) }));
   });

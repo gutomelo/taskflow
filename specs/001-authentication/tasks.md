@@ -51,7 +51,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T23 | Fonte Inter auto-hospedada; `Referrer-Policy: no-referrer` e CSP restrita (Nginx e dev server); `/status` movida                                                       | —            | build; headers verificados                           | [x]    |
 | T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [x]    |
 | T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [x]    |
-| T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [ ]    |
+| T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [x]    |
 | T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [ ]    |
 | T28 | E2E: jornada completa lendo e-mail pela API do Mailpit (CA-14); CI sobe Mailpit e worker                                                                               | T21, T25–T27 | `pnpm e2e`                                           | [ ]    |
 
@@ -490,3 +490,48 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Pendente (tarefas seguintes)**: link "Esqueci minha senha" (rota na T26); home autenticada (T27; hoje `/` leva a `/status`); jornada real com Mailpit (T28).
 - **Docs**: `docs/architecture/overview.md` (Frontend: contratos só como tipos; telas de visitante).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 458 testes unitários; bundle inicial 323 kB); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (12); `pnpm format:check` ✔.
+
+### T26 — 2026-10-09
+
+- **Entregue** (`apps/web/src/app/features/auth`):
+  - **Rotas**: `/forgot-password` (`guestGuard`), `/reset-password` e `/verify-email`. As duas últimas não têm guard: funcionam com ou sem sessão. Link "Esqueci minha senha" no login.
+  - `LinkToken`: lê `#token=` uma vez, valida o formato do contrato (16–256, base64url) e **remove o fragmento** com `history.replaceState`, sem recarregar. Token mal formado é descartado, e a URL é limpa do mesmo jeito.
+  - `PendingEmailVerification`: token só em memória (signal, sem storage), para sobreviver à ida ao login dentro do SPA.
+  - **Verificação** (**CA-03, CA-16/BR-017**), com os estados `needs_login`, `ready`, `verified`, `already_verified`, `wrong_account`, `invalid_link`, `no_token` e `resend_sent`:
+    - **nada é confirmado automaticamente**: sem sessão só há o botão "Entrar para confirmar" (`returnUrl=/verify-email`); com sessão, a confirmação exige o clique;
+    - 204 ou 409 `EMAIL_ALREADY_VERIFIED` ⇒ `AuthStore.markEmailVerified()` e token descartado;
+    - 403 `TOKEN_BELONGS_TO_ANOTHER_ACCOUNT` ⇒ token **mantido** para a conta certa;
+    - 400 `INVALID_OR_EXPIRED_TOKEN` ⇒ token descartado e "Enviar novo link" (`/auth/email-verification/resend`);
+    - conta já verificada na sessão ⇒ nenhuma chamada;
+    - foco no texto de estado a cada transição.
+  - **Esqueci a senha**: a mesma resposta para qualquer endereço (BR-014), com foco na confirmação.
+  - **Redefinir senha**:
+    - token só no componente; sem token ⇒ estado de link inválido com "Pedir novo link";
+    - requisitos de senha sem `same_as_email`, já que não há e-mail na tela (`checksEmail=false`), mas a regra aparece se o servidor recusar;
+    - 204 ⇒ `AuthStore.endSession()`, porque a API revogou todas as sessões (BR-016);
+    - 400 ⇒ link inválido.
+  - Reuso: `passwordPolicyValidator` (em `password-policy.ts`) e `passwordRulesFrom` (em `auth.messages.ts`), compartilhados por cadastro e redefinição. `AccountApi` reúne confirm/resend/forgot/reset.
+- **Testes** (web: 95 → 119):
+  - `LinkToken` 5;
+  - verificação 9: anônimo sem chamada à API e com fragmento removido, clique explícito, token da memória após login, outra conta, link inválido com reenvio, segundo uso, conta já verificada, sem token, `RATE_LIMITED` mantendo o token;
+  - esqueci/redefinir/link 10.
+
+  O helper de teste espelha a URL no `history` real, porque o Router do TestBed usa localização simulada.
+
+- **E2E** (`email-and-password-links.spec.ts`, +3, respostas simuladas):
+  - **jornada da verificação no navegador real**: link sem sessão ⇒ login ⇒ volta a `/verify-email` ⇒ nada enviado até o clique ⇒ confirmação com o token correto. A partir do momento em que a página remove o token, **nenhuma URL navegada o contém** (antes disso só aparecem a carga do documento e a navegação inicial do Router);
+  - redefinição com token fora da barra de endereço;
+  - "esqueci a senha" a partir do login.
+
+  Dois ajustes de tempo nos testes: esperar o título da página antes de interagir.
+
+- **Mutation testing** (diff confirmado; arquivos restaurados e conferidos com `grep`):
+  - anônimo vê "Confirmar" ⇒ 1 falha;
+  - **confirmação automática** ⇒ 4+ falhas;
+  - descartar token de outra conta ⇒ 1 falha;
+  - **token permanece na URL** ⇒ 4 falhas;
+  - token de qualquer formato ⇒ 2 falhas;
+  - sessão local mantida após redefinir ⇒ 1 falha;
+  - e-mail sem `trim()` no "esqueci a senha" **sobrevive**: `input[type=email]` já remove espaços nas pontas (sanitização de valor do HTML). O `trim()` fica como defesa, porque o e-mail é exibido na confirmação.
+- **Docs**: `docs/architecture/overview.md` (Frontend → links de e-mail).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 482 testes unitários; bundle inicial 322 kB, sem warning); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (15); `pnpm format:check` ✔.

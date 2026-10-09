@@ -20,13 +20,13 @@ import { MatButton } from '@angular/material/button';
 import { MatError, MatFormField, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { RouterLink } from '@angular/router';
-import type { FieldViolation, PasswordRule } from '@taskflow/contracts';
+import type { PasswordRule } from '@taskflow/contracts';
 import { AuthApi } from '../../core/auth';
 import { toApiProblem } from '../../core/http/api-problem';
 import { AuthCard } from './auth-card';
-import { authMessages, commonErrorMessage, isPasswordRule } from './auth.messages';
+import { authMessages, commonErrorMessage, passwordRulesFrom } from './auth.messages';
 import { focusAfterRender, focusFirstInvalid } from './form-focus';
-import { unmetPasswordRules } from './password-policy';
+import { passwordPolicyValidator } from './password-policy';
 import { PasswordRequirements } from './password-requirements';
 
 @Component({
@@ -54,7 +54,7 @@ export class RegisterPage {
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(100), notBlank]],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: ['', [Validators.required, passwordPolicy]],
+    password: ['', [Validators.required, passwordPolicyValidator]],
   });
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -109,7 +109,7 @@ export class RegisterPage {
     } catch (error) {
       const problem = toApiProblem(error);
       if (problem.code === 'PASSWORD_POLICY_VIOLATION') {
-        const rules = rulesFrom(problem.violations);
+        const rules = passwordRulesFrom(problem.violations);
         this.rejected.set({ password: request.password, rules });
         // Erro manual: some na próxima edição, quando os validadores rodam de novo.
         controls.password.setErrors({ passwordPolicy: rules });
@@ -126,21 +126,4 @@ export class RegisterPage {
 
 function notBlank(control: AbstractControl<string>): ValidationErrors | null {
   return control.value.length > 0 && control.value.trim().length === 0 ? { blank: true } : null;
-}
-
-/** BR-011 no cliente; o e-mail vem do formulário pai para a regra `same_as_email`. */
-function passwordPolicy(control: AbstractControl<string>): ValidationErrors | null {
-  if (control.value.length === 0) return null; // `required` cuida do vazio
-  const email: unknown = control.parent?.get('email')?.value;
-  const unmet = unmetPasswordRules(control.value, typeof email === 'string' ? email : '');
-  return unmet.length > 0 ? { passwordPolicy: unmet } : null;
-}
-
-function rulesFrom(violations: ReadonlyArray<FieldViolation>): PasswordRule[] {
-  return violations
-    .filter((violation) => violation.field === 'password')
-    .flatMap((violation) => {
-      const rule = violation.message;
-      return isPasswordRule(rule) ? [rule] : [];
-    });
 }

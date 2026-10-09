@@ -1,3 +1,4 @@
+import type { AbstractControl, ValidationErrors } from '@angular/forms';
 import type { PasswordRule } from '@taskflow/contracts';
 
 const MIN_LENGTH = 8;
@@ -22,4 +23,12 @@ export function unmetPasswordRules(password: string, email: string): PasswordRul
   const normalizedEmail = email.trim().toLowerCase();
   if (normalizedEmail && normalized.toLowerCase() === normalizedEmail) unmet.push('same_as_email');
   return unmet;
+}
+
+/** Validador de formulário: e-mail lido do campo irmão `email`, quando existir. */
+export function passwordPolicyValidator(control: AbstractControl<string>): ValidationErrors | null {
+  if (control.value.length === 0) return null; // `required` cuida do vazio
+  const email: unknown = control.parent?.get('email')?.value;
+  const unmet = unmetPasswordRules(control.value, typeof email === 'string' ? email : '');
+  return unmet.length > 0 ? { passwordPolicy: unmet } : null;
 }

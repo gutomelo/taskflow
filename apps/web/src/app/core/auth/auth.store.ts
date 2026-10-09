@@ -39,6 +39,12 @@ export class AuthStore {
     this.state.set({ status: 'authenticated', user });
   }
 
+  /** E-mail confirmado (CA-03): reflete no usuário sem nova chamada ao `/me`. */
+  markEmailVerified(): void {
+    const user = this.user();
+    if (user) this.state.set({ status: 'authenticated', user: { ...user, emailVerified: true } });
+  }
+
   /** Sessão encerrada no servidor. Devolve se havia usuário autenticado (para redirecionar). */
   endSession(): boolean {
     const wasAuthenticated = this.isAuthenticated();
