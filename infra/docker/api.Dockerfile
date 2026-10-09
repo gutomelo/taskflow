@@ -24,6 +24,9 @@ CMD ["pnpm", "prisma", "migrate", "deploy"]
 FROM base AS prod-deps
 WORKDIR /app
 COPY --from=build /workspace/dist/apps/api/package.json /workspace/dist/apps/api/pnpm-lock.yaml ./
+# O pnpm-workspace.yaml gerado pelo build não traz a política de scripts de instalação;
+# usa-se a do workspace (allowBuilds revisado: argon2 com binário pré-compilado, sem build nativo).
+COPY pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 FROM node:24-alpine AS runtime
