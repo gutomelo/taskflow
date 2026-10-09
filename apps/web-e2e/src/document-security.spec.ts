@@ -94,12 +94,12 @@ test.describe('SPA document security', () => {
     );
   });
 
-  test('redirects the root and unknown paths to the status page until the home exists', async ({
+  test('sends anonymous visitors from the home and unknown paths to the login page', async ({
     page,
   }) => {
     await page.goto('/');
-    await expect(page).toHaveURL(/\/status$/);
+    await expect(page).toHaveURL(/\/login\?returnUrl=%2F$/);
     await page.goto('/nao-existe');
-    await expect(page).toHaveURL(/\/status$/);
+    await expect(page).toHaveURL(/\/login\?returnUrl=%2F$/);
   });
 });

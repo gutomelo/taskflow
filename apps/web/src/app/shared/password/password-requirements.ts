@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import type { PasswordRule } from '@taskflow/contracts';
-import { authMessages } from './auth.messages';
+import { passwordMessages } from './password.messages';
 import { unmetPasswordRules } from './password-policy';
 
 /** Regras sempre visíveis; as demais aparecem só quando violadas. */
@@ -67,7 +67,7 @@ export class PasswordRequirements {
   /** Regras recusadas pelo servidor para a senha enviada (inclui `common_password`). */
   readonly serverViolations = input<ReadonlyArray<PasswordRule>>([]);
 
-  protected readonly messages = authMessages.passwordRequirements;
+  protected readonly messages = passwordMessages;
 
   readonly unmet = computed(() => {
     const unmet = new Set(unmetPasswordRules(this.password(), this.email()));

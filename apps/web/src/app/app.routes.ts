@@ -1,8 +1,10 @@
 import type { Route } from '@angular/router';
+import { accountRoutes } from './features/account/account.routes';
 import { authRoutes } from './features/auth/auth.routes';
 
 export const appRoutes: Route[] = [
   ...authRoutes,
+  ...accountRoutes,
   {
     path: 'status',
     title: 'Status do sistema · TaskFlow',
@@ -11,7 +13,6 @@ export const appRoutes: Route[] = [
         (module) => module.SystemStatusPage,
       ),
   },
-  // A home autenticada chega com as telas de autenticação (T25–T27); até lá, a raiz leva ao status.
-  { path: '', pathMatch: 'full', redirectTo: 'status' },
-  { path: '**', redirectTo: 'status' },
+  // Rota desconhecida: início (que leva ao login quem não está autenticado).
+  { path: '**', redirectTo: '' },
 ];

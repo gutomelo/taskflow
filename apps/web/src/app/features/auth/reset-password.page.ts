@@ -20,10 +20,10 @@ import { toApiProblem } from '../../core/http/api-problem';
 import { AccountApi } from './account-api';
 import { AuthCard } from './auth-card';
 import { authMessages, commonErrorMessage, passwordRulesFrom } from './auth.messages';
-import { focusAfterRender, focusFirstInvalid } from './form-focus';
+import { focusAfterRender, focusFirstInvalid } from '../../shared/forms/form-focus';
 import { LinkToken } from './link-token';
-import { passwordPolicyValidator } from './password-policy';
-import { PasswordRequirements } from './password-requirements';
+import { passwordPolicyValidator } from '../../shared/password/password-policy';
+import { PasswordRequirements } from '../../shared/password/password-requirements';
 
 type ResetState = 'form' | 'done' | 'invalid_link';
 

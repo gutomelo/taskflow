@@ -14,6 +14,8 @@ export const AUTH_API_PATHS = {
   refresh: '/api/v1/auth/refresh',
   currentUser: '/api/v1/me',
   login: '/api/v1/auth/login',
+  logout: '/api/v1/auth/logout',
+  resendVerification: '/api/v1/auth/email-verification/resend',
   register: '/api/v1/auth/register',
 } as const;
 
@@ -40,6 +42,16 @@ export class AuthApi {
   async login(request: LoginRequest): Promise<CurrentUser> {
     const body: unknown = await firstValueFrom(this.http.post(AUTH_API_PATHS.login, request));
     return expectCurrentUser(body, AUTH_API_PATHS.login);
+  }
+
+  /** Encerra a sessão; a resposta traz `Clear-Site-Data: "cookies"` (inclui o cookie CSRF). */
+  logout(): Promise<void> {
+    return firstValueFrom(this.http.post<void>(AUTH_API_PATHS.logout, null));
+  }
+
+  /** Novo link de verificação; exige sessão. 202 (suprimido em silêncio acima do limite). */
+  resendEmailVerification(): Promise<void> {
+    return firstValueFrom(this.http.post<void>(AUTH_API_PATHS.resendVerification, null));
   }
 
   /** 202 sempre que os dados são válidos, exista ou não conta com o e-mail (BR-014). */

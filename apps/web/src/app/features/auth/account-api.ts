@@ -9,7 +9,6 @@ import type {
 
 export const ACCOUNT_API_PATHS = {
   confirmEmail: '/api/v1/auth/email-verification/confirm',
-  resendVerification: '/api/v1/auth/email-verification/resend',
   forgotPassword: '/api/v1/auth/password/forgot',
   resetPassword: '/api/v1/auth/password/reset',
 } as const;
@@ -22,11 +21,6 @@ export class AccountApi {
   /** Exige sessão da própria conta (BR-017); 204. */
   confirmEmail(request: ConfirmEmailVerificationRequest): Promise<void> {
     return firstValueFrom(this.http.post<void>(ACCOUNT_API_PATHS.confirmEmail, request));
-  }
-
-  /** Exige sessão; 202 (envio suprimido em silêncio acima do limite). */
-  resendVerification(): Promise<void> {
-    return firstValueFrom(this.http.post<void>(ACCOUNT_API_PATHS.resendVerification, null));
   }
 
   /** 202 sempre: não revela se o e-mail tem conta (BR-014). */

@@ -52,7 +52,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [x]    |
 | T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [x]    |
 | T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [x]    |
-| T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [ ]    |
+| T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [x]    |
 | T28 | E2E: jornada completa lendo e-mail pela API do Mailpit (CA-14); CI sobe Mailpit e worker                                                                               | T21, T25–T27 | `pnpm e2e`                                           | [ ]    |
 
 ## Bloco F — Fechamento
@@ -535,3 +535,41 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
   - e-mail sem `trim()` no "esqueci a senha" **sobrevive**: `input[type=email]` já remove espaços nas pontas (sanitização de valor do HTML). O `trim()` fica como defesa, porque o e-mail é exibido na confirmação.
 - **Docs**: `docs/architecture/overview.md` (Frontend → links de e-mail).
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 482 testes unitários; bundle inicial 322 kB, sem warning); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (15); `pnpm format:check` ✔.
+
+### T27 — 2026-10-09
+
+- **Entregue**:
+  - **Rotas**: `/` (home) e `/account/security` com `authGuard`; rota desconhecida ⇒ `/`, o que leva visitantes anônimos ao login com `returnUrl`. A página de status continua em `/status`.
+  - **Shell** (`core/layout`):
+    - **menu da conta** (Material `mat-menu`, carregado com `@defer (when isAuthenticated)`): "Segurança da conta" e "Sair";
+    - **aviso de e-mail não verificado** (BR-013) com "Reenviar link" (`aria-live`); some ao confirmar;
+    - alerta quando sair falha.
+  - **Home**: saudação e atalhos (Segurança, Status), sem conteúdo fictício.
+  - **Segurança** (`features/account`):
+    - **sessões ativas**: `httpResource` validado por `isSessionList`; estados de carregamento, erro com retry e lista; sessão atual primeiro; dispositivo composto no cliente ("Firefox no Linux", "Navegador desconhecido"); datas pt-BR;
+    - **revogar** outra sessão ⇒ lista recarregada; revogar a **atual** ⇒ estado anônimo, novo CSRF e `/login`; `SESSION_NOT_FOUND` ⇒ recarrega em silêncio;
+    - **troca de senha** (CA-09): requisitos com o e-mail da sessão (`passwordPolicyValidatorFor`); 204 ⇒ confirmação focada, formulário limpo e sessões recarregadas; `CURRENT_PASSWORD_INCORRECT` ⇒ erro no campo e foco; 422 ⇒ regras do servidor.
+  - **Store**: `signOut()` (CA-07) e `afterSessionEnded()`. Falha de rede ao sair **mantém** a sessão e propaga o erro, porque os cookies continuariam válidos; 401 = já saiu. Depois de encerrar, um novo cookie CSRF é emitido, já que o `Clear-Site-Data` da API apaga o anterior e o próximo login precisa dele.
+  - `AuthApi.logout` e `AuthApi.resendEmailVerification`; o reenvio saiu do `AccountApi` para o `core` poder usá-lo sem depender de uma feature.
+- **Refatoração**: `password-policy`, `password-requirements` e `form-focus` foram movidos com `git mv` para `app/shared/{password,forms}`, com `password.messages.ts` e `form.messages.ts`, para que `auth` e `account` não importem uma da outra.
+- **Bundle**: com o menu no shell, o bundle inicial foi a 422 kB. Com `@defer` voltou a **336 kB** (92 kB gzip), e o menu virou um chunk de 64 kB baixado só com sessão.
+- **Testes** (web: 119 → 139):
+  - `AppShell` 6: anônimo sem menu e sem aviso, menu com sessão, aviso com reenvio, aviso some ao confirmar, sair (logout ⇒ CSRF ⇒ `/login`), falha de rede ao sair mantém a sessão;
+  - `SecurityPage` 9: ordenação e rótulos, carregamento/erro/retry, resposta fora do contrato, revogar outra, revogar a atual, sessão já encerrada, troca de senha, senha atual errada, `same_as_email` com o e-mail da sessão;
+  - `isSessionList` +5.
+
+  Testes com `httpResource` esperam a requisição com `vi.waitFor`: o resource conta como tarefa pendente e `whenStable()` antes de responder travaria.
+
+- **E2E**: `account-area.spec.ts` (+1), jornada com respostas simuladas: `/` anônimo ⇒ login ⇒ home ⇒ aviso de verificação ⇒ menu ⇒ Segurança (lista, revogar Safari) ⇒ troca de senha ⇒ sair ⇒ `/login` sem menu, sem violações de CSP. O teste antigo "raiz ⇒ /status" passou a verificar "raiz ⇒ login".
+- **Mutation testing** (diff confirmado; arquivos restaurados e conferidos com `grep`), 8 de 8 detectadas:
+  - logout com falha de rede desloga ⇒ 1 falha;
+  - sem novo CSRF após encerrar ⇒ 2 falhas;
+  - revogar a atual mantendo a sessão local ⇒ 1 falha;
+  - lista não recarrega após trocar a senha ⇒ 1 falha;
+  - senha atual errada sem erro no campo ⇒ 1 falha;
+  - aviso para conta verificada ⇒ 2 falhas;
+  - sem ordenação ⇒ 1 falha;
+  - troca de senha ignorando o e-mail ⇒ **sobreviveu à primeira versão do teste**, porque a senha usada também não tinha dígito. O teste passou a usar uma senha que só viola `same_as_email` e então detectou.
+- **Não executado**: Lighthouse em `/` e `/account/security`, que exigem sessão; a ferramenta de auditoria não simula as respostas da API. A jornada real com a API e o Mailpit é a T28.
+- **Docs**: `docs/architecture/overview.md` (Frontend → área autenticada, peças compartilhadas).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 502 testes unitários; bundle inicial 336 kB); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (16); `pnpm format:check` ✔.

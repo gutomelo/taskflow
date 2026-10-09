@@ -16,7 +16,7 @@ import { toApiProblem } from '../../core/http/api-problem';
 import { AccountApi } from './account-api';
 import { AuthCard } from './auth-card';
 import { authMessages, commonErrorMessage } from './auth.messages';
-import { focusAfterRender, focusFirstInvalid } from './form-focus';
+import { focusAfterRender, focusFirstInvalid } from '../../shared/forms/form-focus';
 
 /** RF-10. A mesma resposta para qualquer e-mail válido: não revela se há conta (BR-014). */
 @Component({

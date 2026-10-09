@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import type { CurrentUser } from '@taskflow/contracts';
 import { AuthApi } from './auth-api';
@@ -43,6 +44,29 @@ export class AuthStore {
   markEmailVerified(): void {
     const user = this.user();
     if (user) this.state.set({ status: 'authenticated', user: { ...user, emailVerified: true } });
+  }
+
+  /**
+   * Logout (CA-07). Falha de rede mantém o estado e propaga o erro: os cookies continuam no
+   * navegador e o usuário continuaria autenticado. 401 significa que já não havia sessão.
+   */
+  async signOut(): Promise<void> {
+    try {
+      await this.api.logout();
+    } catch (error) {
+      if (!(error instanceof HttpErrorResponse && error.status === 401)) throw error;
+    }
+    await this.afterSessionEnded();
+  }
+
+  /**
+   * Depois de a API encerrar a sessão deste navegador (logout ou revogação da sessão atual):
+   * estado anônimo e novo cookie CSRF, já que `Clear-Site-Data` apagou o anterior e o próximo
+   * login precisa dele.
+   */
+  async afterSessionEnded(): Promise<void> {
+    this.endSession();
+    await this.api.issueCsrfToken().catch(() => undefined);
   }
 
   /** Sessão encerrada no servidor. Devolve se havia usuário autenticado (para redirecionar). */

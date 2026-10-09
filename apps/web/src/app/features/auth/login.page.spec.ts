@@ -43,7 +43,7 @@ describe('LoginPage', () => {
   });
 
   it('signs in and goes to the requested internal page', async () => {
-    env = await openAuthPage('/login?returnUrl=%2Faccount%2Fsecurity');
+    env = await openAuthPage('/login?returnUrl=%2Fprojects');
 
     await fillAndSubmit();
     const request = env.backend.expectOne({ method: 'POST', url: LOGIN });
@@ -53,7 +53,7 @@ describe('LoginPage', () => {
     await env.fixture.whenStable();
 
     expect(env.store.user()).toEqual(ana);
-    expect(env.router.url).toBe('/account/security');
+    expect(env.router.url).toBe('/projects');
   });
 
   it('ignores an external returnUrl after signing in (no open redirect)', async () => {

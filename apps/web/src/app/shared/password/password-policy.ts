@@ -27,8 +27,18 @@ export function unmetPasswordRules(password: string, email: string): PasswordRul
 
 /** Validador de formulário: e-mail lido do campo irmão `email`, quando existir. */
 export function passwordPolicyValidator(control: AbstractControl<string>): ValidationErrors | null {
-  if (control.value.length === 0) return null; // `required` cuida do vazio
   const email: unknown = control.parent?.get('email')?.value;
-  const unmet = unmetPasswordRules(control.value, typeof email === 'string' ? email : '');
+  return policyErrors(control.value, typeof email === 'string' ? email : '');
+}
+
+/** Variante com o e-mail vindo de fora do formulário (ex.: o usuário da sessão). */
+export function passwordPolicyValidatorFor(email: () => string) {
+  return (control: AbstractControl<string>): ValidationErrors | null =>
+    policyErrors(control.value, email());
+}
+
+function policyErrors(password: string, email: string): ValidationErrors | null {
+  if (password.length === 0) return null; // `required` cuida do vazio
+  const unmet = unmetPasswordRules(password, email);
   return unmet.length > 0 ? { passwordPolicy: unmet } : null;
 }

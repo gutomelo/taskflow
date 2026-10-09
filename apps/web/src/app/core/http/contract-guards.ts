@@ -1,4 +1,10 @@
-import type { CurrentUser, FieldViolation, ProblemDetails } from '@taskflow/contracts';
+import type {
+  CurrentUser,
+  FieldViolation,
+  ProblemDetails,
+  SessionList,
+  SessionSummary,
+} from '@taskflow/contracts';
 
 // Verificações de forma das respostas da API. Os contratos entram no frontend só como tipos:
 // os schemas Zod de `@taskflow/contracts` custariam ~500 kB no bundle inicial (medido na T25).
@@ -35,6 +41,32 @@ export function isProblemDetails(value: unknown): value is ProblemDetails {
     (value['violations'] === undefined ||
       (Array.isArray(value['violations']) && value['violations'].every(isFieldViolation)))
   );
+}
+
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isSessionSummary(value: unknown): value is SessionSummary {
+  if (!isRecord(value) || !isRecord(value['device'])) return false;
+  const { id, createdAt, lastUsedAt, device, isCurrent } = value;
+  return (
+    typeof id === 'string' &&
+    UUID.test(id) &&
+    typeof createdAt === 'string' &&
+    ISO_DATE_TIME.test(createdAt) &&
+    typeof lastUsedAt === 'string' &&
+    ISO_DATE_TIME.test(lastUsedAt) &&
+    isNullableString(device['browser']) &&
+    isNullableString(device['os']) &&
+    typeof isCurrent === 'boolean'
+  );
+}
+
+export function isSessionList(value: unknown): value is SessionList {
+  return isRecord(value) && Array.isArray(value['items']) && value['items'].every(isSessionSummary);
 }
 
 /** Resposta fora do contrato: tratada como falha (nunca confiar em forma não verificada). */

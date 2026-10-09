@@ -1,4 +1,4 @@
-import { ANNOUNCE_DEBOUNCE_MS } from './password-requirements';
+import { ANNOUNCE_DEBOUNCE_MS } from '../../shared/password/password-requirements';
 import {
   field,
   openAuthPage,

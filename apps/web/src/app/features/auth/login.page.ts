@@ -16,7 +16,7 @@ import { AuthApi, AuthStore, safeReturnUrl } from '../../core/auth';
 import { toApiProblem } from '../../core/http/api-problem';
 import { AuthCard } from './auth-card';
 import { authMessages, commonErrorMessage } from './auth.messages';
-import { focusAfterRender, focusFirstInvalid } from './form-focus';
+import { focusAfterRender, focusFirstInvalid } from '../../shared/forms/form-focus';
 
 @Component({
   selector: 'tf-login-page',

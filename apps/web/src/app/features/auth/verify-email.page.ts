@@ -9,12 +9,12 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { Router, RouterLink } from '@angular/router';
-import { AuthStore } from '../../core/auth';
+import { AuthApi, AuthStore } from '../../core/auth';
 import { toApiProblem } from '../../core/http/api-problem';
 import { AccountApi } from './account-api';
 import { AuthCard } from './auth-card';
 import { authMessages, commonErrorMessage } from './auth.messages';
-import { focusAfterRender } from './form-focus';
+import { focusAfterRender } from '../../shared/forms/form-focus';
 import { LinkToken, PendingEmailVerification } from './link-token';
 
 export type VerifyEmailState =
@@ -40,6 +40,7 @@ export type VerifyEmailState =
 })
 export class VerifyEmailPage {
   private readonly api = inject(AccountApi);
+  private readonly authApi = inject(AuthApi);
   private readonly pending = inject(PendingEmailVerification);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -101,7 +102,7 @@ export class VerifyEmailPage {
     if (this.busy()) return;
     await this.run(async () => {
       try {
-        await this.api.resendVerification();
+        await this.authApi.resendEmailVerification();
         this.moveTo('resend_sent');
       } catch (error) {
         const problem = toApiProblem(error);
