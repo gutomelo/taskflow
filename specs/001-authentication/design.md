@@ -177,7 +177,7 @@ model OutboxEvent {
 | GET    | `/api/v1/me/sessions`                     | ✔                     | —    | —                                                                    | —                                  | 200 `{ items: SessionSummary[] }`                  | 401                                                                                                  |
 | DELETE | `/api/v1/me/sessions/{sessionId}`         | ✔                     | ✔    | —                                                                    | —                                  | 204                                                | 404                                                                                                  |
 
-`CurrentUser = { id, name, email, emailVerified }` · `SessionSummary = { id, createdAt, lastUsedAt, userAgentLabel, isCurrent }` · bodies `.strict()` · todos os limites por IP usam IPv4 completo / IPv6 /64.
+`CurrentUser = { id, name, email, emailVerified }` · `SessionSummary = { id, createdAt, lastUsedAt, device: { browser, os }, isCurrent }` (dados estruturados; o frontend compõe o texto — i18n) · bodies `.strict()` · todos os limites por IP usam IPv4 completo / IPv6 /64.
 
 ### Eventos de fila (`emails`)
 
@@ -227,6 +227,8 @@ Ao apresentar um refresh já rotacionado:
 - tolerância **somente** se for o predecessor imediato do token atual, rotacionado há ≤ **5 s**, `graceUsedAt` vazio e mesmo `ipPrefix` + `userAgent` → marca `graceUsedAt`, responde 409 `REFRESH_IN_PROGRESS`, registra `auth.refresh_grace_hit`;
 - qualquer outro caso (segunda apresentação, token mais antigo, cliente diferente, fora da janela) → revoga a sessão (`reuse_detected`), 401, registra `auth.refresh_reuse_detected`.
 
+Consequência: com três ou mais renovações simultâneas do mesmo token, a terceira é tratada como reuso e revoga a sessão — por isso o frontend **deve** serializar renovações entre abas (Web Locks, T24); coberto por teste de integração.
+
 No 409 o cliente **não repete o refresh**: aguarda o lock entre abas (Web Locks) e repete a requisição original, que já usa o cookie novo.
 
 ### CSRF
@@ -247,6 +249,10 @@ No 409 o cliente **não repete o refresh**: aguarda o lock entre abas (Web Locks
 - Esqueci a senha: trabalho constante (sempre grava evento); worker descarta quando não há conta.
 - Login: verificação contra hash fictício quando o usuário não existe.
 - Limites por e-mail aplicados **antes** de consultar a conta.
+
+### Eventos de segurança
+
+Porta `SecurityEventRecorder` (`identity/application`) registra `auth.refresh_grace_hit`, `auth.refresh_reuse_detected` e `auth.session_revoked` com identificadores apenas; implementada com o logger estruturado no composition root (T16).
 
 ### Logs e privacidade
 

@@ -38,6 +38,7 @@ import type {
   AccessTokenVerifier,
   IssuedAccessToken,
 } from '../lib/ports/access-tokens';
+import type { SecurityEvent, SecurityEventRecorder } from '../lib/ports/security-event-recorder';
 import type { SessionRevocationList } from '../lib/ports/session-revocation-list';
 
 /** Participante de transação com estado copiável (simula o rollback do banco). */
@@ -355,6 +356,16 @@ export class InMemoryRateLimiter implements RateLimiter {
   }
 }
 
+export class RecordingSecurityEvents implements SecurityEventRecorder {
+  events: SecurityEvent[] = [];
+  record(event: SecurityEvent) {
+    this.events.push(event);
+  }
+  types(): string[] {
+    return this.events.map((event) => event.type);
+  }
+}
+
 export const fakePseudonymizer: Pseudonymizer = {
   pseudonymize: (value) =>
     `pseudo(${value.length})#${[...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)}`,
@@ -382,6 +393,7 @@ export function createIdentityTestbed() {
     accessTokens: new FakeAccessTokens(clock),
     revocationList: new FakeRevocationList(),
     rateLimiter: new InMemoryRateLimiter(),
+    securityEvents: new RecordingSecurityEvents(),
     pseudonymizer: fakePseudonymizer,
     commonPasswords: { contains: (password: string) => password.toLowerCase() === 'password1!' },
   };

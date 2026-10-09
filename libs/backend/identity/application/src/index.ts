@@ -33,3 +33,17 @@ export {
   type LogoutCommand,
   type LogoutDependencies,
 } from './lib/use-cases/logout.use-case';
+export type { SecurityEvent, SecurityEventRecorder } from './lib/ports/security-event-recorder';
+export { SessionNotFoundError } from './lib/shared/identity-errors';
+export { summarizeUserAgent, type DeviceSummary } from './lib/shared/user-agent';
+export {
+  RefreshSessionUseCase,
+  type RefreshSessionCommand,
+  type RefreshSessionDependencies,
+  type RefreshSessionResult,
+} from './lib/use-cases/refresh-session.use-case';
+export { ListSessionsUseCase, type SessionSummary } from './lib/use-cases/list-sessions.use-case';
+export {
+  RevokeSessionUseCase,
+  type RevokeSessionDependencies,
+} from './lib/use-cases/revoke-session.use-case';
