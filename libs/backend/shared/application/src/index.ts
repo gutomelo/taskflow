@@ -13,3 +13,4 @@ export type {
   RateLimitPolicy,
   RateLimiter,
 } from './lib/rate-limiting/rate-limiter';
+export { ServiceBusyError } from './lib/errors/service-busy-error';

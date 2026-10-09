@@ -6,6 +6,8 @@ packages: []
 # pré-compilados (optionalDependencies) ou possuem postinstall opcional.
 allowBuilds:
   '@parcel/watcher': false
+  # Usa binário pré-compilado (prebuilds) embarcado no pacote; dispensa compilação nativa.
+  argon2: false
   '@prisma/engines': true
   '@swc/core': true
   cpu-features: false

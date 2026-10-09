@@ -127,6 +127,18 @@ export class PrismaSessionRepository implements SessionRepository {
     return revoked.map(({ id }) => id);
   }
 
+  /**
+   * Fallback da lista de revogação (Redis indisponível): sessão inexistente conta como
+   * revogada. Consulta leve, sem carregar tokens.
+   */
+  async isRevoked(sessionId: string): Promise<boolean> {
+    const row = await this.transactions.client().session.findUnique({
+      where: { id: sessionId },
+      select: { revokedAt: true },
+    });
+    return row === null || row.revokedAt !== null;
+  }
+
   private async load(sessionId: string): Promise<Session | null> {
     const row = await this.transactions.client().session.findUnique({
       where: { id: sessionId },

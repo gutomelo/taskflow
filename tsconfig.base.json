@@ -35,7 +35,8 @@
       "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
       "@taskflow/backend/identity/infrastructure": [
         "./libs/backend/identity/infrastructure/src/index.ts"
-      ]
+      ],
+      "@taskflow/backend/identity/application": ["./libs/backend/identity/application/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

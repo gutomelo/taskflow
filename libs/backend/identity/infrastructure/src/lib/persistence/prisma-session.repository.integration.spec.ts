@@ -223,6 +223,18 @@ describe('PrismaSessionRepository (integration)', () => {
     );
   });
 
+  it('reports revocation state for the revocation-list fallback (missing counts as revoked)', async () => {
+    const active = await persistedSession();
+    const revoked = await persistedSession();
+    const loaded = await sessions.findById(revoked.id);
+    loaded?.revoke('logout', new Date());
+    if (loaded) await sessions.save(loaded);
+
+    expect(await sessions.isRevoked(active.id)).toBe(false);
+    expect(await sessions.isRevoked(revoked.id)).toBe(true);
+    expect(await sessions.isRevoked('00000000-0000-7000-8000-000000000000')).toBe(true);
+  });
+
   it('cascades session and token removal when the user is deleted', async () => {
     const session = await persistedSession();
 

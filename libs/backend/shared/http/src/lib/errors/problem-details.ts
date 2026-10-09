@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
+import { ServiceBusyError } from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import { PROBLEM_CONTENT_TYPE, type ProblemDetails } from '@taskflow/contracts';
 import { HttpError } from './http-error';
@@ -64,6 +65,16 @@ export function createErrorHandler({
         title: error.title,
         ...(error.detail === undefined ? {} : { detail: error.detail }),
         ...(error.violations === undefined ? {} : { violations: [...error.violations] }),
+      });
+      return;
+    }
+
+    if (error instanceof ServiceBusyError) {
+      response.set('Retry-After', String(error.retryAfterSeconds));
+      sendProblem(response, {
+        status: 503,
+        code: error.code,
+        title: 'Serviço temporariamente ocupado. Tente novamente em instantes.',
       });
       return;
     }

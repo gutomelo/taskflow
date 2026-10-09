@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { z } from 'zod';
+import { ServiceBusyError } from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import { problemDetailsSchema } from '@taskflow/contracts';
 import { createTestApp } from '../testing/test-app';
@@ -34,6 +35,9 @@ function buildApp() {
       });
       app.get('/busy', () => {
         throw new HttpError(503, 'SERVICE_BUSY', 'Serviço ocupado', { retryAfterSeconds: 3 });
+      });
+      app.get('/argon2-busy', () => {
+        throw new ServiceBusyError('password-hasher', 2);
       });
       app.get('/crash', () => {
         throw new Error('SELECT * FROM users -- internal');
@@ -76,6 +80,14 @@ describe('error handling', () => {
     const response = await request(buildApp()).get('/busy').expect(503);
 
     expect(response.headers['retry-after']).toBe('3');
+  });
+
+  it('maps ServiceBusyError to 503 SERVICE_BUSY with Retry-After', async () => {
+    const response = await request(buildApp()).get('/argon2-busy').expect(503);
+
+    expect(response.headers['retry-after']).toBe('2');
+    expect(response.body.code).toBe('SERVICE_BUSY');
+    expect(response.text).not.toContain('password-hasher');
   });
 
   it('hides unexpected errors behind a generic 500 with the request id', async () => {

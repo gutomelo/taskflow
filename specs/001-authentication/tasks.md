@@ -21,7 +21,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T8  | `identity/domain`: `Session.rotate` (BR-012 tolerância estrita, BR-015) e `UserToken`                                                                                                                    | T7         | testes com relógio controlado: rotacionar, tolerância única, reuso, outro cliente, expiração deslizante/absoluta | [x]    |
 | T9  | Schema Prisma + primeira migration (users, sessions, refresh_tokens, user_tokens; `outbox_events` antecipada na T5)                                                                                      | T5         | `/database-migration`: SQL revisado; `prisma migrate dev`; `migrate status`                                      | [x]    |
 | T10 | `identity/infrastructure`: repositórios Prisma (incl. `findByRefreshTokenHashForUpdate`), consumo atômico de token                                                                                       | T8, T9     | integração: CRUD, lock fora de transação falha, consumo concorrente de token (um vence)                          | [x]    |
-| T11 | `Argon2PasswordHasher` (semáforo, rehash), `FileCommonPasswordList` (lista embarcada + licença registrada), `JoseAccessTokens` (kid, algoritmos fixos), `RedisSessionRevocationList` (fallback ao banco) | T7, T5     | unit + integração (Redis parado → fallback)                                                                      | [ ]    |
+| T11 | `Argon2PasswordHasher` (semáforo, rehash), `FileCommonPasswordList` (lista embarcada + licença registrada), `JoseAccessTokens` (kid, algoritmos fixos), `RedisSessionRevocationList` (fallback ao banco) | T7, T5     | unit + integração (Redis parado → fallback)                                                                      | [x]    |
 
 ## Bloco C — Casos de uso e API
 
@@ -156,3 +156,17 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Prova dos testes**: sem `FOR UPDATE`, o teste de lock falha (o primeiro teste com `Promise.all` passava mesmo sem lock e foi substituído por intercalação determinística); mutações no consumo (sem `consumed_at IS NULL`, sem checar expiração) e no retry (reativando consumido) foram todas detectadas.
 - **Correções durante a tarefa**: decisão revista no `upsertForEvent` (não reativar token consumido); fixtures de teste movidos para `src/testing/` (excluídos do build e incluídos no `tsconfig.spec.json` — necessário para os aliases no Vitest); teste sem valor removido.
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (10 projetos); `pnpm test:integration` 20 + 24 ✔; `pnpm format:check` ✔.
+
+### T11 — 2026-10-08
+
+- **Portas** (nova lib `libs/backend/identity/application`, criada antecipadamente só com interfaces): `AccessTokenIssuer`, `AccessTokenVerifier` (`ignoreExpiration` restrito ao vínculo CSRF do refresh), `SessionRevocationList`. Em `shared/application`: `ServiceBusyError` (`SERVICE_BUSY`), mapeado para 503 + `Retry-After` no error handler (teste incluído).
+- **Implementações** em `libs/backend/identity/infrastructure/src/lib/security`:
+  - `Argon2PasswordHasher` (`argon2` 0.45, Argon2id m=19456/t=2/p=1, NFC na verificação, hash malformado ⇒ `false`, `needsRehash` também para variante não-Argon2id/legado) com `ConcurrencyLimiter` (semáforo com espera limitada ⇒ `ServiceBusyError`).
+  - `FileCommonPasswordList`: asset `assets/common-passwords.txt` — 97.745 senhas (NCSC top 100k via SecLists, **MIT**), normalizadas (NFC, minúsculas, sem duplicatas/controle); procedência, licença e SHA-256 da origem em `common-passwords.NOTICE.md`; lista vazia impede o start.
+  - `JoseAccessTokens` (`jose` 6): HS256 fixo, `kid` obrigatório de mapa fixo (rotação com chave anterior), `iss`/`aud`/`sub`/`sid`/`iat`/`exp` exigidos, 5 s de tolerância; `ignoreExpiration` aproveita apenas `JWTExpired` (payload já autenticado).
+  - `RedisSessionRevocationList` (TTL 20 min, `MULTI` em lote): gravação falha alto; leitura recorre a `PrismaSessionRepository.isRevoked` (inexistente conta como revogada) quando o Redis falha.
+- **Dependências**: `argon2` com `allowBuilds: false` — binário pré-compilado (inclui `linux-x64`/`arm64` glibc **e musl**, necessário para a imagem Alpine) verificado funcionando sem compilação nativa; `jose`.
+- **Testes**: 27 unitários (limitador; Argon2 com biblioteca real — formato/parâmetros, sal, NFC, rehash, saturação; lista real com variante `Password1!` rejeitada pelo domínio; JWT — expiração e tolerância, rotação de chave, 7 ataques: payload adulterado, `alg=none`, outro segredo, `kid` desconhecido, HS512, outra audiência, lixo) + 29 de integração (lista de revogação com Redis real, TTL, fallback ao banco, falha de gravação; `isRevoked` no PostgreSQL).
+- **Mutação**: algoritmo não fixado, relevar qualquer erro de claim com `ignoreExpiration` e gravação de revogação silenciosa — todas detectadas.
+- **Pendências registradas para a T16**: copiar o asset da lista para `dist/apps/api` e passar o caminho pelo composition root; validar o carregamento do `argon2` na imagem Alpine (`docker build` da API) quando ele passar a ser importado.
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (11 projetos); integração da lib 29/29; `pnpm format:check` ✔.
