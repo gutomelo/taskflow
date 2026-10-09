@@ -49,7 +49,7 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | ID  | Tarefa                                                                                                                                                                 | Depende de   | Verificação                                          | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------- | ------ |
 | T23 | Fonte Inter auto-hospedada; `Referrer-Policy: no-referrer` e CSP restrita (Nginx e dev server); `/status` movida                                                       | —            | build; headers verificados                           | [x]    |
-| T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [ ]    |
+| T24 | `AuthStore`, bootstrap `/me`, CSRF (`withXsrfConfiguration`), interceptor de refresh single-flight com Web Locks e tratamento de 409, guards, validação de `returnUrl` | T16          | testes de store, interceptor (concorrência) e guards | [x]    |
 | T25 | Telas login e cadastro (requisitos de senha com `aria-live`, erros por `code`)                                                                                         | T24          | testes de formulário (CA-12)                         | [ ]    |
 | T26 | Telas verificação de e-mail (fragmento, login preservando token, clique explícito), esqueci e redefinir senha                                                          | T24          | testes de componente (CA-03, CA-16)                  | [ ]    |
 | T27 | Shell autenticado (menu do usuário, banner de verificação), home, página Segurança (sessões, troca de senha)                                                           | T24          | testes de componente                                 | [ ]    |
@@ -394,3 +394,46 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 - **Docs**: `docs/design-system.md` (fonte auto-hospedada) e `docs/architecture/overview.md` (Frontend → segurança do documento).
 - **Pendente**: o build da imagem `web` completa não foi executado (97% de disco ocupado); o teste equivalente com a imagem base do Nginx está registrado acima.
 - **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 363 testes unitários); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (6); `pnpm format:check` ✔.
+
+### T24 — 2026-10-09
+
+- **Entregue** (`apps/web/src/app/core/auth`):
+  - `AuthApi`: `/auth/csrf`, `/me` (resposta validada com `currentUserSchema`), `/auth/refresh`. Timeouts: 5 s no bootstrap e 10 s no refresh, para que uma resposta presa não segure o lock entre abas.
+  - `AuthStore` (Signals): `status` (`unknown` → `authenticated` | `anonymous`), `user`, `isAuthenticated`, `signIn`, `endSession()` (devolve se havia usuário). `bootstrap()` via `provideAppInitializer`, antes da primeira navegação: CSRF → `/me`; nunca rejeita (API fora ⇒ anônimo).
+  - `SessionRefresher`: voo único na aba (promessa compartilhada) e serialização entre abas com Web Lock `taskflow:session-refresh` (injetável; sem suporte ⇒ sem lock). Resultados:
+    - `refreshed` (204, ou 409 `REFRESH_IN_PROGRESS`);
+    - `session_ended` (401);
+    - `unavailable` (rede, timeout, 5xx ou outro 409).
+  - `sessionRefreshInterceptor`: em 401 de `/api/v1/*`, renova e repete a requisição original **uma** vez (a repetição não volta ao interceptor). Exclui `csrf`, `login`, `register`, `refresh`, `logout` e `password/forgot|reset`. Em `session_ended`, o store fica anônimo e, **só se havia usuário**, navega para `/login?returnUrl=…`. Em `unavailable`, a sessão é mantida e o erro original propagado.
+  - `withXsrfConfiguration({ cookieName: '__Host-tf_csrf', headerName: 'X-CSRF-Token' })`, `provideAuth()` em `app.config.ts`.
+  - `safeReturnUrl`: só caminhos internos (rejeita absolutas, `//`, `\`, `javascript:`, caracteres de controle, mais de 2.048 caracteres e páginas de visitante, que causariam laço) e **descarta o fragmento**, para que `#token=` de e-mail não migre para a query string.
+  - `authGuard` (anônimo ⇒ `/login?returnUrl=`) e `guestGuard` (autenticado ⇒ `returnUrl` seguro). Ainda não aplicados a rotas: as telas chegam na T25–T27.
+  - Helper de teste `auth.testing.ts`, excluído do build (`tsconfig.app.json`: `src/**/*.testing.ts`).
+- **Decisões tomadas na implementação**:
+  - A renovação em outra aba roda **depois** da primeira, com o refresh token mais recente do cookie, sem reapresentar token já rotacionado (o que a API trataria como reutilização). Custa uma rotação extra por aba e evita a revogação documentada na T15.
+  - Visitante anônimo faz 3 requisições no bootstrap (`csrf 204`, `/me 401`, `refresh 401`). O cliente não consegue saber se existe sessão, porque os cookies são HttpOnly.
+- **Testes** (web: 6 → 57):
+  - `return-url` 19;
+  - `SessionRefresher` 12: voo único, Web Lock, **duas abas serializadas**, nova renovação após a anterior, sem Web Locks, 7 classificações de falha;
+  - guards 5;
+  - interceptor 10, com `HttpTestingController`: **3 requisições concorrentes com 401 ⇒ 1 refresh e 3 repetições**, 409 ⇒ repete, repetição com 401 não renova de novo, refresh recusado ⇒ anônimo e 1 navegação para o login, bootstrap anônimo sem redirecionamento, falha de rede mantém a sessão, 3 rotas excluídas, 403 sem refresh;
+  - store 7: bootstrap, sessão restaurada pelo refresh, anônimo sem redirecionamento, API fora, `/me` fora do contrato, **API travada ⇒ timeout e app abre**, `endSession`.
+- **E2E**: `auth-bootstrap.spec.ts` contra a API real, com visitante anônimo:
+  - sequência `csrf 204 → /me 401 → refresh 401`, sem redirecionamento;
+  - cookie `__Host-tf_csrf` com `Secure`, `SameSite=Strict`, `path=/`, sem `HttpOnly`;
+  - nenhum cookie de sessão visível em `document.cookie`.
+
+  O teste do _skip link_ passou a esperar a renderização: agora o app renderiza após o bootstrap, e o Tab era pressionado antes de o link existir.
+
+- **Mutation testing** (diff confirmado; arquivos restaurados e conferidos com `grep`), 8 de 8 detectadas:
+  - sem voo único ⇒ 3 falhas;
+  - sem Web Lock ⇒ 2 falhas;
+  - sem tratamento do 409 ⇒ 2 falhas;
+  - qualquer falha encerra a sessão ⇒ 4 falhas;
+  - redirecionar sem usuário ⇒ 3 falhas;
+  - refresh no 401 do login ⇒ falhas;
+  - fragmento preservado no `returnUrl` ⇒ 2 falhas;
+  - `/me` sem timeout ⇒ 1 falha.
+- **Correção de evidências anteriores**: os totais de testes unitários informados de T19 a T23 foram somados de uma saída com códigos ANSI e **omitiam os 6 testes do web**, que foram executados e passaram. Os totais corretos eram 6 a mais.
+- **Docs**: `docs/architecture/overview.md` (Frontend → Sessão).
+- **Comandos**: `pnpm verify --skip-nx-cache` ✔ (13 projetos, 420 testes unitários, web incluído); `pnpm test:integration --skip-nx-cache` ✔ (76); `pnpm e2e --skip-nx-cache` ✔ (7); `pnpm format:check` ✔.

@@ -15,6 +15,8 @@ test.describe('System status page', () => {
 
   test('offers a skip link to the main content for keyboard users', async ({ page }) => {
     await page.goto('/status');
+    // A aplicação renderiza após o bootstrap da sessão (provideAppInitializer).
+    await expect(page.getByRole('heading', { level: 1, name: 'Status do sistema' })).toBeVisible();
 
     await page.keyboard.press('Tab');
     const skipLink = page.getByRole('link', { name: 'Pular para o conteúdo' });
