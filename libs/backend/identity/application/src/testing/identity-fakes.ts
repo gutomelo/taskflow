@@ -230,11 +230,24 @@ export class InMemoryUserTokenRepository implements UserTokenRepository, Transac
     }
     this.rows.set(snapshot.id, snapshot);
   }
-  async consume(tokenHash: string, purpose: UserTokenPurpose, now: Date) {
-    const row = [...this.rows.values()].find((candidate) => candidate.tokenHash === tokenHash);
-    if (!row || row.purpose !== purpose || row.consumedAt || row.expiresAt <= now) return null;
+  async consume(
+    tokenHash: string,
+    purpose: UserTokenPurpose,
+    now: Date,
+    options: { readonly userId?: string } = {},
+  ) {
+    const row = await this.usable(tokenHash, purpose, now);
+    if (!row || (options.userId && row.userId !== options.userId)) return null;
     this.rows.set(row.id, { ...row, consumedAt: now });
     return { userId: row.userId };
+  }
+  async findOwner(tokenHash: string, purpose: UserTokenPurpose, now: Date) {
+    const row = await this.usable(tokenHash, purpose, now);
+    return row ? { userId: row.userId } : null;
+  }
+  private async usable(tokenHash: string, purpose: UserTokenPurpose, now: Date) {
+    const row = [...this.rows.values()].find((candidate) => candidate.tokenHash === tokenHash);
+    return row && row.purpose === purpose && !row.consumedAt && row.expiresAt > now ? row : null;
   }
   async invalidatePending(userId: string, purpose: UserTokenPurpose, now: Date) {
     let count = 0;

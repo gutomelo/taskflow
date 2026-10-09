@@ -199,6 +199,39 @@ describe('Identity repositories (integration)', () => {
       ).toBeNull();
     });
 
+    it('BR-017: finds the owner of a usable token without consuming it', async () => {
+      const owner = await userId();
+      const token = issue(owner, 'email_verification');
+      await tokens.upsertForEvent(token);
+      const hash = token.toSnapshot().tokenHash;
+
+      expect(await tokens.findOwner(hash, 'email_verification', new Date())).toEqual({
+        userId: owner,
+      });
+      expect(await tokens.findOwner(hash, 'password_reset', new Date())).toBeNull();
+      expect(await tokens.consume(hash, 'email_verification', new Date())).toEqual({
+        userId: owner,
+      });
+      expect(await tokens.findOwner(hash, 'email_verification', new Date())).toBeNull();
+    });
+
+    it('BR-017: consumes only when the token belongs to the expected user', async () => {
+      const owner = await userId();
+      const otherUser = await userId();
+      const token = issue(owner, 'email_verification');
+      await tokens.upsertForEvent(token);
+      const hash = token.toSnapshot().tokenHash;
+
+      expect(
+        await tokens.consume(hash, 'email_verification', new Date(), { userId: otherUser }),
+      ).toBeNull();
+      expect(
+        await tokens.consume(hash, 'email_verification', new Date(), { userId: owner }),
+      ).toEqual({
+        userId: owner,
+      });
+    });
+
     it('BR-016: invalidates pending tokens of a purpose, leaving others intact', async () => {
       const owner = await userId();
       const resets = [issue(owner, 'password_reset'), issue(owner, 'password_reset')];

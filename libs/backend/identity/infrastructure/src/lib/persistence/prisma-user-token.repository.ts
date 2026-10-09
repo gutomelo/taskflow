@@ -27,8 +27,11 @@ export class PrismaUserTokenRepository implements UserTokenRepository {
     tokenHash: string,
     purpose: UserTokenPurpose,
     now: Date,
+    options: { readonly userId?: string } = {},
   ): Promise<{ readonly userId: string } | null> {
-    // Uma única instrução: dois consumos simultâneos nunca vencem juntos.
+    const expectedUserId = options.userId ?? null;
+    // Uma única instrução: dois consumos simultâneos nunca vencem juntos, e a checagem do
+    // dono acontece no mesmo UPDATE (sem janela entre verificar e consumir).
     const consumed = await this.transactions.client().$queryRaw<Array<{ user_id: string }>>`
       UPDATE user_tokens
       SET consumed_at = ${now}
@@ -36,9 +39,22 @@ export class PrismaUserTokenRepository implements UserTokenRepository {
         AND purpose = ${purpose}::user_token_purpose
         AND consumed_at IS NULL
         AND expires_at > ${now}
+        AND (${expectedUserId}::uuid IS NULL OR user_id = ${expectedUserId}::uuid)
       RETURNING user_id`;
     const userId = consumed[0]?.user_id;
     return userId ? { userId } : null;
+  }
+
+  async findOwner(
+    tokenHash: string,
+    purpose: UserTokenPurpose,
+    now: Date,
+  ): Promise<{ readonly userId: string } | null> {
+    const row = await this.transactions.client().userToken.findFirst({
+      where: { tokenHash, purpose, consumedAt: null, expiresAt: { gt: now } },
+      select: { userId: true },
+    });
+    return row ? { userId: row.userId } : null;
   }
 
   async invalidatePending(userId: string, purpose: UserTokenPurpose, now: Date): Promise<number> {

@@ -15,6 +15,16 @@ export interface UserTokenRepository {
     tokenHash: string,
     purpose: UserTokenPurpose,
     now: Date,
+    options?: { readonly userId?: string },
+  ): Promise<{ readonly userId: string } | null>;
+  /**
+   * Dono de um token ainda utilizável, **sem consumi-lo** (BR-017: verificar a posse antes
+   * de gastar o token). Com `options.userId`, `consume` só consome se o dono for o esperado.
+   */
+  findOwner(
+    tokenHash: string,
+    purpose: UserTokenPurpose,
+    now: Date,
   ): Promise<{ readonly userId: string } | null>;
   /** Invalida tokens pendentes da finalidade (BR-016). Retorna quantos foram invalidados. */
   invalidatePending(userId: string, purpose: UserTokenPurpose, now: Date): Promise<number>;

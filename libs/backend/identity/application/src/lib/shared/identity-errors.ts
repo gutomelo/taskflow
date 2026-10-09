@@ -15,3 +15,14 @@ export class SessionNotFoundError extends DomainError {
     super('Session not found');
   }
 }
+
+/**
+ * BR-017: link de verificação usado por outra conta autenticada. O token **não** é consumido,
+ * para que o titular verdadeiro ainda possa usá-lo na própria conta.
+ */
+export class TokenBelongsToAnotherAccountError extends DomainError {
+  readonly code = 'TOKEN_BELONGS_TO_ANOTHER_ACCOUNT';
+  constructor() {
+    super('Verification token belongs to another account');
+  }
+}

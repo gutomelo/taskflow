@@ -47,3 +47,14 @@ export {
   RevokeSessionUseCase,
   type RevokeSessionDependencies,
 } from './lib/use-cases/revoke-session.use-case';
+export { TokenBelongsToAnotherAccountError } from './lib/shared/identity-errors';
+export {
+  ResendEmailVerificationUseCase,
+  type ResendEmailVerificationDependencies,
+} from './lib/use-cases/resend-email-verification.use-case';
+export {
+  ConfirmEmailVerificationUseCase,
+  type ConfirmEmailVerificationCommand,
+  type ConfirmEmailVerificationDependencies,
+} from './lib/use-cases/confirm-email-verification.use-case';
+export { GetUserVerificationStatusUseCase } from './lib/use-cases/get-user-verification-status.use-case';
