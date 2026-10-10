@@ -64,6 +64,13 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return row ? toInvitation(row) : null;
   }
 
+  async findForDelivery(invitationId: string): Promise<Invitation | null> {
+    const row = await this.transactions
+      .client()
+      .invitation.findUnique({ where: { id: invitationId } });
+    return row ? toInvitation(row) : null;
+  }
+
   async findOpenByEmail(organizationId: string, email: EmailAddress): Promise<Invitation | null> {
     const row = await this.transactions.client().invitation.findFirst({
       where: { organizationId, email: email.value, ...OPEN },

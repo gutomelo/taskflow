@@ -83,18 +83,18 @@ Hoje o TaskFlow tem contas, mas nenhum espaço de trabalho: não há onde criar 
 
 ## Critérios de aceitação (resumo)
 
-- [ ] CA-01 Usuário verificado cria organização e vira owner; não verificado recebe 403 `EMAIL_NOT_VERIFIED`.
-- [ ] CA-02 Slug inválido, reservado ou em uso é recusado; slug não muda após a criação.
-- [ ] CA-03 Membro de A não acessa nada de B (404 em todos os endpoints tenant-scoped).
-- [ ] CA-04 Convite chega ao Mailpit; aceite pela conta convidada cria membership com o papel do convite.
-- [ ] CA-05 Aceite por outra conta ⇒ 403 sem consumir; convite expirado, revogado ou usado ⇒ 400 `INVALID_OR_EXPIRED_INVITATION`.
-- [ ] CA-06 Reenviar invalida o link anterior; revogar impede o aceite.
-- [ ] CA-07 Admin não promove a owner nem altera ou remove owners; owner pode.
-- [ ] CA-08 Último owner não sai, não é removido nem rebaixado; duas operações concorrentes sobre owners nunca deixam zero owners.
-- [ ] CA-09 Membro removido perde o acesso na próxima requisição.
-- [ ] CA-10 App abre `/o/:slug`, alterna organizações pelo seletor e leva quem não tem organização ao onboarding.
-- [ ] CA-11 Jornada E2E: criar organização → convidar → convidado se cadastra e aceita pelo link do Mailpit → aparece na lista de membros → owner altera o papel → convidado sai.
-- [ ] CA-12 Limites de criação e convite respondem 429.
+- [x] CA-01 Usuário verificado cria organização e vira owner; não verificado recebe 403 `EMAIL_NOT_VERIFIED`.
+- [x] CA-02 Slug inválido, reservado ou em uso é recusado; slug não muda após a criação.
+- [x] CA-03 Membro de A não acessa nada de B (404 em todos os endpoints tenant-scoped).
+- [x] CA-04 Convite chega ao Mailpit; aceite pela conta convidada cria membership com o papel do convite.
+- [x] CA-05 Aceite por outra conta ⇒ 403 sem consumir; convite expirado, revogado ou usado ⇒ 400 `INVALID_OR_EXPIRED_INVITATION`.
+- [x] CA-06 Reenviar invalida o link anterior; revogar impede o aceite.
+- [x] CA-07 Admin não promove a owner nem altera ou remove owners; owner pode.
+- [x] CA-08 Último owner não sai, não é removido nem rebaixado; duas operações concorrentes sobre owners nunca deixam zero owners.
+- [x] CA-09 Membro removido perde o acesso na próxima requisição.
+- [x] CA-10 App abre `/o/:slug`, alterna organizações pelo seletor e leva quem não tem organização ao onboarding.
+- [x] CA-11 Jornada E2E: criar organização → convidar → convidado se cadastra e aceita pelo link do Mailpit → aparece na lista de membros → owner altera o papel → convidado sai.
+- [x] CA-12 Limites de criação e convite respondem 429.
 
 ## Casos limite
 

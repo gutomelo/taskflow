@@ -1,4 +1,3 @@
-import type { Logger } from 'pino';
 import {
   SendAccountNoticeUseCase,
   SendEmailVerificationUseCase,
@@ -13,7 +12,6 @@ import {
 import type { EmailSender } from '@taskflow/backend/shared/application';
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
 import type { PrismaTransactionRunner } from '@taskflow/backend/shared/infrastructure';
-import { createEmailJobProcessor } from '../queues/email-jobs';
 
 export interface IdentityEmailsModuleDependencies {
   readonly transactions: PrismaTransactionRunner;
@@ -21,7 +19,6 @@ export interface IdentityEmailsModuleDependencies {
   readonly idGenerator: IdGenerator;
   readonly clock: Clock;
   readonly appUrl: string;
-  readonly logger: Logger;
 }
 
 /** Composição dos envios de e-mail do contexto identity para o worker (ADR 0011). */
@@ -41,13 +38,8 @@ export function createIdentityEmailsModule(deps: IdentityEmailsModuleDependencie
   };
 
   return {
-    processEmailJob: createEmailJobProcessor(
-      {
-        sendEmailVerification: new SendEmailVerificationUseCase(tokenIssuing),
-        sendPasswordReset: new SendPasswordResetUseCase(tokenIssuing),
-        sendAccountNotice: new SendAccountNoticeUseCase(shared),
-      },
-      deps.logger,
-    ),
+    sendEmailVerification: new SendEmailVerificationUseCase(tokenIssuing),
+    sendPasswordReset: new SendPasswordResetUseCase(tokenIssuing),
+    sendAccountNotice: new SendAccountNoticeUseCase(shared),
   };
 }

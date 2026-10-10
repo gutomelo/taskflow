@@ -12,9 +12,13 @@ import {
   type PrismaClient,
   type Redis,
 } from '@taskflow/backend/shared/infrastructure';
-import type { EmailDeliveryOutcome } from '@taskflow/backend/identity/application';
 import { createIdentityEmailsModule } from './modules/identity-emails.module';
-import { describeJobError } from './queues/email-jobs';
+import { createOrganizationsEmailsModule } from './modules/organizations-emails.module';
+import {
+  createEmailJobProcessor,
+  describeJobError,
+  type EmailJobOutcome,
+} from './queues/email-jobs';
 import { EMAIL_EVENT_TYPES, EMAIL_QUEUE_NAME } from './queues/email-queue';
 
 export interface EmailDeliveryDependencies {
@@ -53,15 +57,20 @@ export function createEmailDelivery(deps: EmailDeliveryDependencies) {
     logger,
     ...(deps.relayPollIntervalMs === undefined ? {} : { pollIntervalMs: deps.relayPollIntervalMs }),
   });
-  const { processEmailJob } = createIdentityEmailsModule({
+  const senders = {
     transactions,
     emailSender: deps.emailSender,
-    idGenerator: deps.idGenerator,
     clock: deps.clock,
     appUrl: deps.appUrl,
+  };
+  const processEmailJob = createEmailJobProcessor(
+    {
+      ...createIdentityEmailsModule({ ...senders, idGenerator: deps.idGenerator }),
+      ...createOrganizationsEmailsModule(senders),
+    },
     logger,
-  });
-  let consumer: EventWorker<EmailDeliveryOutcome> | undefined;
+  );
+  let consumer: EventWorker<EmailJobOutcome> | undefined;
 
   return {
     queue,

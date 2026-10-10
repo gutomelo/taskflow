@@ -6,6 +6,7 @@ import {
   FixedClock,
   InMemoryOutbox,
   InMemoryRateLimiter,
+  RecordingEmailSender,
   SequentialIds,
   fakePseudonymizer,
   type TransactionalStore,
@@ -26,6 +27,7 @@ import {
   type Page,
   type PageRequest,
 } from '@taskflow/backend/organizations/domain';
+import type { InvitationEmailTemplates } from '../lib/ports/invitation-email-templates';
 import type { InvitationTokenGenerator } from '../lib/ports/invitation-token-generator';
 import {
   MAX_USER_ACCOUNTS_PER_QUERY,
@@ -231,6 +233,10 @@ export class InMemoryInvitationRepository implements InvitationRepository, Trans
       ? Invitation.restore(row.snapshot)
       : null;
   }
+  async findForDelivery(invitationId: string) {
+    const row = this.rows.get(invitationId);
+    return row ? Invitation.restore(row.snapshot) : null;
+  }
   async findOpenByEmail(organizationId: string, email: EmailAddress) {
     const row = [...this.rows.values()].find(
       (candidate) =>
@@ -338,6 +344,14 @@ export class RecordingOrganizationsSecurityEvents implements OrganizationsSecuri
   }
 }
 
+/** Templates que expõem os dados recebidos (o texto real é testado na infraestrutura). */
+export const fakeInvitationEmailTemplates: InvitationEmailTemplates = {
+  invitation: ({ to, ...data }) => {
+    const text = JSON.stringify({ template: 'invitation', ...data });
+    return { to, subject: 'invitation', text, html: text };
+  },
+};
+
 /** Grafo completo de fakes para os testes de casos de uso de `organizations`. */
 export function createOrganizationsTestbed() {
   const transactions = new FakeTransactionRunner();
@@ -354,6 +368,9 @@ export function createOrganizationsTestbed() {
     outbox,
     users: new InMemoryUserDirectory(),
     tokens: new FakeInvitationTokens(),
+    emailSender: new RecordingEmailSender(),
+    templates: fakeInvitationEmailTemplates,
+    appUrl: 'https://app.taskflow.test',
     rateLimiter: new InMemoryRateLimiter(),
     securityEvents: new RecordingOrganizationsSecurityEvents(),
     pseudonymizer: fakePseudonymizer,

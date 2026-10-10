@@ -47,6 +47,11 @@ export interface InvitationRepository {
   /** Grava reenvio, reconvite e revogação (filtrado por `organizationId`). */
   save(invitation: Invitation): Promise<void>;
   findById(organizationId: string, invitationId: string): Promise<Invitation | null>;
+  /**
+   * Só para o worker (processo do sistema, sem tenant): o id vem de um evento da própria outbox.
+   * Nunca exposto a requisições de usuário.
+   */
+  findForDelivery(invitationId: string): Promise<Invitation | null>;
   findOpenByEmail(organizationId: string, email: EmailAddress): Promise<Invitation | null>;
   listOpenPage(organizationId: string, page: PageRequest): Promise<Page<Invitation>>;
   /** Revoga os convites abertos criados por um membro removido ou rebaixado. Retorna quantos. */

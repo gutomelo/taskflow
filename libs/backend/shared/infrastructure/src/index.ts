@@ -17,6 +17,12 @@ export { SystemClock } from './lib/time/system-clock';
 export { RedisRateLimiter } from './lib/rate-limiting/redis-rate-limiter';
 export { SmtpEmailSender, type SmtpEmailSenderOptions } from './lib/email/smtp-email-sender';
 export {
+  escapeHtml,
+  renderEmail,
+  type EmailBlock,
+  type EmailRecipient,
+} from './lib/email/email-layout';
+export {
   createRedisClient,
   createRedisProbe,
   type Redis,

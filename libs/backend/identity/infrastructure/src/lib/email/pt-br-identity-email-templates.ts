@@ -1,5 +1,5 @@
 import type { IdentityEmailTemplates } from '@taskflow/backend/identity/application';
-import { renderEmail } from './email-layout';
+import { renderEmail } from '@taskflow/backend/shared/infrastructure';
 
 /** Textos pt-BR dos e-mails de identidade (spec 001). Assuntos sem dados do usuário. */
 export const ptBrIdentityEmailTemplates: IdentityEmailTemplates = {

@@ -1,6 +1,6 @@
 # Autorização
 
-Status: **Planejado** — matriz inicial para revisão; será confirmada na spec `006-permissions`.
+Status: papéis e permissões **da organização** **implementados** na spec 002 (BR-019, BR-021; marcados abaixo); papéis e permissões **de projeto** **planejados** — matriz inicial confirmada na spec `006-permissions`.
 
 ## Modelo
 
@@ -38,6 +38,10 @@ Legenda: ✅ permitido · ⚪ apenas sobre o próprio recurso/próprio usuário 
 | `audit:read`                                |  ✅   |  ✅   |   ❌    |   ❌    |
 
 ¹ Admin não altera nem remove owner, nem promove alguém a owner. ² Configurável pela organização (padrão: permitido); o criador vira `manager` do projeto.
+
+**Estado na spec 002**: implementados `organization:read`, `organization:update` (nome; o slug é imutável — BR-022), `member:invite` (convites nunca concedem owner), `member:change-role` e `member:remove`/sair, com a regra do último owner (BR-019). `organization:delete` e `team:manage` estão **fora do escopo** (backlog e spec que usar equipes); `organization:transfer-ownership` não é um fluxo dedicado — é coberto por vários owners (promover outro e então sair). A decisão final de toda mutação de membership e convite usa o papel **relido sob o lock da organização**, não o do middleware.
+
+**Visibilidade de dados de membros**: todos os membros veem nome, e-mail e papel dos demais membros da própria organização (decisão do usuário na spec 002; a revisão de segurança recomendava restringir o e-mail a owner/admin). Quem não é membro não vê nada (404). A lista de convites é só de owner/admin.
 
 ### Projeto (papel efetivo no projeto)
 

@@ -11,6 +11,8 @@ import { AppShell } from './app-shell';
 @Component({ template: '' })
 class Blank {}
 
+const ORGANIZATIONS = '/api/v1/me/organizations';
+
 const ana = {
   id: '01a11e1a-99fa-7501-a131-4ad99a122005',
   name: 'Ana Souza',
@@ -36,7 +38,11 @@ describe('AppShell', () => {
     store = TestBed.inject(AuthStore);
   });
 
-  afterEach(() => backend.verify());
+  // O seletor de organização (spec 002) carrega "minhas organizações" para quem está autenticado.
+  afterEach(() => {
+    for (const request of backend.match(ORGANIZATIONS)) request.flush({ items: [] });
+    backend.verify();
+  });
 
   async function render() {
     fixture = TestBed.createComponent(AppShell);
@@ -66,6 +72,35 @@ describe('AppShell', () => {
 
     expect(element().querySelector('[aria-label="Menu da conta de Ana Souza"]')).not.toBeNull();
     expect(banner()).toBeNull();
+  });
+
+  it('CA-10: lists the organizations in the header switcher and marks the current one', async () => {
+    store.signIn({ ...ana, emailVerified: true });
+    await TestBed.inject(Router).navigateByUrl('/o/beta/members');
+    await render();
+    backend.expectOne(ORGANIZATIONS).flush({
+      items: [
+        { id: '0192a000-0000-7000-8000-000000000001', name: 'Acme', slug: 'acme', role: 'owner' },
+        { id: '0192a000-0000-7000-8000-000000000002', name: 'Beta', slug: 'beta', role: 'viewer' },
+      ],
+    });
+    await settle();
+
+    const trigger = element().querySelector<HTMLButtonElement>('[aria-label^="Organização atual"]');
+    expect(trigger?.getAttribute('aria-label')).toBe(
+      'Organização atual: Beta. Trocar de organização',
+    );
+    trigger?.click();
+    await settle();
+    const items = [...document.querySelectorAll('.mat-mdc-menu-panel a')];
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      'Acme',
+      'Beta',
+      'Todas as organizações',
+      'Criar organização',
+    ]);
+    expect(items[1]?.getAttribute('aria-current')).toBe('page');
+    expect(items[0]?.getAttribute('href')).toBe('/o/acme');
   });
 
   it('asks unverified users to confirm the e-mail and resends the link (BR-013)', async () => {

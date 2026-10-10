@@ -20,6 +20,23 @@ const IDENTITY_ROUTES = [
   ['delete', '/api/v1/me/sessions/{sessionId}'],
 ] as const;
 
+/** Spec 002 (T15): rotas fora do tenant e sob o prefixo `/organizations/{organizationId}`. */
+const ORGANIZATIONS_ROUTES = [
+  ['post', '/api/v1/organizations'],
+  ['get', '/api/v1/me/organizations'],
+  ['post', '/api/v1/invitations/lookup'],
+  ['post', '/api/v1/invitations/accept'],
+  ['get', '/api/v1/organizations/{organizationId}'],
+  ['patch', '/api/v1/organizations/{organizationId}'],
+  ['get', '/api/v1/organizations/{organizationId}/members'],
+  ['patch', '/api/v1/organizations/{organizationId}/members/{userId}'],
+  ['delete', '/api/v1/organizations/{organizationId}/members/{userId}'],
+  ['get', '/api/v1/organizations/{organizationId}/invitations'],
+  ['post', '/api/v1/organizations/{organizationId}/invitations'],
+  ['post', '/api/v1/organizations/{organizationId}/invitations/{invitationId}/resend'],
+  ['delete', '/api/v1/organizations/{organizationId}/invitations/{invitationId}'],
+] as const;
+
 describe('OpenAPI document (RF-14, CA-15)', () => {
   const document = createTaskflowApiDocument();
 
@@ -36,6 +53,19 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
     for (const [method, path] of IDENTITY_ROUTES) {
       expect(paths[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
     }
+  });
+
+  it('T15: describes every organizations endpoint of spec 002, with 404 for non-members', () => {
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of ORGANIZATIONS_ROUTES) {
+      const operation = paths[path]?.[method];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      if (path.includes('{organizationId}')) {
+        expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
+      }
+    }
+    expect(Object.keys(paths).filter((path) => path.includes('organizations'))).toHaveLength(8);
   });
 
   it('documents errors as Problem Details and cookie/CSRF security schemes', () => {

@@ -13,6 +13,11 @@ import {
   readFakeEmail,
 } from '@taskflow/backend/identity/application/testing';
 import type { OutboxJobData } from '@taskflow/backend/shared/infrastructure';
+import {
+  OrganizationsEventType,
+  SendInvitationUseCase,
+} from '@taskflow/backend/organizations/application';
+import { createOrganizationsTestbed } from '@taskflow/backend/organizations/application/testing';
 import { createEmailJobProcessor, describeJobError } from './email-jobs';
 
 const EVENT_ID = '01a11e1a-9a02-730e-9858-639ea281969b';
@@ -29,15 +34,17 @@ async function setup() {
       now: bed.clock.now(),
     }),
   );
+  const sendInvitation = new SendInvitationUseCase(createOrganizationsTestbed());
   const process = createEmailJobProcessor(
     {
       sendEmailVerification: new SendEmailVerificationUseCase(bed),
       sendPasswordReset: new SendPasswordResetUseCase(bed),
       sendAccountNotice: new SendAccountNoticeUseCase(bed),
+      sendInvitation,
     },
     pino({ level: 'silent' }),
   );
-  return { bed, process };
+  return { bed, process, sendInvitation };
 }
 
 function job(data: Partial<OutboxJobData> & Record<string, unknown>): Job<OutboxJobData> {
@@ -83,6 +90,29 @@ describe('email job processor', () => {
 
     await expect(process(job(data))).rejects.toBeInstanceOf(UnrecoverableError);
     expect(bed.emailSender.attempted).toHaveLength(0);
+  });
+
+  it('dispatches organizations.invitation_requested with the event id as delivery id', async () => {
+    const { process, sendInvitation } = await setup();
+    const execute = vi.spyOn(sendInvitation, 'execute');
+    const invitationId = '01a11e1a-99fa-7501-a131-4ad99a1220aa';
+
+    const outcome = await process(
+      job({ type: OrganizationsEventType.invitationRequested, payload: { invitationId } }),
+    );
+
+    expect(execute).toHaveBeenCalledWith({ eventId: EVENT_ID, invitationId });
+    expect(outcome).toEqual({ status: 'discarded', reason: 'invitation_not_found' });
+  });
+
+  it('rejects an invitation job with a malformed invitation id without retry', async () => {
+    const { process } = await setup();
+
+    await expect(
+      process(
+        job({ type: OrganizationsEventType.invitationRequested, payload: { invitationId: 'x' } }),
+      ),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
   });
 
   it('propagates send failures so the queue retries the job', async () => {

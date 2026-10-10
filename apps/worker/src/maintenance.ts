@@ -14,6 +14,8 @@ import {
   type IdentityPurgeReport,
 } from '@taskflow/backend/identity/application';
 import { PrismaIdentityDataRetention } from '@taskflow/backend/identity/infrastructure';
+import { PurgeClosedInvitationsUseCase } from '@taskflow/backend/organizations/application';
+import { PrismaInvitationRetention } from '@taskflow/backend/organizations/infrastructure';
 import { describeJobError } from './queues/email-jobs';
 
 export const MAINTENANCE_QUEUE_NAME = 'maintenance';
@@ -27,7 +29,8 @@ export const OUTBOX_RETENTION_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_RETRY_MS = 60_000;
 
-export type DataPurgeReport = IdentityPurgeReport & Readonly<{ outboxEvents: number }>;
+export type DataPurgeReport = IdentityPurgeReport &
+  Readonly<{ closedInvitations: number; outboxEvents: number }>;
 
 export interface MaintenanceDependencies {
   readonly prisma: PrismaClient;
@@ -52,14 +55,20 @@ export function createMaintenance(deps: MaintenanceDependencies) {
     retention: new PrismaIdentityDataRetention(transactions),
     clock,
   });
+  // Spec 002 (T17): convites encerrados há mais de 30 dias.
+  const purgeInvitations = new PurgeClosedInvitationsUseCase({
+    retention: new PrismaInvitationRetention(transactions),
+    clock,
+  });
   const outboxRetention = new PrismaOutboxRetention(transactions);
 
   async function purgeExpiredData(): Promise<DataPurgeReport> {
     const identity = await purgeIdentity.execute();
+    const invitations = await purgeInvitations.execute();
     const outboxEvents = await outboxRetention.deletePublishedBefore(
       new Date(clock.now().getTime() - OUTBOX_RETENTION_DAYS * DAY_MS),
     );
-    const report = { ...identity, outboxEvents };
+    const report = { ...identity, ...invitations, outboxEvents };
     logger.info({ report }, 'Expired data purged');
     return report;
   }

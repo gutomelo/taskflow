@@ -34,6 +34,26 @@ import {
   PrismaUserTokenRepository,
 } from '@taskflow/backend/identity/infrastructure';
 import type { UserTokenPurpose } from '@taskflow/backend/identity/domain';
+import {
+  Membership,
+  Organization,
+  OrganizationName,
+  OrganizationSlug,
+} from '@taskflow/backend/organizations/domain';
+import {
+  InviteMemberUseCase,
+  OrganizationsEventType,
+  ResendInvitationUseCase,
+} from '@taskflow/backend/organizations/application';
+import {
+  InMemoryUserDirectory,
+  RecordingOrganizationsSecurityEvents,
+} from '@taskflow/backend/organizations/application/testing';
+import {
+  PrismaInvitationRepository,
+  PrismaMembershipRepository,
+  PrismaOrganizationRepository,
+} from '@taskflow/backend/organizations/infrastructure';
 import { createEmailDelivery, type EmailDelivery } from './email-delivery';
 
 const APP_URL = 'http://localhost:4200';
@@ -322,5 +342,122 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
       { timeout: 15_000, interval: 100 },
     );
     expect(await messagesTo(stranger)).toHaveLength(0);
+  });
+
+  // Spec 002 (T16): convites pela mesma pipeline (outbox → fila `emails` → SendInvitation).
+  async function organizationWithOwner() {
+    const runner = transactions();
+    const ownerId = randomUUID();
+    const now = new Date();
+    const organization = Organization.create({
+      id: randomUUID(),
+      name: OrganizationName.create('Acme'),
+      slug: OrganizationSlug.create(`acme-${randomUUID().slice(0, 8)}`),
+      now,
+    });
+    await new PrismaOrganizationRepository(runner).add(organization);
+    await new PrismaMembershipRepository(runner).add(
+      Membership.create({
+        id: randomUUID(),
+        organizationId: organization.id,
+        userId: ownerId,
+        role: 'owner',
+        now,
+      }),
+    );
+    return { organizationId: organization.id, ownerId };
+  }
+
+  function invitationDependencies() {
+    const runner = transactions();
+    return {
+      organizations: new PrismaOrganizationRepository(runner),
+      memberships: new PrismaMembershipRepository(runner),
+      invitations: new PrismaInvitationRepository(runner),
+      users: new InMemoryUserDirectory(),
+      // Limites novos a cada chamada: o alvo aqui é a entrega, não o limite.
+      rateLimiter: new InMemoryRateLimiter(),
+      pseudonymizer: fakePseudonymizer,
+      outbox: new PrismaOutboxWriter(runner),
+      transactions: runner,
+      securityEvents: new RecordingOrganizationsSecurityEvents(),
+      idGenerator: new UuidV7Generator(),
+      clock: new SystemClock(),
+    };
+  }
+
+  const asOwner = (organizationId: string, ownerId: string) => ({
+    requestId: randomUUID(),
+    actor: { userId: ownerId, sessionId: randomUUID() },
+    tenant: { organizationId, organizationRole: 'owner' as const },
+  });
+
+  async function usableInvitationId(token: string) {
+    const invitation = await new PrismaInvitationRepository(transactions()).findUsableByTokenHash(
+      new CryptoSecretTokenGenerator().hash(token),
+      new Date(),
+    );
+    return invitation?.id ?? null;
+  }
+
+  it('CA-04: delivers the invitation with a fragment link that resolves to the invitation', async () => {
+    const { organizationId, ownerId } = await organizationWithOwner();
+    const email = uniqueEmail();
+    delivery?.start();
+
+    const { invitation } = await new InviteMemberUseCase(invitationDependencies()).execute(
+      asOwner(organizationId, ownerId),
+      { email, role: 'member' },
+    );
+
+    const [message] = await waitForMessages(email, 1);
+    expect(message?.Subject).toBe('Convite para a organização “Acme” no TaskFlow');
+    expect(message?.Text).toContain('Se você não esperava este convite, ignore este e-mail.');
+    const token = tokenIn(message?.Text ?? '', '/invitations/accept');
+    expect(await usableInvitationId(token)).toBe(invitation.id);
+  });
+
+  it('CA-06: a resend invalidates the previous link; the old event, reprocessed late, is discarded', async () => {
+    const { organizationId, ownerId } = await organizationWithOwner();
+    const email = uniqueEmail();
+    delivery?.start();
+    const { invitation } = await new InviteMemberUseCase(invitationDependencies()).execute(
+      asOwner(organizationId, ownerId),
+      { email, role: 'viewer' },
+    );
+    const [first] = await waitForMessages(email, 1);
+    const firstToken = tokenIn(first?.Text ?? '', '/invitations/accept');
+    const firstEvent = await prisma.outboxEvent.findFirstOrThrow({
+      where: {
+        type: OrganizationsEventType.invitationRequested,
+        payload: { equals: { invitationId: invitation.id } },
+      },
+      orderBy: { occurredAt: 'asc' },
+    });
+
+    await new ResendInvitationUseCase(invitationDependencies()).execute(
+      asOwner(organizationId, ownerId),
+      invitation.id,
+    );
+
+    const messages = await waitForMessages(email, 2);
+    const secondToken = messages
+      .map((message) => tokenIn(message.Text, '/invitations/accept'))
+      .find((token) => token !== firstToken);
+    expect(await usableInvitationId(firstToken)).toBeNull();
+    expect(await usableInvitationId(secondToken ?? '')).toBe(invitation.id);
+
+    const outcome = await delivery?.processEmailJob({
+      data: {
+        eventId: firstEvent.id,
+        type: firstEvent.type,
+        occurredAt: firstEvent.occurredAt.toISOString(),
+        payload: firstEvent.payload,
+      },
+      attemptsMade: 0,
+    } as Parameters<EmailDelivery['processEmailJob']>[0]); // só `data` e `attemptsMade` são lidos
+    expect(outcome).toEqual({ status: 'discarded', reason: 'superseded' });
+    expect(await messagesTo(email)).toHaveLength(2);
+    expect(await usableInvitationId(secondToken ?? '')).toBe(invitation.id);
   });
 });

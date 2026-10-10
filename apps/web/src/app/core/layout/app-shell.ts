@@ -3,16 +3,17 @@ import { RouterLink } from '@angular/router';
 import { AuthStore } from '../auth';
 import { EmailVerificationBanner } from './email-verification-banner';
 import { layoutMessages } from './layout.messages';
+import { OrganizationSwitcher } from './organization-switcher';
 import { UserMenu } from './user-menu';
 
 /**
  * Layout da aplicação: cabeçalho com a marca e, autenticado, o menu da conta e o aviso de
- * verificação de e-mail. A navegação lateral e o seletor de organização chegam com a spec 002.
+ * verificação de e-mail, e o seletor de organização (spec 002).
  */
 @Component({
   selector: 'tf-app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmailVerificationBanner, RouterLink, UserMenu],
+  imports: [EmailVerificationBanner, OrganizationSwitcher, RouterLink, UserMenu],
   host: { class: 'flex min-h-dvh flex-col' },
   template: `
     <a
@@ -41,6 +42,7 @@ import { UserMenu } from './user-menu';
         <!-- Menu (Material + overlay do CDK) baixado só com sessão: anônimos não pagam por ele. -->
         @defer (when store.isAuthenticated()) {
           @if (store.isAuthenticated()) {
+            <tf-organization-switcher />
             <div class="ms-auto">
               <tf-user-menu (signOutFailed)="signOutFailed.set(true)" />
             </div>

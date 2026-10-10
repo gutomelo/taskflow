@@ -75,3 +75,14 @@ export {
   AcceptInvitationUseCase,
   type AcceptInvitationDependencies,
 } from './lib/use-cases/accept-invitation.use-case';
+export type { InvitationEmailTemplates } from './lib/ports/invitation-email-templates';
+export {
+  SendInvitationUseCase,
+  type InvitationDeliveryOutcome,
+  type SendInvitationDependencies,
+} from './lib/use-cases/send-invitation.use-case';
+export type { InvitationRetention } from './lib/ports/invitation-retention';
+export {
+  CLOSED_INVITATION_RETENTION_DAYS,
+  PurgeClosedInvitationsUseCase,
+} from './lib/use-cases/purge-closed-invitations.use-case';

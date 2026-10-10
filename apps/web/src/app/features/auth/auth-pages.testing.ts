@@ -13,7 +13,6 @@ import { ForgotPasswordPage } from './forgot-password.page';
 import { ResetPasswordPage } from './reset-password.page';
 import { VerifyEmailPage } from './verify-email.page';
 import { SecurityPage } from '../account/security.page';
-import { HomePage } from '../home/home.page';
 
 @Component({ template: 'destino' })
 class Destination {}
@@ -34,7 +33,6 @@ export async function openAuthPage(
         { path: 'reset-password', component: ResetPasswordPage },
         { path: 'verify-email', component: VerifyEmailPage },
         { path: 'account/security', component: SecurityPage },
-        { path: 'home', component: HomePage },
         { path: 'projects', component: Destination },
         { path: '', component: Destination },
       ]),

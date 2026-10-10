@@ -9,8 +9,8 @@ paths:
 # Regras de design de API REST
 
 - Prefixo versionado: `/api/v1`. Endpoints operacionais fora da versão: `/health/live`, `/health/ready`.
-- Recursos no plural, kebab-case, inglês: `/api/v1/projects/{projectId}/tasks`. Aninhe no máximo um nível; use filtros para o resto.
-- O tenant **não** vai na URL como prova de acesso: ele vem da sessão (organização ativa). Rotas como `/organizations/{id}` existem apenas para administrar a própria organização e validam membership.
+- Recursos no plural, kebab-case, inglês. Recursos tenant-scoped vivem sob o prefixo do tenant (ADR 0012), que conta como o nível de aninhamento permitido: `/api/v1/organizations/{organizationId}/projects/{projectId}`, `/api/v1/organizations/{organizationId}/tasks?projectId=…`; aninhamentos mais profundos viram filtros.
+- O `organizationId` do caminho é **intenção**, nunca prova (ADR 0012): `createTenantScope` monta `authenticate → csrf → tenantContext` uma vez sobre o prefixo, valida a membership a cada request e entrega `TenantRequestContext`. Routers tenant-scoped são montados **só** dentro desse escopo (`mergeParams`), com caminhos relativos; controllers usam `tenantRequestContextFrom(request)`. Rotas sem organização ativa (criar organização, `/me/...`, aceite de convite, identidade) ficam fora do prefixo. Uma rota usa uma única origem para o tenant (nunca caminho e header juntos).
 - Verbos: `GET` (seguro), `POST` (criar/ação), `PATCH` (alteração parcial com `version`), `PUT` (substituição completa, raro), `DELETE`.
 - Ações de domínio que não são CRUD viram sub-recursos de ação: `POST /tasks/{id}/complete`, `POST /sprints/{id}/close`, `POST /boards/{id}/moves`.
 - Concorrência: `PATCH`/ações enviam `version` (ou `If-Match` com ETag); conflito → `409` com `code: VERSION_CONFLICT`.

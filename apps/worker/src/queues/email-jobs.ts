@@ -8,6 +8,11 @@ import {
   type SendEmailVerificationUseCase,
   type SendPasswordResetUseCase,
 } from '@taskflow/backend/identity/application';
+import {
+  OrganizationsEventType,
+  type InvitationDeliveryOutcome,
+  type SendInvitationUseCase,
+} from '@taskflow/backend/organizations/application';
 import type { OutboxJobData } from '@taskflow/backend/shared/infrastructure';
 
 const userPayload = z.object({ userId: z.uuid() });
@@ -35,12 +40,22 @@ const emailJobSchema = z.discriminatedUnion('type', [
     type: z.literal(IdentityEventType.passwordChangedNotice),
     payload: userPayload,
   }),
+  // Spec 002: o id do evento é o `delivery_event_id` do convite (só o último envio emite token).
+  z.object({
+    eventId: z.uuid(),
+    type: z.literal(OrganizationsEventType.invitationRequested),
+    payload: z.object({ invitationId: z.uuid() }),
+  }),
 ]);
+
+/** Resultado de qualquer job da fila `emails`, para log (nunca contém e-mail nem token). */
+export type EmailJobOutcome = EmailDeliveryOutcome | InvitationDeliveryOutcome;
 
 export interface EmailJobUseCases {
   readonly sendEmailVerification: SendEmailVerificationUseCase;
   readonly sendPasswordReset: SendPasswordResetUseCase;
   readonly sendAccountNotice: SendAccountNoticeUseCase;
+  readonly sendInvitation: Pick<SendInvitationUseCase, 'execute'>;
 }
 
 /**
@@ -49,7 +64,7 @@ export interface EmailJobUseCases {
  * falha de envio propaga para o retry com backoff da fila.
  */
 export function createEmailJobProcessor(useCases: EmailJobUseCases, logger: Logger) {
-  return async (job: Job<OutboxJobData>): Promise<EmailDeliveryOutcome> => {
+  return async (job: Job<OutboxJobData>): Promise<EmailJobOutcome> => {
     const parsed = emailJobSchema.safeParse(job.data);
     if (!parsed.success) {
       throw new UnrecoverableError(
@@ -73,8 +88,8 @@ export function createEmailJobProcessor(useCases: EmailJobUseCases, logger: Logg
 
 function dispatch(
   job: z.infer<typeof emailJobSchema>,
-  { sendEmailVerification, sendPasswordReset, sendAccountNotice }: EmailJobUseCases,
-): Promise<EmailDeliveryOutcome> {
+  { sendEmailVerification, sendPasswordReset, sendAccountNotice, sendInvitation }: EmailJobUseCases,
+): Promise<EmailJobOutcome> {
   switch (job.type) {
     case IdentityEventType.emailVerificationRequested:
       return sendEmailVerification.execute({ eventId: job.eventId, userId: job.payload.userId });
@@ -91,6 +106,11 @@ function dispatch(
       });
     case IdentityEventType.passwordChangedNotice:
       return sendAccountNotice.execute({ userId: job.payload.userId, notice: 'password_changed' });
+    case OrganizationsEventType.invitationRequested:
+      return sendInvitation.execute({
+        eventId: job.eventId,
+        invitationId: job.payload.invitationId,
+      });
   }
 }
 

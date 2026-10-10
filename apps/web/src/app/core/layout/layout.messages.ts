@@ -7,6 +7,13 @@ export const layoutMessages = {
     signOut: 'Sair',
     signOutFailed: 'Não foi possível sair agora. Verifique sua conexão e tente novamente.',
   },
+  organizationSwitcher: {
+    open: (current: string | null) =>
+      current ? `Organização atual: ${current}. Trocar de organização` : 'Escolher organização',
+    label: 'Organizações',
+    all: 'Todas as organizações',
+    create: 'Criar organização',
+  },
   verificationBanner: {
     body: (email: string) =>
       `Confirme seu e-mail (${email}) para criar ou entrar em organizações. Use o link que enviamos.`,

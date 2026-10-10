@@ -26,16 +26,32 @@ const sessions = {
   ],
 };
 
+// Spec 002: o início abre a organização do usuário (CA-10).
+const organizations = {
+  items: [
+    { id: '01a11e1a-0000-7000-8000-0000000000aa', name: 'Acme', slug: 'acme', role: 'owner' },
+  ],
+};
+
 async function signIn(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/login', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ana) }),
+  );
+  await page.route('**/api/v1/me/organizations', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(organizations),
+    }),
   );
   await page.goto('/');
   await expect(page).toHaveURL(/\/login\?returnUrl=%2F$/);
   await page.getByLabel('E-mail').fill(ana.email);
   await page.getByLabel('Senha', { exact: true }).fill('Correct-Horse-9');
   await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/o\/acme$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Olá, Ana Souza!' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Organização atual: Acme/ })).toBeVisible();
 }
 
 test('signed-in journey: home, verification banner, security page and sign out', async ({

@@ -1,5 +1,11 @@
 import type { EmailMessage } from '@taskflow/backend/shared/application';
-import type { IdentityEmailRecipient } from '@taskflow/backend/identity/application';
+import type { EmailAddress } from '@taskflow/backend/shared/kernel';
+
+/**
+ * Destinatário de um e-mail transacional. `name` nulo ⇒ saudação genérica (ex.: conta não
+ * verificada, convidado sem conta): nome escolhido por terceiros não entra no e-mail.
+ */
+export type EmailRecipient = Readonly<{ email: EmailAddress; name: string | null }>;
 
 export type EmailBlock =
   | Readonly<{ kind: 'paragraph'; text: string }>
@@ -21,11 +27,12 @@ export function escapeHtml(value: string): string {
 const FOOTER = 'Equipe TaskFlow · Este é um e-mail automático; não é preciso respondê-lo.';
 
 /**
+ * Layout compartilhado dos e-mails transacionais (`identity` e `organizations`).
  * Monta as versões texto e HTML a partir dos mesmos blocos, para que nunca divirjam.
  * O HTML é mínimo (estilos inline, sem imagens nem recursos externos).
  */
 export function renderEmail(
-  recipient: IdentityEmailRecipient,
+  recipient: EmailRecipient,
   subject: string,
   blocks: ReadonlyArray<EmailBlock>,
 ): EmailMessage {

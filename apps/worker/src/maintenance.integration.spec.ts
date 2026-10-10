@@ -78,8 +78,37 @@ describe('maintenance (integration: PostgreSQL + Redis)', () => {
     expect(new Date((next?.timestamp ?? 0) + (next?.delay ?? 0)).getUTCHours()).toBe(3);
   });
 
-  it('purges expired identity data and published outbox events when the job runs', async () => {
+  it('purges expired identity data, closed invitations and published outbox events when the job runs', async () => {
     const now = Date.now();
+    const organizationId = randomUUID();
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: 'Acme',
+        slug: `acme-${organizationId.slice(0, 8)}`,
+        createdAt: new Date(now - 60 * DAY),
+        updatedAt: new Date(now - 60 * DAY),
+      },
+    });
+    const invitation = (email: string, data: { revokedAt?: Date; expiresAt: Date }) =>
+      prisma.invitation.create({
+        data: {
+          id: randomUUID(),
+          organizationId,
+          email,
+          role: 'member',
+          invitedByUserId: randomUUID(),
+          deliveryEventId: randomUUID(),
+          createdAt: new Date(now - 45 * DAY),
+          updatedAt: new Date(now - 45 * DAY),
+          ...data,
+        },
+      });
+    await invitation('revogado@exemplo.com', {
+      revokedAt: new Date(now - 31 * DAY),
+      expiresAt: new Date(now - 38 * DAY),
+    });
+    await invitation('pendente@exemplo.com', { expiresAt: new Date(now + DAY) });
     const abandonedId = randomUUID();
     await prisma.user.create({
       data: {
@@ -112,6 +141,7 @@ describe('maintenance (integration: PostgreSQL + Redis)', () => {
           unverifiedUsers: 1,
           sessions: 0,
           userTokens: 0,
+          closedInvitations: 1,
           outboxEvents: 1,
         });
       },
@@ -119,5 +149,8 @@ describe('maintenance (integration: PostgreSQL + Redis)', () => {
     );
     expect(await prisma.user.count({ where: { id: abandonedId } })).toBe(0);
     expect(await prisma.outboxEvent.count()).toBe(0);
+    expect(
+      (await prisma.invitation.findMany({ select: { email: true } })).map((row) => row.email),
+    ).toEqual(['pendente@exemplo.com']);
   });
 });

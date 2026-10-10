@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockMyOrganizations } from './support/organizations';
 
 // T26: links de e-mail no navegador real (Router + fragmento). Respostas da API simuladas.
 const TOKEN = 'abcDEF123_-abcDEF123_-abcDEF123_-abcDEF12';
@@ -18,6 +19,7 @@ test('verification link: sign in first, keep the token out of every URL, confirm
   await page.route('**/api/v1/auth/login', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ana) }),
   );
+  await mockMyOrganizations(page);
   await page.route('**/api/v1/auth/email-verification/confirm', (route) => {
     confirmBodies.push(route.request().postDataJSON());
     return route.fulfill({ status: 204 });

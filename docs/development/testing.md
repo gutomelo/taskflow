@@ -49,6 +49,16 @@ pnpm e2e
 
 As variáveis do shell têm precedência sobre o `.env` (o Nx não as sobrescreve). O Playwright lê o Mailpit em `MAILPIT_URL` (padrão `http://localhost:58025`). Os demais testes E2E simulam a API com `page.route` e não gravam dados. O cadastro é limitado a 5 por hora por IP: várias execuções seguidas da jornada podem receber 429; os contadores ficam no índice do Redis usado pelo E2E (`rate-limit:*`) e expiram sozinhos.
 
+A jornada `organizations-journey.spec.ts` (spec 002, CA-11) também é real: cadastra duas contas, cria uma organização, convida pelo Mailpit, aceita, troca o papel e sai. Uma execução completa faz três cadastros ou mais, então duas execuções seguidas esgotam o limite de cadastro por IP. Para repetir sem esperar a expiração, apague **só** as chaves de limite de autenticação do índice do E2E (nunca do índice de desenvolvimento):
+
+```bash
+docker compose exec redis sh -c "redis-cli -n 2 --scan --pattern 'rate-limit:auth.*' | xargs -r redis-cli -n 2 del"
+```
+
+Testes que simulam o login (`page.route`) também precisam simular `GET /api/v1/me/organizations` (helper `support/organizations.ts`): o seletor de organização do cabeçalho chama a API real, e uma sessão inexistente nela encerraria a sessão simulada.
+
+Se o `.env` local definir `PORT`, o executor de Node do Nx o usa como porta do inspector e ela colide com a API (`Port 3333 is already in use`). Use `NX_LOAD_DOT_ENV_FILES=false` com as variáveis exportadas, ou remova `PORT` do `.env` (a API usa `API_PORT`).
+
 ## Metas de cobertura
 
 - **90%** de linhas em `domain` e `application` de contextos críticos (identity, organizations, projects, tasks, boards).
@@ -64,6 +74,8 @@ Os limites (`thresholds`) serão ativados por biblioteca quando cada contexto cr
 ## Estado atual
 
 Spec 001: unitários de domínio, aplicação, HTTP e frontend; integração com PostgreSQL, Redis e Mailpit (Testcontainers), inclusive o pipeline de e-mail do worker; E2E com jornadas simuladas e a jornada real CA-14. Evidências em `specs/001-authentication/tasks.md`.
+
+Spec 002: domínio com política de papéis tabela-driven; casos de uso com fakes; integração com PostgreSQL para repositórios, concorrência (lock da organização, rebaixamento mútuo, aceite × revogação) e **isolamento A/B pela API real** (`apps/api`, alvo `integration-test`); Mailpit para convites; componentes Angular com rotas reais; E2E da jornada real CA-11. Mutation testing manual registrado por tarefa. Evidências em `specs/002-organizations/tasks.md`.
 
 ### Fase 0
 

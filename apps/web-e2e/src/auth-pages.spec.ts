@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockMyOrganizations } from './support/organizations';
 
 // T25: telas de login e cadastro no navegador real (CSP, Material, foco e requisitos de senha).
 // Os envios usam respostas simuladas: o E2E roda contra o banco local de desenvolvimento.
@@ -104,6 +105,7 @@ test.describe('Login page', () => {
         }),
       }),
     );
+    await mockMyOrganizations(page);
 
     await page.goto('/login?returnUrl=%2Fstatus');
     await page.getByLabel('E-mail').fill('ana@exemplo.com');

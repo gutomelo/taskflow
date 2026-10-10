@@ -39,9 +39,10 @@ test('CA-14: register, confirm by e-mail, sign in, see the session and sign out'
   await page.getByRole('button', { name: 'Confirmar e-mail' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'E-mail confirmado' })).toBeVisible();
 
-  // Home sem o aviso de verificação
+  // Conta nova sem organização: o início leva ao onboarding (spec 002, CA-10), sem o aviso
   await page.getByRole('link', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Olá, Pessoa E2E!' })).toBeVisible();
+  await expect(page).toHaveURL(/\/organizations\/new$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Crie sua organização' })).toBeVisible();
   await expect(page.getByTestId('verification-banner')).toHaveCount(0);
 
   // Segurança lista a sessão atual

@@ -1,28 +1,20 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthStore } from '../../core/auth';
+import { ActiveOrganizationStore } from '../../core/organizations';
+import { organizationMessages, ROLE_LABELS } from './organizations.messages';
 
-// Textos de interface centralizados (pt-BR) para facilitar a futura internacionalização.
-const homeMessages = {
-  greeting: (name: string) => `Olá, ${name}!`,
-  intro: 'Sua conta está pronta. Organizações, projetos e quadros chegam nas próximas versões.',
-  securityTitle: 'Segurança da conta',
-  securityBody: 'Veja onde sua conta está conectada e troque sua senha.',
-  statusTitle: 'Status do sistema',
-  statusBody: 'Verifique se a API e os serviços estão operacionais.',
-} as const;
-
-/** Página inicial autenticada (spec 001). */
+/** Início da organização (`/o/:slug`). */
 @Component({
-  selector: 'tf-home-page',
+  selector: 'tf-organization-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
   template: `
     <section class="mx-auto max-w-3xl px-4 py-10" aria-labelledby="home-title">
       <h1 id="home-title" class="text-2xl font-semibold tracking-tight">
-        {{ messages.greeting(store.user()?.name ?? '') }}
+        {{ messages.greeting(auth.user()?.name ?? '') }}
       </h1>
-      <p class="mt-1 text-sm text-muted">{{ messages.intro }}</p>
+      <p class="mt-1 text-sm text-muted">{{ youAreIn() }}</p>
       <ul class="mt-8 grid gap-4 sm:grid-cols-2">
         <li>
           <a
@@ -46,7 +38,17 @@ const homeMessages = {
     </section>
   `,
 })
-export class HomePage {
-  protected readonly store = inject(AuthStore);
-  protected readonly messages = homeMessages;
+export class OrganizationHomePage {
+  protected readonly auth = inject(AuthStore);
+  private readonly active = inject(ActiveOrganizationStore);
+  protected readonly messages = organizationMessages;
+  protected readonly youAreIn = computed(() => {
+    const organization = this.active.organization();
+    return organization
+      ? organizationMessages.youAreIn(
+          organization.name,
+          ROLE_LABELS[organization.role].toLowerCase(),
+        )
+      : '';
+  });
 }

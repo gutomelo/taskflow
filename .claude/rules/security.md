@@ -18,9 +18,9 @@ Referências: `docs/security/authentication.md`, `docs/security/authorization.md
 
 ## Tenant isolation (risco nº 1)
 
-- O tenant ativo é resolvido no servidor a partir da sessão autenticada + `Membership` válida. `organizationId` vindo do cliente (header, body, rota) é apenas **intenção**, validada contra as memberships.
+- O tenant ativo é resolvido no servidor a partir da sessão autenticada + `Membership` válida (ADR 0012: `organizationId` no caminho `/api/v1/organizations/{organizationId}/…`, resolvido por `createTenantScope`). `organizationId` vindo do cliente é apenas **intenção**; nunca aceite `organizationId` no body de comandos (`strictObject`).
 - Recurso de outro tenant responde **404**, nunca 403 (não revelar existência).
-- Todo caso de uso tenant-scoped recebe `RequestContext` com `organizationId` verificado. Repositórios aplicam o filtro.
+- Todo caso de uso tenant-scoped recebe `TenantRequestContext` (obtido só por `tenantRequestContextFrom`). Repositórios aplicam o filtro em leitura **e** escrita. Decisões que dependem do estado atual (papéis, último owner) relêem a membership sob lock; o papel do middleware é só negação rápida.
 - Toda feature tenant-scoped exige **teste de isolamento** (usuário da org A não lê/altera/lista dados da org B).
 
 ## Autenticação

@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import type { EmailMessage, EmailSender } from '@taskflow/backend/shared/application';
+import type { EmailMessage } from '@taskflow/backend/shared/application';
 import {
   FakeTransactionRunner,
   FixedClock,
   InMemoryOutbox,
   InMemoryRateLimiter,
+  RecordingEmailSender,
   SequentialIds,
   fakePseudonymizer,
   type TransactionalStore,
@@ -54,6 +55,7 @@ export {
   FixedClock,
   InMemoryOutbox,
   InMemoryRateLimiter,
+  RecordingEmailSender,
   SequentialIds,
   fakePseudonymizer,
 };
@@ -273,25 +275,6 @@ export class FakeSecretTokens implements SecretTokenGenerator {
   }
   hash(token: string) {
     return createHash('sha256').update(token).digest('hex');
-  }
-}
-
-/** Grava as mensagens enviadas; `failNext(n)` simula falhas de SMTP (o job faria retry). */
-export class RecordingEmailSender implements EmailSender {
-  readonly sent: EmailMessage[] = [];
-  readonly attempted: EmailMessage[] = [];
-  private failuresLeft = 0;
-
-  failNext(times = 1) {
-    this.failuresLeft = times;
-  }
-  async send(message: EmailMessage) {
-    this.attempted.push(message);
-    if (this.failuresLeft > 0) {
-      this.failuresLeft -= 1;
-      throw new Error('SMTP unavailable');
-    }
-    this.sent.push(message);
   }
 }
 

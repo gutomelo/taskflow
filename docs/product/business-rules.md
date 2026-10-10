@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 002+); BR-011…BR-018 **implementadas e testadas** (spec 001). A spec que implementa cada regra está indicada.
+Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002). A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -65,6 +65,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Consistência**: o registro de auditoria é gravado **na mesma transação** da alteração (BR-010).
 - **Relevantes (mínimo)**: mudanças de membership/papel, convites, criação/arquivamento de projeto, mudança de status/responsável/prazo de tarefa, fechamento/reabertura de sprint, mudanças de workflow.
 - **Imutabilidade**: registros de auditoria não são editados nem apagados pela aplicação.
+- **Desvio registrado (spec 002)**: mudanças de membership/papel e convites vão, por ora, ao **log estruturado de segurança** (eventos `organizations.*`, só ids), não a uma trilha transacional e imutável. A trilha em banco nasce com o contexto `audit` (Fase 3); aceitável enquanto não há dados de produção.
 
 ## BR-008 — Atualizações concorrentes não geram estado inconsistente
 
@@ -104,7 +105,7 @@ Cada uso emite novo refresh e invalida o anterior. Reapresentar um refresh rotac
 
 ### BR-013 — Gate de e-mail verificado
 
-Criar ou entrar em organização exige e-mail verificado (aplicado pela spec 002 por porta própria ligada a uma consulta desta spec). Login e gestão da própria conta não exigem.
+Criar ou entrar em organização exige e-mail verificado — **implementado na spec 002** pela porta `UserDirectory` de `organizations` (`emailVerified` lido de `identity` a cada operação, nunca do JWT). Login e gestão da própria conta não exigem.
 
 ### BR-014 — Não enumeração de contas
 
@@ -125,3 +126,21 @@ O link de verificação só confirma o e-mail quando usado por uma sessão auten
 ### BR-018 — Atraso progressivo de login
 
 Após 5 falhas consecutivas para uma conta, cada nova tentativa exige espera que dobra (1 s até 15 min), zerada no sucesso; sem bloqueio permanente. Tentativas da mesma conta são processadas uma de cada vez; as simultâneas recebem 429, para que palpites paralelos não contornem a espera (_rev. 4_).
+
+## Organizations & multi-tenancy (spec 002)
+
+### BR-019 — Sempre um owner
+
+Toda organização tem ≥ 1 membro com papel `owner`. O último owner não sai, não é removido nem rebaixado (`LAST_OWNER`, 409). Mudanças no conjunto de owners são serializadas por organização (lock `FOR NO KEY UPDATE` da organização + releitura de ator e alvo); a checagem vem antes da política de papéis, para que no rebaixamento mútuo simultâneo quem perde receba `LAST_OWNER`.
+
+### BR-020 — Convite nominal
+
+Convite vale para um e-mail, um papel (`admin`, `member` ou `viewer`) e uma organização; uso único; expira em 7 dias; aceito apenas por conta autenticada com aquele e-mail verificado — outra conta recebe 403 `INVITATION_FOR_ANOTHER_ACCOUNT` sem consumir. Um convite aberto por e-mail e organização: reenviar ou reconvidar (que atualiza o papel) emite novo link e invalida o anterior na hora. E-mail que já é membro ⇒ 409 `ALREADY_A_MEMBER`. O aceite revalida que o convidante ainda pode conceder o papel.
+
+### BR-021 — Hierarquia de papéis
+
+Só `owner` promove alguém a owner ou altera/remove um owner; `admin` gerencia papéis e remoções entre `admin`, `member` e `viewer`. Ninguém altera o próprio papel, exceto o owner que se rebaixa havendo outro owner. Quem deixa de poder convidar (removido ou rebaixado a member/viewer) tem seus convites abertos revogados na mesma transação.
+
+### BR-022 — Slug da organização
+
+Único globalmente, 3–40 caracteres `[a-z0-9-]`, começando por letra, sem hífen no fim nem duplo; palavras reservadas recusadas contra impersonação (`admin`, `support`, `taskflow`, `security`…); imutável após a criação (`SLUG_TAKEN` 409, `INVALID_SLUG` 400).

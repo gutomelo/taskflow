@@ -1,6 +1,5 @@
 import { EmailAddress } from '@taskflow/backend/shared/kernel';
 import type { IdentityEmailRecipient } from '@taskflow/backend/identity/application';
-import { escapeHtml } from './email-layout';
 import { ptBrIdentityEmailTemplates as templates } from './pt-br-identity-email-templates';
 
 const to = EmailAddress.create('ana@exemplo.com');
@@ -61,11 +60,5 @@ describe('ptBrIdentityEmailTemplates', () => {
     expect(`${message.text}${message.html}`).not.toContain('token');
     expect(message.text).toContain('https://app.taskflow.dev/login');
     expect(message.text).toContain('https://app.taskflow.dev/forgot-password');
-  });
-
-  it('escapes every HTML-significant character', () => {
-    expect(escapeHtml(`<a href="x">'&'</a>`)).toBe(
-      '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;',
-    );
   });
 });

@@ -33,33 +33,33 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 
 | ID  | Tarefa                                                                                                                                                                                                                                                    | Depende de | Verificação                                                                                           | Status |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- | ------ |
-| T13 | Contratos (`libs/contracts`), router de `organizations` (rotas do tenant e fora dele), mapeamento de erros, limites; `createOrganizationsModule`; router do tenant único no composition root (`mergeParams`), ordem `authenticate → csrf → tenantContext` | T3, T12    | Supertest dos endpoints; teste que percorre a tabela de rotas (toda rota tenant-scoped sob o prefixo) | [ ]    |
-| T14 | Isolamento A/B (RNF-01): todo endpoint sob o prefixo com ids **reais** da organização B; PATCH/DELETE de membro e resend/revoke de convite ⇒ 404 e banco inalterado                                                                                       | T13        | integração com PostgreSQL (CA-03, CA-09)                                                              | [ ]    |
-| T15 | OpenAPI dos endpoints novos                                                                                                                                                                                                                               | T13        | documento válido; todas as rotas descritas                                                            | [ ]    |
+| T13 | Contratos (`libs/contracts`), router de `organizations` (rotas do tenant e fora dele), mapeamento de erros, limites; `createOrganizationsModule`; router do tenant único no composition root (`mergeParams`), ordem `authenticate → csrf → tenantContext` | T3, T12    | Supertest dos endpoints; teste que percorre a tabela de rotas (toda rota tenant-scoped sob o prefixo) | [x]    |
+| T14 | Isolamento A/B (RNF-01): todo endpoint sob o prefixo com ids **reais** da organização B; PATCH/DELETE de membro e resend/revoke de convite ⇒ 404 e banco inalterado                                                                                       | T13        | integração com PostgreSQL (CA-03, CA-09)                                                              | [x]    |
+| T15 | OpenAPI dos endpoints novos                                                                                                                                                                                                                               | T13        | documento válido; todas as rotas descritas                                                            | [x]    |
 
 ## Bloco E — Worker
 
 | ID  | Tarefa                                                                                                                                                                                                                            | Depende de | Verificação                                                                                                                       | Status |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| T16 | `SendInvitation` (emissão condicional a `delivery_event_id`) + template pt-BR (frase fixa, nome entre aspas, aviso) + mapeamento na fila `emails`; adaptador `UserDirectory` no worker; limite por destinatário aplicado no envio | T11        | integração com Mailpit: convite entregue; reenvio invalida o link anterior; evento antigo fora de ordem descartado (CA-04, CA-06) | [ ]    |
-| T17 | Retenção: convites encerrados (aceitos, revogados, expirados) apagados após 30 dias no job diário                                                                                                                                 | T6         | integração da limpeza                                                                                                             | [ ]    |
+| T16 | `SendInvitation` (emissão condicional a `delivery_event_id`) + template pt-BR (frase fixa, nome entre aspas, aviso) + mapeamento na fila `emails`; adaptador `UserDirectory` no worker; limite por destinatário aplicado no envio | T11        | integração com Mailpit: convite entregue; reenvio invalida o link anterior; evento antigo fora de ordem descartado (CA-04, CA-06) | [x]    |
+| T17 | Retenção: convites encerrados (aceitos, revogados, expirados) apagados após 30 dias no job diário                                                                                                                                 | T6         | integração da limpeza                                                                                                             | [x]    |
 
 ## Bloco F — Frontend
 
 | ID  | Tarefa                                                                                                                                                                                                                          | Depende de   | Verificação                                             | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- | ------ |
-| T18 | `ActiveOrganizationStore` (slug → id, recarga única, 404 ⇒ `/organizations`), data-access com URLs pelo id, stores da organização providos em `/o/:slug`; home `/` redireciona; `localStorage { userId, slug }` limpo no logout | T13          | testes de store e redirecionamento (CA-10)              | [ ]    |
-| T19 | Onboarding `/organizations/new` (nome → slug sugerido, erros por `code`), `/organizations` e seletor no cabeçalho                                                                                                               | T18          | testes de formulário e componente (CA-01, CA-02, CA-10) | [ ]    |
-| T20 | Membros e convites `/o/:slug/members` e configurações `/o/:slug/settings`: lista paginada, alterar papel, remover, sair, convidar, reenviar, revogar (ações conforme papel; confirmação)                                        | T18          | testes de componente (CA-07, CA-08)                     | [ ]    |
-| T21 | Aceite `/invitations/accept`: token do fragmento só em memória, entrar/cadastrar, `lookup`, aceite por clique, orientação para reabrir o link                                                                                   | T18          | testes de componente (CA-04, CA-05)                     | [ ]    |
-| T22 | E2E: jornada CA-11 com Mailpit (banco descartável); E2E de isolamento pela UI (URL de outra organização ⇒ não encontrada)                                                                                                       | T16, T19–T21 | `pnpm e2e`                                              | [ ]    |
+| T18 | `ActiveOrganizationStore` (slug → id, recarga única, 404 ⇒ `/organizations`), data-access com URLs pelo id, stores da organização providos em `/o/:slug`; home `/` redireciona; `localStorage { userId, slug }` limpo no logout | T13          | testes de store e redirecionamento (CA-10)              | [x]    |
+| T19 | Onboarding `/organizations/new` (nome → slug sugerido, erros por `code`), `/organizations` e seletor no cabeçalho                                                                                                               | T18          | testes de formulário e componente (CA-01, CA-02, CA-10) | [x]    |
+| T20 | Membros e convites `/o/:slug/members` e configurações `/o/:slug/settings`: lista paginada, alterar papel, remover, sair, convidar, reenviar, revogar (ações conforme papel; confirmação)                                        | T18          | testes de componente (CA-07, CA-08)                     | [x]    |
+| T21 | Aceite `/invitations/accept`: token do fragmento só em memória, entrar/cadastrar, `lookup`, aceite por clique, orientação para reabrir o link                                                                                   | T18          | testes de componente (CA-04, CA-05)                     | [x]    |
+| T22 | E2E: jornada CA-11 com Mailpit (banco descartável); E2E de isolamento pela UI (URL de outra organização ⇒ não encontrada)                                                                                                       | T16, T19–T21 | `pnpm e2e`                                              | [x]    |
 
 ## Bloco G — Fechamento
 
 | ID  | Tarefa                                                                                                                                                                                                                                                                             | Depende de | Verificação                                                              | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------ | ------ |
-| T23 | `/review-code` e `/security-audit` do conjunto; correções                                                                                                                                                                                                                          | T1–T22     | sem bloqueantes / sem Críticos-Altos abertos                             | [ ]    |
-| T24 | Docs: BR-019…BR-022 e desvio da BR-007 em `business-rules.md`; `multi-tenancy.md` e `authorization.md` (prefixo, sem `status`, visibilidade de e-mails); `.claude/rules/api-design.md` e `security.md`; ADR 0012 → Aceito; roadmap (equipes adiadas); índice de specs; arquitetura | T23        | verificação de links; `pnpm verify`, `pnpm test:integration`, `pnpm e2e` | [ ]    |
+| T23 | `/review-code` e `/security-audit` do conjunto; correções                                                                                                                                                                                                                          | T1–T22     | sem bloqueantes / sem Críticos-Altos abertos                             | [x]    |
+| T24 | Docs: BR-019…BR-022 e desvio da BR-007 em `business-rules.md`; `multi-tenancy.md` e `authorization.md` (prefixo, sem `status`, visibilidade de e-mails); `.claude/rules/api-design.md` e `security.md`; ADR 0012 → Aceito; roadmap (equipes adiadas); índice de specs; arquitetura | T23        | verificação de links; `pnpm verify`, `pnpm test:integration`, `pnpm e2e` | [x]    |
 
 ## Evidências
 
@@ -245,3 +245,250 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
   - Integração de organizations: 25/25, três vezes seguidas.
 - **Mutation testing**, 8/9 detectadas: BR-013 no aceite; 403 de outra conta; convidante rebaixado; teto frouxo; aceite sem lock (detectado depois que o teste determinístico de revogação esperando o aceite foi incluído); consumo perdido ignorado (idem, com o teste de defesa em profundidade); prévia sem máscara; `isForCurrentUser` fixo. **Equivalente**: retirar a checagem prévia de "já membro" não muda o resultado, porque o único `(organization_id, user_id)` falha e a transação desfaz o consumo. A checagem foi mantida para responder 409 antes do teto (422).
 - **Comandos**: `nx affected -t lint typecheck test` ✔ (13 projetos); `pnpm test:integration` ✔ (shared 28, identity 50, worker 7, organizations 25); `prettier --check` ✔.
+
+### T13 — 2026-10-10
+
+- **Entregue**:
+  - `libs/contracts`: contratos de organização, "minhas organizações", membros e convites, paginados; prévia do convite; consulta de página (padrão 25, máximo 100); `strictObject` nos comandos; o contrato de convite não aceita `owner`.
+  - `libs/backend/organizations/http` (`type:presentation`): `createOrganizationsRouters` devolve dois routers:
+    - `router`, para as rotas fora do tenant: `POST /organizations` (201 + `Location`), `GET /me/organizations`, `POST /invitations/lookup|accept`, com 429 por usuário;
+    - `tenantRouter`, com `mergeParams` e caminhos relativos.
+
+    Também traz `organizationsErrorMappings` e `no-store`. Parâmetros malformados respondem 404 do recurso.
+
+  - `shared/http`: `createTenantScope` e `TENANT_PATH_PREFIX`. Montam `authenticate → csrf → tenantContext` uma única vez sobre `/organizations/:organizationId` e, abaixo, os routers dos contextos: ficam protegidos por construção (ADR 0012) e reutilizáveis pelas specs 003+.
+  - `apps/api`:
+    - `createOrganizationsModule`;
+    - adaptador `createUserDirectory` (organizations → consultas públicas de identity);
+    - o módulo de identity passa a expor `authenticate`, `csrf`, `userAccounts` e `userIdByEmail`;
+    - `main.ts` monta `identity.router`, `organizations.router` e o tenant scope, e mescla os mapeamentos de erro.
+
+    O token do convite usa o `CryptoSecretTokenGenerator` de identity, compatível com a porta.
+- **Testes**:
+  - contratos: 4;
+  - `createTenantScope`: 4 (tenant resolvido, 404 sem membership, 401 antes, CSRF em mutação, sem capturar `POST /organizations`);
+  - Supertest do router, 26 casos:
+    - CA-01/CA-02 com `Location`, `EMAIL_NOT_VERIFIED`, `INVALID_SLUG`, `SLUG_TAKEN`, campo desconhecido;
+    - CA-12: 429 com `Retry-After` na criação, no convite e em lookup/accept;
+    - sessão e CSRF obrigatórios;
+    - leitura e renomeação com RBAC e BR-008;
+    - paginação e teto; papel e `LAST_OWNER`; remoção exigindo versão; saída ⇒ 404 na próxima requisição (CA-09);
+    - convites 201/200/404; aceite só pela conta convidada;
+    - **tabela de rotas**: as rotas fora do prefixo são exatamente as quatro previstas, e as 9 do tenant são relativas, cada uma com 401 sem sessão e 404 sem membership;
+  - adaptador `UserDirectory` + alinhamento dos tetos de identity e organizations: 2.
+- **Smoke da API compilada** (`dist/apps/api`, banco descartável `taskflow_e2e`, variáveis do `.env.example`): sobe; `GET /me/organizations`, rotas do tenant (com UUID válido ou não) e `POST /organizations` ⇒ 401 Problem Details; `GET /auth/csrf` ⇒ 204. O `/health/ready` respondeu 503 porque o container `taskflow-redis-1` do ambiente local estava só criado e, iniciado à mão, não publica porta. A API seguiu com fallbacks, como projetado. O container foi parado de novo.
+- **Mutation testing**, 10/10 detectadas: escopo sem CSRF; sem `tenantContext`; sem `mergeParams`; criação sem CSRF; reconvite respondendo 201; `Location` errado; lookup sem limite; tenant sem `no-store`; DELETE sem exigir versão; "minhas organizações" sem sessão.
+- **Pendente nesta área**: atualizar `.claude/rules/api-design.md`, `docs/security/multi-tenancy.md` e `.claude/rules/security.md` para o ADR 0012 (T24); OpenAPI (T15); A/B com PostgreSQL (T14).
+- **Comandos**: `nx affected -t lint typecheck test build` ✔ (17 projetos); `prettier --check` ✔.
+
+### T14 — 2026-10-10
+
+- **Entregue**: alvo `integration-test` em `apps/api` (Vitest + Testcontainers, igual ao do worker) e `organizations-isolation.integration.spec.ts`. O teste usa a API real: `createApp`, `createOrganizationsModule`, `createTenantScope`, repositórios Prisma e CSRF real; só a sessão e a `UserDirectory` são fakes.
+- **Testes** (4, PostgreSQL real):
+  - **CA-03 / RNF-01**: os 9 endpoints sob o prefixo de B, chamados por quem só é membro de A, respondem 404 `ORGANIZATION_NOT_FOUND`, igual a uma organização inexistente. O banco de B (organização, memberships, convites) fica idêntico.
+  - **CA-03**: ids **reais** de B sob o prefixo de A respondem 404, e o banco de B fica inalterado:
+    - PATCH de membro, inclusive o owner de B ⇒ `MEMBER_NOT_FOUND`;
+    - DELETE de membro ⇒ `MEMBER_NOT_FOUND`;
+    - resend e revoke de convite ⇒ `INVITATION_NOT_FOUND`.
+
+    As listas de A não contêm nada de B.
+
+  - Ids malformados (organização, membro, convite) ⇒ 404, sem chegar ao banco.
+  - **CA-09**: membro removido recebe 404 na requisição seguinte, e a organização some de "minhas organizações".
+  - Três execuções seguidas, 4/4.
+- **Mutation testing**, 3/3 detectadas: `membership.find` sem `organizationId` (3 testes falham); `invitation.findById` sem `organizationId`; parâmetro malformado repassado ao banco.
+- **Comandos**: `nx run-many -t lint typecheck -p api` ✔; `vitest run --config vitest.integration.config.mts` (api) ✔ 4/4.
+
+### T15 — 2026-10-10
+
+- **Entregue**: `organizationsOpenApiPaths` e `organizationsOpenApiSchemas` (`organizations/http`), gerados dos schemas Zod de `@taskflow/contracts` e incluídos em `createTaskflowApiDocument`. São 13 operações em 8 caminhos, com segurança (cookie, CSRF), códigos de erro por status e o 404 de não membro descrito como resposta única (ADR 0012).
+- **Testes**: o documento continua OpenAPI 3.1 válido (`@readme/openapi-parser`); todas as 13 operações estão descritas, e toda rota sob `{organizationId}` documenta 404. Um mutante que renomeia a rota de reenvio foi detectado.
+- **Comandos**: `nx run-many -t lint typecheck test -p api backend-organizations-http` ✔ (api 31, http 26).
+
+### T16 — 2026-10-10
+
+- **Entregue**:
+  - `SendInvitationUseCase` (`organizations/application`). Convite inexistente, encerrado ou expirado ⇒ descartado. Evento diferente do `delivery_event_id` vigente ⇒ descartado (`superseded`). Caso contrário, gera o token e o grava com `issueToken`, condicionado ao evento, aberto e não expirado; só então envia. Um retry do mesmo evento troca o token, e vale o link da última tentativa. O link usa o **fragmento** (`/invitations/accept#token=…`).
+  - Porta `InvitationEmailTemplates`; `InvitationRepository.findForDelivery`, só para o worker, porque o id vem da própria outbox.
+  - `ptBrInvitationEmailTemplates` (`organizations/infrastructure`), seguindo o RNF-08:
+    - frase fixa "“Ana” convidou você para a organização “Acme” no TaskFlow, com o papel de …";
+    - assunto só com o nome da organização entre aspas;
+    - aviso "Se você não esperava este convite, ignore este e-mail";
+    - um único link; saudação genérica.
+  - Worker:
+    - tipo `organizations.invitation_requested` na fila `emails`, com schema Zod do job (`invitationId` UUID);
+    - `organizations-emails.module`, com o adaptador `UserDirectory` para identity;
+    - o processador compõe os casos de uso dos dois contextos.
+  - **Refatorações para dois usuários**: o layout de e-mail (`renderEmail`, `escapeHtml`, `EmailRecipient`) foi de identity para `shared/infrastructure`, e o `RecordingEmailSender` para `shared/application/testing`. Identity os reexporta.
+- **Limite por destinatário**: aplicado ao agendar o envio (T11, `InvitationDelivery.schedule`): acima do limite, o evento não entra na outbox e nenhum e-mail sai, com o mesmo efeito de "aplicado no envio". Assim o limite não fica duplicado no worker, e o link anterior é invalidado mesmo quando o envio é suprimido.
+- **Testes**:
+  - 5 unitários do caso de uso: link no fragmento resolvendo para o convite; CA-06 com evento antigo fora de ordem descartado e link vigente preservado; retry substituindo o token; revogado, expirado e inexistente sem envio; frase sem nome.
+  - 3 do template (aspas, aviso, um link, escape, saudação genérica).
+  - 2 do processador da fila (despacho com `eventId`, payload inválido sem retry).
+  - 2 de integração com PostgreSQL, Redis e **Mailpit** reais:
+    - CA-04: convite entregue, com o link resolvendo para o convite;
+    - CA-06: o reenvio invalida o link anterior, e o evento antigo, reprocessado depois, é descartado sem novo e-mail.
+- **Mutation testing**: 7 detectados — token na query; sem checar convite encerrado (detectado depois que o teste foi corrigido: ele avançava o relógio antes e testava o revogado como expirado); sem o aviso; saudação com o nome do convidante (detectado depois que a asserção foi incluída); fila sem o tipo de convite (integração); e as duas defesas do evento, checagem prévia e emissão condicionada, removidas juntas. Cada uma dessas duas defesas, sozinha, é um mutante equivalente, porque a outra cobre.
+- **Comandos**: `nx affected -t lint typecheck test build` ✔; `pnpm test:integration` ✔ (shared 28, organizations 25, identity 50, api 4, worker 9).
+
+### T17 — 2026-10-10
+
+- **Entregue**:
+  - Porta `InvitationRetention` e `PurgeClosedInvitationsUseCase` (`CLOSED_INVITATION_RETENTION_DAYS = 30`, RNF-08).
+  - `PrismaInvitationRetention`: remove em lotes de 1 000 linhas, em autocommit, como a retenção de identity, os convites com `accepted_at`, `revoked_at` ou `expires_at` anteriores ao corte. Convites abertos dentro do prazo nunca são tocados.
+  - O job diário do worker (`maintenance.purge_expired_data`, 03:00 UTC) passa a incluir `closedInvitations` no relatório.
+- **Testes**:
+  - Caso de uso: corte = agora − 30 dias.
+  - Integração: aceito, revogado e expirado antes do corte removidos, cada condição isolada; aceito e revogado depois do corte e o aberto mantidos; lotes de 2; segunda execução remove 0.
+  - Job do worker com PostgreSQL e Redis reais: revogado há 31 dias removido, pendente mantido.
+- **Mutation testing**, 5/5 detectadas: ignorar aceitos; ignorar expirados; um só lote; prazo de 7 dias; job sem a retenção de convites.
+- **Comandos**: `nx affected -t lint typecheck test build` ✔; integração de organizations ✔ 26/26 e do worker ✔ 9/9.
+
+### T18 — 2026-10-10
+
+- **Entregue** (`apps/web/src/app/core/organizations`):
+  - `OrganizationsApi` e `tenantUrl(organizationId, sufixo)`. As URLs tenant-scoped são montadas com o id resolvido da rota; **nenhum interceptor injeta o tenant** (ADR 0012).
+  - Guards de contrato sem Zod, pelo mesmo motivo de bundle da spec 001.
+  - `MyOrganizationsStore` (Signals): carga única compartilhada; `resolve(slug)` recarrega **uma vez** antes de "não encontrada"; `add`, `invalidate`, `reset`.
+  - `ActiveOrganizationStore`, provido no layout de `/o/:slug`, que lê a organização resolvida pelo `organizationResolver`.
+  - `OrganizationRouteReuseStrategy`, que **recria a área e os stores quando o slug muda**.
+  - `homeRedirectGuard` em `/`: última organização deste usuário, senão a primeira, senão `/organizations/new`; falha de carga ⇒ `/organizations`.
+  - `organizationNotFoundInterceptor`: 404 `ORGANIZATION_NOT_FOUND` de rota tenant-scoped ⇒ invalida a lista e leva a `/organizations` com aviso. Outros 404 não são afetados.
+  - `LastOrganizationStorage`: `localStorage { userId, slug }`, ignorado para outro usuário e tolerante a storage bloqueado.
+  - `provideOrganizations`: reseta a lista ao trocar de usuário e apaga a última organização quando a sessão termina.
+  - `provideAuth` aceita `outerInterceptors` (por fora da renovação de sessão).
+  - A home antiga (`features/home`) virou a home da organização (`/o/:slug`).
+- **Bug encontrado pelos testes e corrigido**: o resolver injetava `AuthStore` depois de um `await`, fora do contexto de injeção (NG0203). As injeções agora acontecem antes do primeiro `await`.
+- **Testes**: 9 de roteamento com `RouterTestingHarness` e as rotas reais:
+  - CA-10: última organização, primeira, onboarding;
+  - anônimo ⇒ login;
+  - slug inexistente ⇒ `/organizations` com aviso;
+  - troca de slug recria a área (2 instâncias, id correto);
+  - CA-09: 404 do tenant invalida e redireciona; outro 404 não;
+  - logout limpa storage e lista.
+
+  Mais 5 do store (deduplicação, recarga única, falha e nova tentativa, contrato violado) e 3 do storage.
+
+- **E2E**: com o redirecionamento de `/`, a jornada real `auth-journey` passa a terminar no onboarding. Os testes com sessão simulada passaram a simular `/me/organizations` (helper `support/organizations.ts`); sem isso, o seletor do cabeçalho receberia 401 da API real e encerraria a sessão simulada.
+- **Mutation testing** (com a T19), 8/8 detectadas: sem recarga única; ignorar a última organização; reaproveitar a área na troca de slug; qualquer 404 do tenant redirecionando; logout sem limpar; última organização de outro usuário; sugestão sobrescrevendo slug editado; organização criada fora da lista.
+- **Ambiente**: o `pnpm e2e` (alvo atomizado do Nx) esgotou as portas efêmeras locais, com cerca de 19 mil conexões em `TIME_WAIT` para a 3333, durante a espera pelos servidores. O Playwright foi rodado direto com `NX_LOAD_DOT_ENV_FILES=false`, porque o `.env` local do usuário tem `PORT=3333`, que vira a porta do inspector do Node e colide com a API. O container `taskflow-redis-1`, criado sem mapeamento de porta, foi recriado por `pnpm infra:up`, preservando o volume.
+- **Comandos**: `nx run-many -t lint typecheck test build -p web web-e2e` ✔ (web 191 testes; bundle inicial 346,95 kB); Playwright ✔ 17/17, duas vezes seguidas (banco `taskflow_e2e`, Redis índice 2).
+
+### T19 — 2026-10-10
+
+- **Entregue** (`apps/web/src/app/features/organizations`):
+  - `/organizations/new`: nome → slug sugerido, sem acentos, até o usuário editar o endereço; validação espelhando a BR-022 e o nome de 2–80 caracteres. Erros por `code`: no campo (`INVALID_SLUG`, `SLUG_TAKEN`, `INVALID_ORGANIZATION_NAME`, com foco) ou em alerta (`EMAIL_NOT_VERIFIED`, `ORGANIZATION_LIMIT_REACHED` e os comuns, como 429). Há aviso prévio para conta não verificada. No sucesso, a organização entra em "minhas organizações" e o usuário vai para `/o/:slug`.
+  - `/organizations`: lista com o papel; estados de carregando, vazio (com dica de convite), erro com nova tentativa e aviso de "não encontrada".
+  - Seletor no cabeçalho (`core/layout/organization-switcher`): organizações com `aria-current` na atual, "Todas as organizações" e "Criar organização".
+- **Testes**: slug (12 casos); criação (sugestão, validação local sem chamar a API, sucesso, 3 erros de campo, 3 alertas, aviso de não verificado); lista (papéis e links, erro → nova tentativa → vazio); seletor no `AppShell`.
+- **Comandos**: os mesmos da T18.
+
+### T20 — 2026-10-10
+
+- **Entregue** (`apps/web/src/app/features/organizations`):
+  - `OrganizationApi`: todas as chamadas recebem o id explícito da organização ativa.
+  - Espelho da BR-021 só para a interface (`role-policy.ts`); a decisão continua no servidor.
+  - `MembersStore` e `InvitationsStore` (Signals), providos nos componentes e recriados com a área.
+  - `/o/:slug/members`, com estados de carregando, erro com nova tentativa e "carregar mais". Membros:
+    - papel escolhido num `select` e salvo por botão (o `select` não age sozinho, WCAG 3.2.2), com a versão;
+    - remoção e saída com **confirmação na linha**, foco no "Confirmar";
+    - erros por `code` em alerta focado (`LAST_OWNER`, `ROLE_CHANGE_NOT_ALLOWED`, `VERSION_CONFLICT` e `MEMBER_NOT_FOUND` recarregam a lista);
+    - saída ⇒ `/organizations`.
+  - Convites (só owner/admin): formulário de e-mail e papel, nunca owner; lista com convidante e prazo ou "Expirado"; reenviar recarrega a lista; revogar com confirmação. Mensagens de convite novo e de reconvite são diferentes.
+  - `/o/:slug/settings`: renomear com a versão carregada, slug exibido como fixo, somente leitura para member/viewer. `VERSION_CONFLICT` recarrega e explica; o novo nome entra em "minhas organizações".
+  - Navegação da área: Início, Membros, Configurações.
+- **Testes**: 15 de componente com as rotas reais e o backend simulado:
+  - CA-07: owner troca o papel com a versão; admin sem opção owner e sem ações sobre owners; member/viewer só leitura e sem convites;
+  - CA-08: `LAST_OWNER` em alerta focado;
+  - BR-008: conflito recarrega;
+  - remoção só após confirmação, com foco; saída com cancelar e confirmar;
+  - convites: lista, convidar, `ALREADY_A_MEMBER`, 429, reenviar e revogar;
+  - configurações: versão, conflito, somente leitura.
+
+  Mais 12 da política espelhada.
+
+- **Mutation testing**, 8/8 detectadas: admin oferecendo owner; papel com versão fixa (detectado depois que o teste passou a usar versão 3 em vez de 1); remoção sem confirmação; sair sem deixar a área; renomear com versão fixa; conflito sem recarregar; convites para quem não gerencia; admin removendo owner.
+- **Comandos**: `nx run-many -t lint typecheck test build -p web` ✔ (218 testes).
+
+### T21 — 2026-10-10
+
+- **Entregue**:
+  - `/invitations/accept`, sem guard. O token é lido do fragmento por `LinkToken`, que foi movido de `features/auth` para `shared/links` porque agora tem dois usos; auth o reexporta. A URL é limpa na hora, e o token fica em `PendingInvitation`, **só em memória**.
+  - A prévia (`lookup`) não consome o convite, e o aceite exige clique. Estados:
+    - sem token: orienta a reabrir o link, que vale 7 dias;
+    - sem sessão: entrar ou criar conta com `returnUrl=/invitations/accept`, só o caminho, e "Já entrei em outra aba";
+    - carregando;
+    - pronto: frase com os nomes entre aspas e prazo;
+    - e-mail não verificado: "Já confirmei meu e-mail" relê o `/me`;
+    - conta errada: e-mail mascarado, sem botão de aceite, token mantido;
+    - já membro;
+    - inválido: token descartado;
+    - falha na prévia: token mantido, com "Tentar de novo".
+
+    O aceite bem-sucedido põe a organização em "minhas organizações" e abre `/o/:slug`.
+- **Testes** (11):
+  - token fora da barra de endereço e fora de `localStorage`/`sessionStorage`, com os links de login e cadastro sem o token;
+  - CA-04: prévia, nada aceito antes do clique, aceite e navegação;
+  - CA-05: conta errada; convite inválido esquecido;
+  - BR-013: não verificado → confirmar → pronto;
+  - mapeamento de `INVITATION_FOR_ANOTHER_ACCOUNT`, `ALREADY_A_MEMBER` e `EMAIL_NOT_VERIFIED` no aceite, com o token mantido ou descartado conforme o caso;
+  - token sobrevive ao login dentro do SPA; aba recarregada; falha de rede com nova tentativa.
+- **Mutation testing**, 6/6 detectadas: aceite automático sem clique; conta errada vendo o botão; conta errada descartando o token; token em `sessionStorage`; falha de rede descartando o convite; token deixado na barra de endereço.
+- **Comandos**: `nx run-many -t lint typecheck test -p web` ✔ (229 testes).
+
+### T22 — 2026-10-10
+
+- **Entregue**: `apps/web-e2e/src/organizations-journey.spec.ts`, uma jornada **real** do CA-11, sem simulações (web, API, worker, Mailpit), com dois contextos de navegador:
+  1. A owner se cadastra, confirma o e-mail pelo Mailpit, cai no onboarding (CA-10) e cria a organização (CA-01).
+  2. Ela convida o e-mail do convidado.
+  3. O e-mail de convite chega com a frase fixa, os nomes entre aspas e o aviso (RNF-08).
+  4. O link abre "entre ou cadastre-se", e o token não aparece em nenhuma URL.
+  5. O convidado se cadastra e confirma o e-mail. Depois reabre o link (a aba saiu do SPA, como o design prevê), vê a prévia e aceita (CA-04).
+  6. Ele aparece na lista da owner, que muda o papel para admin pelo `select` + "Salvar papel".
+  7. O convidado vê a seção de convites (agora é admin) e sai com confirmação.
+  8. **Isolamento pela interface** (CA-03, CA-09): reabrir a URL da organização leva a `/organizations` com "Organização não encontrada", e a owner já não o vê na lista.
+- **Ambiente**: a execução completa faz 3 ou mais cadastros reais, e o limite `auth.register.ip` é de 5 por hora (RNF-05 da spec 001). Execuções seguidas no mesmo Redis o esgotam ("Muitas tentativas", visto no snapshot da falha). Antes de cada execução foram apagadas **só** as chaves `rate-limit:auth.register.ip*` e `rate-limit:auth.login.ip*` do índice 2, o descartável do E2E. No CI, o Redis é novo a cada execução.
+- **Comandos**: Playwright (`NX_LOAD_DOT_ENV_FILES=false`, banco `taskflow_e2e`, Redis índice 2) ✔ **18/18, duas vezes seguidas** (17 anteriores + a jornada nova).
+
+### T23 — 2026-10-10
+
+- **`/review-code`**: nenhum bloqueante.
+  - **Importante, corrigido**: a lista de convites não tinha "carregar mais", e o reconvite de um convite fora da página era tratado como novo. O painel ganhou paginação, e `OrganizationApi.invite` lê o status (`201` = novo, `200` = reconvite).
+  - **Sugestões corrigidas**:
+    - `MyOrganizationsStore.add` só mescla numa lista já carregada, sem criar lista parcial;
+    - `reset` descarta respostas de uma sessão anterior (contador de geração);
+    - "carregar mais" de membros e convites ficou protegido contra clique duplo;
+    - a organização ativa reflete a entrada atual de "minhas organizações", então o próprio papel alterado e o nome renomeado aparecem na hora;
+    - a fila `emails` lista explicitamente `organizations.invitation_requested`.
+  - **Registradas**:
+    - a limpeza dos limites de cadastro e login antes de E2E seguidos fica documentada (T24), em vez de um `globalSetup` que apagaria chaves e poderia atingir um Redis de desenvolvimento;
+    - a retenção de convites varre a tabela sem índice para o `OR` de encerramento. Isso é aceitável no volume atual, num job diário fora do pico, e deve ser reavaliado com índices parciais se a tabela crescer.
+- **`/security-audit`**: **nenhum Crítico ou Alto**.
+  - **Baixo B1, corrigido**: um cursor forjado com JSON válido e id fora do formato UUID chegava ao PostgreSQL (`invalid input syntax for type uuid`), causando 500. O `decodeCursor` agora valida o UUID e não usa mais cast. O teste de integração cobre membros e convites, e o mutante que remove a validação falha com o erro do PostgreSQL.
+  - **Baixo B2, sem alteração**: a linha apontada no design é a do **histórico** da revisão 2, que registra a recomendação da época. A revisão 3 registra a decisão do usuário de mostrar o e-mail a todos os membros. O histórico está correto.
+  - **Médio M1, pendente de decisão do usuário**: o limite por destinatário soma todas as organizações (RNF-04 aprovado: 3/dia, 10/semana). Uma conta verificada com organização própria pode gastar esse limite de um e-mail qualquer, por exemplo convidando, revogando e reconvidando a cada 10 minutos. Os convites legítimos de outras organizações a esse e-mail passam a ser suprimidos em silêncio, ficando pendentes e sem link, sem que ninguém perceba. A correção (limite por par organização-destinatário mais um teto global alto, e/ou indicar ao admin que a entrega foi adiada) **muda uma decisão aprovada**, então exige revisão da spec. Não foi aplicada.
+- **Testes novos**:
+  - web: paginação de convites com clique duplo, reconvite 200, próprio papel atualizado, `add` sem lista parcial e resposta descartada após `reset` (234 testes);
+  - integração: cursor forjado.
+- **Comandos**: `nx run-many -t lint typecheck test -p web` ✔ (234); integração de organizations ✔ 18/18 no arquivo de persistência.
+
+### T24 — 2026-10-10
+
+- **Documentação atualizada**:
+  - `docs/product/business-rules.md`: BR-019…BR-022, desvio da BR-007 (log de segurança até o contexto `audit`) e BR-013 como implementada.
+  - `docs/security/multi-tenancy.md`: reescrito para o ADR 0012, com prefixo de caminho, `createTenantScope`, releitura sob lock, frontend sem interceptor de tenant e testes A/B com ids reais. Saíram o header `X-Organization-Id` e o campo `status`.
+  - `docs/security/authorization.md`: o que está implementado, exclusão e transferência fora do escopo, e visibilidade do e-mail dos membros (decisão do usuário).
+  - `.claude/rules/api-design.md` e `security.md`: prefixo do tenant como o nível de aninhamento permitido, montagem só pelo escopo, nunca `organizationId` no body, decisão sob lock.
+  - `docs/architecture/dependency-rules.md`: bibliotecas de organizations e o que a spec 002 acrescentou a `shared/*`. Também foi corrigido um parágrafo partido que já existia ("Reg…ra de inclusão").
+  - `bounded-contexts.md` e roadmap (equipes adiadas); índice de specs; `docs/development/testing.md` (jornada CA-11, limpeza segura dos limites de autenticação no índice do E2E, simulação de `/me/organizations`, `PORT` do `.env` contra o inspector do Node).
+  - `acceptance.md`: evidência por critério.
+
+  O ADR 0012 já estava "Aceito".
+
+- **Regressão da T23 encontrada pelo E2E e corrigida**: com o contador de geração, o efeito de sincronizar a sessão rodava **depois** de o guard de `/` iniciar o carregamento para quem acabou de entrar, e descartava a resposta certa. O usuário caía no onboarding mesmo tendo organizações (`account-area.spec.ts`). Agora o store guarda o usuário dono da lista ou da busca, e `syncUser` só descarta dados de **outro** usuário. Um teste unitário reproduz a ordem real.
+- **Comandos (gate final)**:
+  - `pnpm exec prettier --check .` ✔;
+  - `pnpm verify` ✔: 17 projetos, 895 testes unitários;
+  - `pnpm test:integration` ✔: shared 28, identity 50, organizations 26, api 4, worker 9;
+  - Playwright ✔ 18/18, duas vezes (banco `taskflow_e2e`, Redis índice 2, `NX_LOAD_DOT_ENV_FILES=false`).
+- **Pendente**: decisão do usuário sobre o achado **M1** da auditoria (T23), o limite de convites por destinatário somando organizações. Corrigi-lo exige revisar o RNF-04.

@@ -20,6 +20,7 @@ import {
   SlugTakenError,
 } from '@taskflow/backend/organizations/domain';
 import { PrismaInvitationRepository } from './prisma-invitation.repository';
+import { PrismaInvitationRetention } from './prisma-invitation-retention';
 import { PrismaMembershipRepository } from './prisma-membership.repository';
 import { PrismaOrganizationRepository } from './prisma-organization.repository';
 
@@ -294,6 +295,17 @@ describe('organizations persistence (integration, T6/T7)', () => {
 
       expect(sizes).toEqual([2, 2, 1]);
       expect(new Set(seen).size).toBe(5);
+      // Cursor forjado com JSON válido e id fora do formato UUID: recomeça, nunca 500 (T23/B1).
+      const forged = Buffer.from(JSON.stringify({ c: '2026-01-01T00:00:00Z', i: 'x' })).toString(
+        'base64url',
+      );
+      const fromForged = await memberships.listPage(organizationId, { limit: 2, cursor: forged });
+      expect(fromForged.items).toHaveLength(2);
+      const fromForgedInvitations = await invitations.listOpenPage(organizationId, {
+        limit: 2,
+        cursor: forged,
+      });
+      expect(fromForgedInvitations.items).toEqual([]);
       const restarted = await memberships.listPage(organizationId, { limit: 2, cursor: 'lixo' });
       expect(restarted.items.map((item) => item.userId)).toEqual(seen.slice(0, 2));
     });
@@ -353,6 +365,46 @@ describe('organizations persistence (integration, T6/T7)', () => {
       expect(await invitations.findUsableByTokenHash(tokenHash, new Date())).toBeNull();
       const row = await prisma.invitation.findUniqueOrThrow({ where: { id: open.id } });
       expect(row.tokenHash).toBeNull();
+    });
+
+    it('T17: purges accepted, revoked and expired invitations closed before the cutoff, in batches', async () => {
+      const organizationId = await organization();
+      const cutoff = new Date('2026-10-01T00:00:00.000Z');
+      const before = new Date(cutoff.getTime() - 1000);
+      const after = new Date(cutoff.getTime() + 1000);
+      const seed = async (email: string, data: Record<string, Date | string | null>) => {
+        const created = invitation(organizationId, email, new Date(cutoff.getTime() - 30 * DAY));
+        await invitations.add(created);
+        // Prazo depois do corte salvo indicação contrária: só o encerramento decide.
+        await prisma.invitation.update({
+          where: { id: created.id },
+          data: { expiresAt: new Date(cutoff.getTime() + 7 * DAY), ...data },
+        });
+        return email;
+      };
+      const ownerId = randomUUID();
+      await seed('aceito-velho@exemplo.com', { acceptedAt: before, acceptedByUserId: ownerId });
+      await seed('revogado-velho@exemplo.com', { revokedAt: before });
+      await seed('expirado-velho@exemplo.com', { expiresAt: before });
+      await seed('aceito-novo@exemplo.com', { acceptedAt: after, acceptedByUserId: ownerId });
+      await seed('revogado-novo@exemplo.com', { revokedAt: after });
+      await seed('aberto@exemplo.com', { expiresAt: new Date(cutoff.getTime() + 7 * DAY) });
+
+      const removed = await new PrismaInvitationRetention(transactions, 2).deleteClosedBefore(
+        cutoff,
+      );
+
+      expect(removed).toBe(3);
+      const left = await prisma.invitation.findMany({
+        where: { organizationId },
+        select: { email: true },
+      });
+      expect(left.map((row) => row.email).sort()).toEqual([
+        'aberto@exemplo.com',
+        'aceito-novo@exemplo.com',
+        'revogado-novo@exemplo.com',
+      ]);
+      expect(await new PrismaInvitationRetention(transactions).deleteClosedBefore(cutoff)).toBe(0);
     });
 
     it('emits the token only for the latest delivery event of an open invitation', async () => {

@@ -1,6 +1,8 @@
 // Fakes genéricos para testes de casos de uso de qualquer contexto. Nunca em produção.
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
 import type {
+  EmailMessage,
+  EmailSender,
   IntegrationEvent,
   OutboxWriter,
   Pseudonymizer,
@@ -108,3 +110,22 @@ export const fakePseudonymizer: Pseudonymizer = {
   pseudonymize: (value) =>
     `pseudo(${value.length})#${[...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)}`,
 };
+
+/** Grava as mensagens enviadas; `failNext(n)` simula falhas de SMTP (o job faria retry). */
+export class RecordingEmailSender implements EmailSender {
+  readonly sent: EmailMessage[] = [];
+  readonly attempted: EmailMessage[] = [];
+  private failuresLeft = 0;
+
+  failNext(times = 1) {
+    this.failuresLeft = times;
+  }
+  async send(message: EmailMessage) {
+    this.attempted.push(message);
+    if (this.failuresLeft > 0) {
+      this.failuresLeft -= 1;
+      throw new Error('SMTP unavailable');
+    }
+    this.sent.push(message);
+  }
+}
