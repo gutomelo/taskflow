@@ -22,9 +22,24 @@ export const INVITATION_POLICIES = {
     points: 1,
     durationSeconds: TEN_MINUTES,
   },
-  /** Por destinatário pseudonimizado, somando organizações (supressão silenciosa). */
-  perRecipient: [
-    { name: 'organizations.invitations.recipient.day', points: 3, durationSeconds: DAY },
-    { name: 'organizations.invitations.recipient.week', points: 10, durationSeconds: WEEK },
+  /**
+   * Por (organização, destinatário pseudonimizado), supressão silenciosa (rev. 4, achado M1):
+   * uma organização não esgota a cota de um e-mail para as outras.
+   */
+  perOrganizationRecipient: [
+    {
+      name: 'organizations.invitations.organization-recipient.day',
+      points: 3,
+      durationSeconds: DAY,
+    },
+    {
+      name: 'organizations.invitations.organization-recipient.week',
+      points: 10,
+      durationSeconds: WEEK,
+    },
+  ],
+  /** Teto global por destinatário, somando organizações: contra spam em massa (silencioso). */
+  perRecipientGlobal: [
+    { name: 'organizations.invitations.recipient-global.day', points: 20, durationSeconds: DAY },
   ],
 } as const satisfies Record<string, RateLimitPolicy | ReadonlyArray<RateLimitPolicy>>;

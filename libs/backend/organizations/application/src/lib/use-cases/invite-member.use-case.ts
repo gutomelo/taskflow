@@ -78,13 +78,13 @@ export class InviteMemberUseCase {
       const now = this.deps.clock.now();
       const open = await this.deps.invitations.findOpenByEmail(organizationId, email);
       if (open) {
-        const { deliveryEventId } = await this.delivery.schedule(open.id, email);
+        const { deliveryEventId } = await this.delivery.schedule(organizationId, open.id, email);
         open.redeliver({ deliveryEventId, role, invitedByUserId: actorUserId, now });
         await this.deps.invitations.save(open);
         return { invitation: open, created: false };
       }
       const invitationId = this.deps.idGenerator.generate();
-      const { deliveryEventId } = await this.delivery.schedule(invitationId, email);
+      const { deliveryEventId } = await this.delivery.schedule(organizationId, invitationId, email);
       const invitation = Invitation.create({
         id: invitationId,
         organizationId,

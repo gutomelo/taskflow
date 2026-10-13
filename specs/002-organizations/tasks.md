@@ -61,6 +61,12 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
 | T23 | `/review-code` e `/security-audit` do conjunto; correções                                                                                                                                                                                                                          | T1–T22     | sem bloqueantes / sem Críticos-Altos abertos                             | [x]    |
 | T24 | Docs: BR-019…BR-022 e desvio da BR-007 em `business-rules.md`; `multi-tenancy.md` e `authorization.md` (prefixo, sem `status`, visibilidade de e-mails); `.claude/rules/api-design.md` e `security.md`; ADR 0012 → Aceito; roadmap (equipes adiadas); índice de specs; arquitetura | T23        | verificação de links; `pnpm verify`, `pnpm test:integration`, `pnpm e2e` | [x]    |
 
+## Bloco H — Revisão 4 (achado M1 da auditoria)
+
+| ID  | Tarefa                                                                                                                                        | Depende de | Verificação                                                                                                   | Status |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- | ------ |
+| T25 | Limite de convites por (organização, destinatário) 3/dia e 10/semana + teto global por destinatário 20/dia, ambos silenciosos (RNF-04 rev. 4) | T11, T23   | fakes: cota de uma organização não afeta outra; 4º envio da mesma organização suprimido; 21º global suprimido | [x]    |
+
 ## Evidências
 
 ### T1 — 2026-10-09
@@ -491,4 +497,13 @@ Regras: uma tarefa por execução de `/implement-spec`; marcar `[x]` somente com
   - `pnpm verify` ✔: 17 projetos, 895 testes unitários;
   - `pnpm test:integration` ✔: shared 28, identity 50, organizations 26, api 4, worker 9;
   - Playwright ✔ 18/18, duas vezes (banco `taskflow_e2e`, Redis índice 2, `NX_LOAD_DOT_ENV_FILES=false`).
-- **Pendente**: decisão do usuário sobre o achado **M1** da auditoria (T23), o limite de convites por destinatário somando organizações. Corrigi-lo exige revisar o RNF-04.
+- **Pendente na data**: decisão do usuário sobre o achado **M1** — resolvido na T25 (revisão 4).
+
+### T25 — 2026-10-13
+
+- **Decisão do usuário** (achado M1 da auditoria da T23): limite por (organização, destinatário) + teto global. Spec revisada: RNF-04 e pergunta aberta 12 em `requirements.md`; seção "Abuso de e-mail" e histórico (revisão 4) em `design.md`.
+- **Entregue**: `INVITATION_POLICIES.perOrganizationRecipient` (3/dia e 10/semana por `organização:destinatário pseudonimizado`) e `perRecipientGlobal` (20/dia por destinatário somando organizações), ambos silenciosos. `InvitationDelivery.schedule` passa a receber a organização e consulta primeiro a cota da organização, depois o teto global: envios que a organização já teria suprimido não consomem o teto global das demais.
+- **Risco residual aceito** (registrado no design): bloquear um e-mail pelo teto global exige pelo menos 7 organizações próprias convidando o mesmo endereço no dia.
+- **Testes**: o 4º envio da mesma organização é suprimido com resposta igual; **regressão do M1** (uma organização esgotando sua cota não bloqueia o convite de outra); o 21º envio global é suprimido.
+- **Mutation testing**, 4/4 detectadas: voltar a somar organizações (a regressão do achado); sem teto global; teto global frouxo; cota da organização ignorada.
+- **Comandos**: `pnpm verify` ✔ (17 projetos); `pnpm test:integration` ✔ (shared 28, identity 50, organizations 26, api 4, worker 9); Playwright ✔ 18/18; `prettier --check .` ✔.

@@ -41,22 +41,34 @@ export class InvitationDelivery {
    * do limite, o evento não entra na outbox — o convite muda de envio mesmo assim (o link
    * anterior deixa de valer) e a resposta não revela a supressão.
    */
-  async schedule(invitationId: string, email: EmailAddress): Promise<{ deliveryEventId: string }> {
+  async schedule(
+    organizationId: string,
+    invitationId: string,
+    email: EmailAddress,
+  ): Promise<{ deliveryEventId: string }> {
     const event = createIntegrationEvent(
       OrganizationsEventType.invitationRequested,
       { invitationId },
       this.deps,
     );
-    if (await this.recipientAllowed(email)) {
+    if (await this.recipientAllowed(organizationId, email)) {
       await this.deps.outbox.append([event]);
     }
     return { deliveryEventId: event.id };
   }
 
-  private async recipientAllowed(email: EmailAddress): Promise<boolean> {
-    const key = this.deps.pseudonymizer.pseudonymize(email.value);
-    for (const policy of INVITATION_POLICIES.perRecipient) {
+  /**
+   * Primeiro a cota da organização, depois o teto global: envios que a própria organização já
+   * teria suprimido não consomem o teto global das demais.
+   */
+  private async recipientAllowed(organizationId: string, email: EmailAddress): Promise<boolean> {
+    const recipient = this.deps.pseudonymizer.pseudonymize(email.value);
+    for (const policy of INVITATION_POLICIES.perOrganizationRecipient) {
+      const key = `${organizationId}:${recipient}`;
       if (!(await this.deps.rateLimiter.consume(policy, key)).allowed) return false;
+    }
+    for (const policy of INVITATION_POLICIES.perRecipientGlobal) {
+      if (!(await this.deps.rateLimiter.consume(policy, recipient)).allowed) return false;
     }
     return true;
   }

@@ -56,7 +56,11 @@ export class ResendInvitationUseCase {
       if (!canInvite(actor.role, invitedRole)) throw new InsufficientRoleError();
       await this.delivery.consumeOrganizationEmailLimit(organizationId, email);
 
-      const { deliveryEventId } = await this.delivery.schedule(invitation.id, email);
+      const { deliveryEventId } = await this.delivery.schedule(
+        organizationId,
+        invitation.id,
+        email,
+      );
       invitation.redeliver({
         deliveryEventId,
         invitedByUserId: actorUserId,

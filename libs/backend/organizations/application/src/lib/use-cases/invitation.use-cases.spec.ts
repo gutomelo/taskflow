@@ -295,34 +295,66 @@ describe('InviteMemberUseCase (RF-06)', () => {
     expect(bed.organizations.locks).toEqual([]);
   });
 
-  it('CA-12: past 3 e-mails a day to one recipient, keeps answering the same but sends nothing', async () => {
-    const bed = createOrganizationsTestbed();
-    const orgs = [];
-    for (const slug of ['org-a', 'org-b', 'org-c', 'org-d']) {
-      orgs.push(await seed(bed, [[`owner-${slug}`, 'owner']], slug));
-    }
-    const invite = new InviteMemberUseCase(bed);
-
-    const results = [];
-    for (const [index, organizationId] of orgs.entries()) {
-      const owner = `owner-${['org-a', 'org-b', 'org-c', 'org-d'][index]}`;
-      results.push(
-        await invite.execute(as(owner, organizationId, 'owner'), {
-          email: 'alvo@exemplo.com',
-          role: 'viewer',
-        }),
+  /** Convida o alvo e reenvia `resends` vezes (cada envio a 10 min do anterior). */
+  async function deliveries(
+    bed: OrganizationsTestbed,
+    organizationId: string,
+    owner: string,
+    resends: number,
+  ) {
+    const { invitation } = await new InviteMemberUseCase(bed).execute(
+      as(owner, organizationId, 'owner'),
+      {
+        email: 'alvo@exemplo.com',
+        role: 'viewer',
+      },
+    );
+    for (let index = 0; index < resends; index += 1) {
+      afterTenMinutes(bed);
+      await new ResendInvitationUseCase(bed).execute(
+        as(owner, organizationId, 'owner'),
+        invitation.id,
       );
     }
+    return invitation;
+  }
 
-    expect(results.map((result) => result.created)).toEqual([true, true, true, true]);
-    expect(results.map((result) => result.invitation.status)).toEqual([
-      'pending',
-      'pending',
-      'pending',
-      'pending',
-    ]);
-    expect(bed.outbox.events).toHaveLength(3);
+  const queuedFor = (bed: OrganizationsTestbed, invitationId: string) =>
+    bed.outbox.events.filter((event) => event.payload['invitationId'] === invitationId).length;
+
+  it('CA-12 (rev. 4): past 3 e-mails a day from one organization to one recipient, answers the same but sends nothing', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [['ana', 'owner']]);
+
+    const invitation = await deliveries(bed, acme, 'ana', 3);
+
+    expect(queuedFor(bed, invitation.id)).toBe(3);
+    expect((await bed.invitations.findById(acme, invitation.id))?.isOpen).toBe(true);
     expect(JSON.stringify(bed.rateLimiter.keys())).not.toContain('alvo@');
+  });
+
+  it('M1 (rev. 4): one organization exhausting its quota for an address does not block another', async () => {
+    const bed = createOrganizationsTestbed();
+    const attacker = await seed(bed, [['mal', 'owner']], 'atacante');
+    const victimOrg = await seed(bed, [['ana', 'owner']], 'legitima');
+    await deliveries(bed, attacker, 'mal', 5);
+
+    const legit = await deliveries(bed, victimOrg, 'ana', 0);
+
+    expect(queuedFor(bed, legit.id)).toBe(1);
+  });
+
+  it('CA-12 (rev. 4): the global ceiling of 20 e-mails a day per recipient suppresses the 21st', async () => {
+    const bed = createOrganizationsTestbed();
+    const sent: number[] = [];
+    for (let index = 0; index < 7; index += 1) {
+      const slug = `org-${String.fromCharCode(97 + index)}`;
+      const organizationId = await seed(bed, [[`owner-${slug}`, 'owner']], slug);
+      const invitation = await deliveries(bed, organizationId, `owner-${slug}`, 2);
+      sent.push(queuedFor(bed, invitation.id));
+    }
+
+    expect(sent).toEqual([3, 3, 3, 3, 3, 3, 2]);
   });
 });
 

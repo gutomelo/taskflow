@@ -15,16 +15,16 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
 - Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
 
-## Fase 1 — MVP · Em andamento (spec 001 concluída; 002 implementada)
+## Fase 1 — MVP · Em andamento (specs 001 e 002 concluídas)
 
-| Ordem | Spec                 | Conteúdo                                                                                                                                                                                                             |
-| ----- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | `001-authentication` | **Concluída.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.                                                                                                                             |
-| 2     | `002-organizations`  | **Implementada** (uma decisão pendente: achado M1 da auditoria, limite de convites por destinatário). Organizações (tenant), membros, convites, troca de organização ativa. Equipes adiadas para a spec que as usar. |
-| 3     | `006-permissions`    | Papéis, matriz de permissões, políticas por recurso, testes de isolamento.                                                                                                                                           |
-| 4     | `003-projects`       | Projetos, membros do projeto, configurações, arquivamento.                                                                                                                                                           |
-| 5     | `004-tasks`          | Tarefas, prioridade, responsáveis, prazos, subtarefas, dependências (BR-001, 003, 006, 008).                                                                                                                         |
-| 6     | `005-kanban`         | Quadros, colunas, transições configuráveis, ordenação, movimentação (BR-004, 009).                                                                                                                                   |
+| Ordem | Spec                 | Conteúdo                                                                                                                      |
+| ----- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `001-authentication` | **Concluída.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.                                      |
+| 2     | `002-organizations`  | **Concluída.** Organizações (tenant), membros, convites, troca de organização ativa. Equipes adiadas para a spec que as usar. |
+| 3     | `006-permissions`    | Papéis, matriz de permissões, políticas por recurso, testes de isolamento.                                                    |
+| 4     | `003-projects`       | Projetos, membros do projeto, configurações, arquivamento.                                                                    |
+| 5     | `004-tasks`          | Tarefas, prioridade, responsáveis, prazos, subtarefas, dependências (BR-001, 003, 006, 008).                                  |
+| 6     | `005-kanban`         | Quadros, colunas, transições configuráveis, ordenação, movimentação (BR-004, 009).                                            |
 
 > A spec `006-permissions` é implementada logo após organizações porque todas as features seguintes dependem dela, embora mantenha a numeração original.
 
