@@ -91,21 +91,31 @@ Então a atualização é negada com 403 e nome e configuração ficam como esta
 
 ## Testes obrigatórios
 
-- [ ] Kernel: matrizes tabela-driven, papel efetivo, negação por padrão
-- [ ] Domínio e casos de uso: configuração, capacidades, ações por membro
-- [ ] Integração: coluna nova, isolamento pelo harness (todas as rotas)
-- [ ] HTTP: contratos, 403/409, OpenAPI
-- [ ] Frontend: capacidades, ações, configuração
-- [ ] E2E: jornadas existentes verdes
+- [x] Kernel: matrizes tabela-driven, papel efetivo, negação por padrão
+- [x] Domínio e casos de uso: configuração, capacidades, ações por membro
+- [x] Integração: coluna nova, isolamento pelo harness (todas as rotas)
+- [x] HTTP: contratos, 403/409, OpenAPI
+- [x] Frontend: capacidades, ações, configuração
+- [x] E2E: jornadas existentes verdes
 
 ## Evidências de validação
 
-| Critério | Evidência (comando + resultado) | Data |
-| -------- | ------------------------------- | ---- |
+| Critério | Evidência (comando + resultado)                                                                                                                                                | Data       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| CA-01    | `authorization.spec.ts` do kernel (matrizes transcritas, chaves hostis) e `catalog-parity.spec.ts`; `nx test backend-shared-kernel` ✔ 142                                      | 2026-10-13 |
+| CA-02    | `authorization.spec.ts` (BR-023, incluindo papéis desconhecidos) ✔                                                                                                             | 2026-10-13 |
+| CA-03    | `organization.use-cases.spec.ts` (CA-03), `organizations-router.spec.ts` (CA-03), `settings.page.spec.ts` ✔                                                                    | 2026-10-13 |
+| CA-04    | `organization.use-cases.spec.ts` (CA-04), `organizations-router.spec.ts` (CA-04 / CA-05) ✔                                                                                     | 2026-10-13 |
+| CA-05    | `member.use-cases.spec.ts` ("member actions (spec 006, CA-05)"), `organizations-router.spec.ts` ✔                                                                              | 2026-10-13 |
+| CA-06    | `members.page.spec.ts` (lista forjada sem ações, recarga falha), `settings.page.spec.ts`; chamada forjada ⇒ 403 em `organizations-router.spec.ts`; `role-policy.ts` removido ✔ | 2026-10-13 |
+| CA-07    | `route-coverage.spec.ts` (rota sem caso falha; harness falha fechado) e `organizations-isolation.integration.spec.ts` ✔ 5/5                                                    | 2026-10-13 |
+| CA-08    | Revisão do [ADR 0014](../../docs/architecture/adr/0014-rls-deferred.md) e do status do ADR 0004                                                                                | 2026-10-13 |
+| CA-09    | `organization.use-cases.spec.ts` ("CA-09: decides on the role re-read under the organization lock") ✔                                                                          | 2026-10-13 |
+| Gate     | `pnpm verify` ✔ 54/54; `pnpm test:integration` ✔ 120; Playwright ✔ 18/18                                                                                                       | 2026-10-13 |
 
 ## Definição de concluído
 
-- [ ] CA-01 a CA-09 comprovados por testes executados (CA-08 por revisão do ADR)
-- [ ] `pnpm verify`, `pnpm test:integration` e E2E passando
-- [ ] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
-- [ ] ADRs 0013 e 0014; documentação e roadmap atualizados
+- [x] CA-01 a CA-09 comprovados por testes executados (CA-08 por revisão do ADR)
+- [x] `pnpm verify`, `pnpm test:integration` e E2E passando
+- [x] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
+- [x] ADRs 0013 e 0014; documentação e roadmap atualizados

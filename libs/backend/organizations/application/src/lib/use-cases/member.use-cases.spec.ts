@@ -116,6 +116,7 @@ describe('ListMembersUseCase (RF-09)', () => {
         role: 'owner',
         version: 1,
         joinedAt: bed.clock.now(),
+        actions: { changeRoleTo: [], remove: false },
       },
       {
         userId: 'bia',
@@ -124,6 +125,7 @@ describe('ListMembersUseCase (RF-09)', () => {
         role: 'member',
         version: 1,
         joinedAt: bed.clock.now(),
+        actions: { changeRoleTo: [], remove: false },
       },
     ]);
     expect(second.items.map((member) => member.userId)).toEqual(['caio']);
@@ -145,6 +147,76 @@ describe('ListMembersUseCase (RF-09)', () => {
     expect(page.items).toEqual([
       expect.objectContaining({ userId: 'ana', name: null, email: null }),
     ]);
+  });
+
+  it('RF-01: denies a role without organization:read before touching the repository', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [['ana', 'member']]);
+    const listPage = vi.spyOn(bed.memberships, 'listPage');
+    const context = as('ana', acme, 'member');
+    // Papel fora do catálogo em runtime (dado corrompido): nenhum papel válido nega a leitura.
+    Reflect.set(context.tenant, 'organizationRole', 'guest');
+
+    await expect(new ListMembersUseCase(bed).execute(context, {})).rejects.toBeInstanceOf(
+      InsufficientRoleError,
+    );
+    expect(listPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('member actions (spec 006, CA-05)', () => {
+  it('an admin listing members gets no actions on owners and the allowed roles for others', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['eva', 'owner'],
+      ['adm', 'admin'],
+      ['bia', 'member'],
+    ]);
+
+    const page = await new ListMembersUseCase(bed).execute(as('adm', acme, 'admin'), {});
+    const actions = Object.fromEntries(page.items.map((item) => [item.userId, item.actions]));
+
+    expect(actions).toEqual({
+      ana: { changeRoleTo: [], remove: false },
+      eva: { changeRoleTo: [], remove: false },
+      adm: { changeRoleTo: [], remove: false },
+      bia: { changeRoleTo: ['admin', 'viewer'], remove: true },
+    });
+  });
+
+  it('computes the returned actions with the actor role re-read under the lock', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['bia', 'member'],
+    ]);
+
+    // O middleware viu "admin" (promovida a owner depois); as ações seguem o papel relido.
+    const view = await new ChangeMemberRoleUseCase(bed).execute(as('ana', acme, 'admin'), {
+      userId: 'bia',
+      role: 'viewer',
+      version: 1,
+    });
+
+    expect(view.actions.changeRoleTo).toContain('owner');
+  });
+
+  it('after stepping down, the returned actions use the new role of the actor', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['eva', 'owner'],
+    ]);
+
+    const view = await new ChangeMemberRoleUseCase(bed).execute(as('ana', acme, 'owner'), {
+      userId: 'ana',
+      role: 'admin',
+      version: 1,
+    });
+
+    // Admin não altera o próprio papel: nenhuma ação sobre si.
+    expect(view.actions).toEqual({ changeRoleTo: [], remove: false });
   });
 });
 

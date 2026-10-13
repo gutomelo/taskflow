@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import type { MyOrganization } from '@taskflow/contracts';
+import type { MyOrganization, OrganizationPermission } from '@taskflow/contracts';
 import { MyOrganizationsStore } from './my-organizations.store';
 
 /**
@@ -23,8 +23,19 @@ export class ActiveOrganizationStore {
   });
   readonly id = computed(() => this.organization()?.id ?? null);
   readonly role = computed(() => this.organization()?.role ?? null);
-  /** Ações de gestão (BR-021): a API decide; a interface só esconde o que seria negado. */
-  readonly canManage = computed(() => this.role() === 'owner' || this.role() === 'admin');
+  private readonly capabilities = computed(
+    () => new Set<string>(this.organization()?.capabilities ?? []),
+  );
+
+  /**
+   * Capacidade calculada pela API (spec 006): a interface esconde o que seria negado, sem matriz
+   * própria. Dica apenas — a API decide toda ação. Se a última recarga de "minhas organizações"
+   * falhou, as capacidades em memória podem estar velhas (ex.: o próprio papel acabou de mudar) e
+   * nada é oferecido até a próxima recarga bem-sucedida.
+   */
+  can(permission: OrganizationPermission): boolean {
+    return this.mine.status() !== 'error' && this.capabilities().has(permission);
+  }
 
   /** Liga o store à organização resolvida pela rota (sinal de input do layout). */
   connect(source: () => MyOrganization | null): void {

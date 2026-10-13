@@ -17,7 +17,7 @@ import { invitationsMessages, membersMessages } from './organizations.messages';
         </h1>
         <tf-members-list />
       </section>
-      @if (active.canManage()) {
+      @if (active.can('member:invite')) {
         <section aria-labelledby="invitations-title">
           <h2 id="invitations-title" class="text-xl font-semibold tracking-tight">
             {{ invitations.title }}

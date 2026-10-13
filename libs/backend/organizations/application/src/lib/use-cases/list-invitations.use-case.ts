@@ -1,9 +1,6 @@
 import type { TenantRequestContext } from '@taskflow/backend/shared/application';
-import type { Clock } from '@taskflow/backend/shared/kernel';
-import {
-  canManageMembers,
-  type InvitationRepository,
-} from '@taskflow/backend/organizations/domain';
+import { hasOrganizationPermission, type Clock } from '@taskflow/backend/shared/kernel';
+import { type InvitationRepository } from '@taskflow/backend/organizations/domain';
 import type { UserDirectory } from '../ports/user-directory';
 import { toInvitationView, type InvitationView } from '../shared/invitation-view';
 import { InsufficientRoleError } from '../shared/organizations-errors';
@@ -23,7 +20,8 @@ export class ListInvitationsUseCase {
     context: TenantRequestContext,
     query: PageQuery,
   ): Promise<{ items: InvitationView[]; nextCursor: string | null }> {
-    if (!canManageMembers(context.tenant.organizationRole)) throw new InsufficientRoleError();
+    if (!hasOrganizationPermission(context.tenant.organizationRole, 'member:invite'))
+      throw new InsufficientRoleError();
     const page = await this.deps.invitations.listOpenPage(
       context.tenant.organizationId,
       toPageRequest(query),

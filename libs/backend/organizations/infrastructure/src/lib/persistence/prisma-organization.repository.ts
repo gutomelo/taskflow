@@ -14,10 +14,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly transactions: PrismaTransactionRunner) {}
 
   async add(organization: Organization): Promise<void> {
-    const { id, name, slug, version, createdAt, updatedAt } = organization.toSnapshot();
+    const { id, name, slug, membersCanCreateProjects, version, createdAt, updatedAt } =
+      organization.toSnapshot();
     try {
       await this.transactions.client().organization.create({
-        data: { id, name: name.value, slug: slug.value, version, createdAt, updatedAt },
+        data: {
+          id,
+          name: name.value,
+          slug: slug.value,
+          membersCanCreateProjects,
+          version,
+          createdAt,
+          updatedAt,
+        },
       });
     } catch (error) {
       if (isUniqueConstraintViolation(error)) throw new SlugTakenError();
@@ -43,10 +52,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async save(organization: Organization): Promise<void> {
-    const { id, name, version, updatedAt } = organization.toSnapshot();
+    const { id, name, membersCanCreateProjects, version, updatedAt } = organization.toSnapshot();
     const { count } = await this.transactions.client().organization.updateMany({
       where: { id, version },
-      data: { name: name.value, updatedAt, version: { increment: 1 } },
+      data: { name: name.value, membersCanCreateProjects, updatedAt, version: { increment: 1 } },
     });
     if (count === 0) throw new VersionConflictError('Organization');
   }

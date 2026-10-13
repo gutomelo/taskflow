@@ -31,11 +31,12 @@ export {
 export { ListMyOrganizationsUseCase } from './lib/use-cases/list-my-organizations.use-case';
 export { GetOrganizationUseCase } from './lib/use-cases/get-organization.use-case';
 export {
-  RenameOrganizationUseCase,
-  type RenameOrganizationCommand,
-} from './lib/use-cases/rename-organization.use-case';
+  UpdateOrganizationUseCase,
+  type UpdateOrganizationCommand,
+  type UpdateOrganizationDependencies,
+} from './lib/use-cases/update-organization.use-case';
 export { ResolveTenantMembershipUseCase } from './lib/use-cases/resolve-tenant-membership.use-case';
-export type { MemberView } from './lib/shared/member-view';
+export type { MemberView, Viewer } from './lib/shared/member-view';
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type PageQuery } from './lib/shared/pagination';
 export { ListMembersUseCase } from './lib/use-cases/list-members.use-case';
 export {

@@ -162,6 +162,7 @@ export class CreateOrganizationPage {
         name: created.name,
         slug: created.slug,
         role: created.myRole,
+        capabilities: created.capabilities,
       });
       await this.router.navigate(['/o', created.slug]);
     } catch (error) {

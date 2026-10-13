@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { OrganizationRole } from '@taskflow/contracts';
+import type { OrganizationPermission, OrganizationRole } from '@taskflow/contracts';
 import { MyOrganizationsStore } from '../../core/organizations';
 import {
   acme,
@@ -14,13 +14,41 @@ import {
 import { organizationsRoutes } from './organizations.routes';
 
 const URL = `/api/v1/organizations/${acme.id}`;
-const dto = (name: string, version: number, myRole: OrganizationRole = 'owner') => ({
+const CAPABILITIES: Record<OrganizationRole, OrganizationPermission[]> = {
+  owner: [
+    'organization:read',
+    'organization:update',
+    'member:invite',
+    'member:change-role',
+    'member:remove',
+    'project:create',
+  ],
+  admin: [
+    'organization:read',
+    'organization:update',
+    'member:invite',
+    'member:change-role',
+    'member:remove',
+    'project:create',
+  ],
+  member: ['organization:read', 'project:create'],
+  viewer: ['organization:read'],
+};
+
+const dto = (
+  name: string,
+  version: number,
+  myRole: OrganizationRole = 'owner',
+  membersCanCreateProjects = true,
+) => ({
   id: acme.id,
   name,
   slug: 'acme',
+  membersCanCreateProjects,
   version,
   createdAt: '2026-10-01T10:00:00.000Z',
   myRole,
+  capabilities: CAPABILITIES[myRole],
 });
 
 async function open(role: OrganizationRole) {
@@ -28,7 +56,9 @@ async function open(role: OrganizationRole) {
   env.auth.signIn(ana);
   const harness = await RouterTestingHarness.create();
   const navigation = harness.navigateByUrl('/o/acme/settings');
-  (await nextRequest(env.backend, MINE)).flush({ items: [{ ...acme, role }] });
+  (await nextRequest(env.backend, MINE)).flush({
+    items: [{ ...acme, role, capabilities: CAPABILITIES[role] }],
+  });
   await navigation;
   (await nextRequest(env.backend, URL)).flush(dto('Acme', 3, role));
   await settle();
@@ -57,7 +87,11 @@ describe('SettingsPage (RF-05, BR-008, BR-022)', () => {
     await rename(env, 'Acme Brasil');
     const request = await nextRequest(env.backend, URL);
     expect(request.request.method).toBe('PATCH');
-    expect(request.request.body).toEqual({ name: 'Acme Brasil', version: 3 });
+    expect(request.request.body).toEqual({
+      name: 'Acme Brasil',
+      membersCanCreateProjects: true,
+      version: 3,
+    });
     request.flush(dto('Acme Brasil', 4, 'admin'));
     await settle();
 
@@ -88,6 +122,56 @@ describe('SettingsPage (RF-05, BR-008, BR-022)', () => {
 
     expect((root(env).querySelector('input') as HTMLInputElement).readOnly).toBe(true);
     expect(root(env).querySelector('button[type="submit"]')).toBeNull();
-    expect(root(env).textContent).toContain('Só proprietários e administradores alteram o nome.');
+    expect(root(env).textContent).toContain(
+      'Só proprietários e administradores alteram as configurações.',
+    );
+  });
+
+  it('CA-03: owner/admin turn off "members can create projects"; it is saved with the version', async () => {
+    const env = await open('admin');
+    const checkbox = root(env).querySelector<HTMLInputElement>('#members-can-create-projects');
+    expect(checkbox?.checked).toBe(true);
+    expect(checkbox?.disabled).toBe(false);
+    expect(checkbox?.labels?.[0]?.textContent?.trim()).toBe('Membros podem criar projetos');
+
+    checkbox?.click();
+    root(env).querySelector('form')?.dispatchEvent(new Event('submit'));
+    const request = await nextRequest(env.backend, URL);
+    expect(request.request.body).toEqual({
+      name: 'Acme',
+      membersCanCreateProjects: false,
+      version: 3,
+    });
+    request.flush(dto('Acme', 4, 'admin', false));
+    await settle();
+    await env.harness.fixture.whenStable();
+
+    expect(root(env).querySelector<HTMLInputElement>('#members-can-create-projects')?.checked).toBe(
+      false,
+    );
+  });
+
+  it('shows the setting to members without letting them change it', async () => {
+    const env = await open('member');
+
+    expect(
+      root(env).querySelector<HTMLInputElement>('#members-can-create-projects')?.disabled,
+    ).toBe(true);
+  });
+
+  it('disables the setting when the capabilities change with the page open', async () => {
+    const env = await open('admin');
+
+    TestBed.inject(MyOrganizationsStore).add({
+      ...acme,
+      role: 'member',
+      capabilities: CAPABILITIES.member,
+    });
+    await settle();
+    await env.harness.fixture.whenStable();
+
+    expect(
+      root(env).querySelector<HTMLInputElement>('#members-can-create-projects')?.disabled,
+    ).toBe(true);
   });
 });

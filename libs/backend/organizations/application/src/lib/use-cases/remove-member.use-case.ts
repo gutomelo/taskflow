@@ -1,7 +1,10 @@
 import type { TenantRequestContext, TransactionRunner } from '@taskflow/backend/shared/application';
-import { VersionConflictError, type Clock } from '@taskflow/backend/shared/kernel';
 import {
-  canManageMembers,
+  VersionConflictError,
+  type Clock,
+  hasOrganizationPermission,
+} from '@taskflow/backend/shared/kernel';
+import {
   canRemove,
   LastOwnerError,
   type InvitationRepository,
@@ -34,7 +37,8 @@ export class RemoveMemberUseCase {
     const { organizationId, organizationRole } = context.tenant;
     const actorUserId = context.actor.userId;
     const isSelf = command.userId === actorUserId;
-    if (!isSelf && !canManageMembers(organizationRole)) throw new InsufficientRoleError();
+    if (!isSelf && !hasOrganizationPermission(organizationRole, 'member:remove'))
+      throw new InsufficientRoleError();
 
     const outcome = await this.deps.transactions.run(async () => {
       const actor = await lockOrganizationAndRereadActor(this.deps, organizationId, actorUserId);

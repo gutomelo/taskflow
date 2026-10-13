@@ -1,8 +1,7 @@
 import type { TenantRequestContext, TransactionRunner } from '@taskflow/backend/shared/application';
-import type { Clock } from '@taskflow/backend/shared/kernel';
+import { hasOrganizationPermission, type Clock } from '@taskflow/backend/shared/kernel';
 import {
   canInvite,
-  canManageMembers,
   type InvitationRepository,
   type MembershipRepository,
   type OrganizationRepository,
@@ -30,7 +29,8 @@ export class RevokeInvitationUseCase {
   async execute(context: TenantRequestContext, invitationId: string): Promise<void> {
     const { organizationId, organizationRole } = context.tenant;
     const actorUserId = context.actor.userId;
-    if (!canManageMembers(organizationRole)) throw new InsufficientRoleError();
+    if (!hasOrganizationPermission(organizationRole, 'member:invite'))
+      throw new InsufficientRoleError();
 
     const role = await this.deps.transactions.run(async () => {
       const actor = await lockOrganizationAndRereadActor(this.deps, organizationId, actorUserId);

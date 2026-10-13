@@ -138,6 +138,7 @@ export const OrganizationScalarFieldEnum = {
   id: 'id',
   name: 'name',
   slug: 'slug',
+  membersCanCreateProjects: 'membersCanCreateProjects',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

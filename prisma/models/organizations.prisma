@@ -14,13 +14,15 @@ enum OrganizationRole {
 
 /// Tenant (ADR 0004). Slug único e imutável (BR-022) — CHECK de formato na migration.
 model Organization {
-  id        String   @id @db.Uuid
-  name      String   @db.VarChar(80)
-  slug      String   @unique @db.VarChar(40)
+  id                       String   @id @db.Uuid
+  name                     String   @db.VarChar(80)
+  slug                     String   @unique @db.VarChar(40)
+  /// BR-024 (spec 006): members criam projetos; owner/admin sempre podem.
+  membersCanCreateProjects Boolean  @default(true) @map("members_can_create_projects")
   /// Optimistic locking (BR-008). O lock de membership (FOR NO KEY UPDATE) não o altera.
-  version   Int      @default(1)
-  createdAt DateTime @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  version                  Int      @default(1)
+  createdAt                DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   memberships Membership[]
   invitations Invitation[]

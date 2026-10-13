@@ -1,6 +1,6 @@
 # Multi-tenancy
 
-Status: **Implementado** na spec 002 (organização ativa, memberships, isolamento por `organizationId`; ADRs [0004](../architecture/adr/0004-multi-tenancy-shared-database.md) e [0012](../architecture/adr/0012-tenant-in-api-path.md)). RLS continua **planejada** (spec 006).
+Status: **Implementado** na spec 002 (organização ativa, memberships, isolamento por `organizationId`; ADRs [0004](../architecture/adr/0004-multi-tenancy-shared-database.md) e [0012](../architecture/adr/0012-tenant-in-api-path.md)). RLS **adiada para a Fase 4** ([ADR 0014](../architecture/adr/0014-rls-deferred.md)); harness de isolamento obrigatório **implementado** (spec 006).
 
 ## Modelo
 
@@ -43,10 +43,17 @@ sequenceDiagram
 5. Rooms de Socket.IO: `org:{organizationId}` e `project:{projectId}`; ingresso autorizado no servidor, revalidado em reconexão.
 6. Jobs carregam `organizationId` e revalidam o estado ao executar.
 
-## Defesa em profundidade (proposta)
+## Defesa em profundidade (RLS adiado — ADR 0014)
 
-RLS no PostgreSQL com `set_config('app.organization_id', $1, true)` por transação — avaliação na spec 006 (benefícios: banco bloqueia vazamentos por filtro esquecido; limitações: toda query precisa de transação com contexto, pool de conexões, migrations com papel distinto, custo de depuração).
+RLS no PostgreSQL com `set_config('app.organization_id', $1, true)` por transação foi avaliado na spec 006 e **adiado para a Fase 4** ([ADR 0014](../architecture/adr/0014-rls-deferred.md)), com gatilhos de reavaliação antecipada (primeiro SQL raw tenant-scoped, busca/relatórios/exportação, worker com dados de tenant, Socket.IO, integrações externas, qualquer incidente de isolamento) e preparação barata já exigida das próximas specs (`organization_id NOT NULL` em toda tabela filha, FKs compostas `(organization_id, id)`, `PrismaTransactionRunner` como ponto único de acesso). Até lá, o risco residual (filtro esquecido) é coberto pelas garantias acima, pelo harness abaixo, pelo lint de `params.organizationId` e por `/security-audit` em cada spec.
 
 ## Testes obrigatórios
 
-Para cada recurso tenant-scoped: usuário da organização A **não** consegue listar, ler, alterar, excluir, referenciar (ex.: atribuir, criar dependência) nem se inscrever em eventos de recursos da organização B. Implementados como testes de integração com duas organizações semeadas, usando ids **reais** de B sob o prefixo de A e verificando que o banco de B fica inalterado (referência: `apps/api/src/modules/organizations-isolation.integration.spec.ts`, spec 002/T14). Cada novo router tenant-scoped também entra no teste de tabela de rotas do contexto (rotas fora do prefixo enumeradas; todas as do tenant com 401 sem sessão e 404 sem membership).
+Para cada recurso tenant-scoped: usuário da organização A **não** consegue listar, ler, alterar, excluir, referenciar (ex.: atribuir, criar dependência) nem se inscrever em eventos de recursos da organização B. Implementados pelo **harness de isolamento** (spec 006, `apps/api/src/testing`):
+
+- as rotas são lidas da composição real (`composeApiRouters`) por introspecção do router do Express 5, falhando fechado se a estrutura mudar;
+- cada rota do escopo do tenant precisa de um caso em `isolation-cases.ts` e cada rota global de uma justificativa em `GLOBAL_ROUTES` — o teste unitário `route-coverage.spec.ts` falha se faltar um deles ou se uma rota com `:organizationId` ficar fora do escopo;
+- a integração (`organizations-isolation.integration.spec.ts`) executa para cada rota: 401 sem sessão, 404 sem membership e as variantes por referência com ids **reais** de B sob o prefixo de A;
+- um snapshot genérico de todas as tabelas com `organization_id` (via `information_schema`) prova que B fica inalterado, e ids canário de B (inclusive contas que só existem em B) não podem aparecer em nenhuma resposta.
+
+Uma spec que cria rota tenant-scoped só acrescenta os casos dela; tabelas novas entram no snapshot automaticamente.

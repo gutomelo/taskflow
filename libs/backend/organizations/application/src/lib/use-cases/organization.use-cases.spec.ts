@@ -32,7 +32,7 @@ import {
 import { CreateOrganizationUseCase } from './create-organization.use-case';
 import { GetOrganizationUseCase } from './get-organization.use-case';
 import { ListMyOrganizationsUseCase } from './list-my-organizations.use-case';
-import { RenameOrganizationUseCase } from './rename-organization.use-case';
+import { UpdateOrganizationUseCase } from './update-organization.use-case';
 import { ResolveTenantMembershipUseCase } from './resolve-tenant-membership.use-case';
 
 const ANA = 'u-ana';
@@ -96,9 +96,18 @@ describe('CreateOrganizationUseCase (RF-01)', () => {
       id: expect.any(String),
       name: 'Acme Ltda',
       slug: 'acme',
+      membersCanCreateProjects: true,
       version: 1,
       createdAt: bed.clock.now(),
       myRole: 'owner',
+      capabilities: [
+        'organization:read',
+        'organization:update',
+        'member:invite',
+        'member:change-role',
+        'member:remove',
+        'project:create',
+      ],
     });
     expect((await bed.memberships.find(view.id, ANA))?.toSnapshot().role).toBe('owner');
     expect(bed.securityEvents.events).toEqual([
@@ -215,8 +224,27 @@ describe('ListMyOrganizationsUseCase (RF-02)', () => {
     const list = await new ListMyOrganizationsUseCase(bed).execute(contextFor(ANA));
 
     expect(list).toEqual([
-      { id: acme, name: 'Org acme', slug: 'acme', role: 'owner' },
-      { id: beta, name: 'Org beta', slug: 'beta', role: 'viewer' },
+      {
+        id: acme,
+        name: 'Org acme',
+        slug: 'acme',
+        role: 'owner',
+        capabilities: [
+          'organization:read',
+          'organization:update',
+          'member:invite',
+          'member:change-role',
+          'member:remove',
+          'project:create',
+        ],
+      },
+      {
+        id: beta,
+        name: 'Org beta',
+        slug: 'beta',
+        role: 'viewer',
+        capabilities: ['organization:read'],
+      },
     ]);
     expect(bed.organizations.batches).toHaveLength(1);
   });
@@ -248,16 +276,28 @@ describe('GetOrganizationUseCase', () => {
       new GetOrganizationUseCase(bed).execute(tenantContextFor(ANA, 'gone', 'owner')),
     ).rejects.toBeInstanceOf(OrganizationNotFoundError);
   });
+
+  it('RF-01: denies a role without organization:read (deny by default)', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [[ANA, 'member']]);
+    const context = tenantContextFor(ANA, acme, 'member');
+    // Papel fora do catálogo em runtime (dado corrompido): nenhum papel válido nega a leitura.
+    Reflect.set(context.tenant, 'organizationRole', 'guest');
+
+    await expect(new GetOrganizationUseCase(bed).execute(context)).rejects.toBeInstanceOf(
+      InsufficientRoleError,
+    );
+  });
 });
 
-describe('RenameOrganizationUseCase (RF-05)', () => {
+describe('UpdateOrganizationUseCase (RF-05, BR-024)', () => {
   it.each<OrganizationRole>(['owner', 'admin'])(
     'lets the %s rename, keeping the slug (BR-022)',
     async (role) => {
       const bed = createOrganizationsTestbed();
       const acme = await seedOrganization(bed, 'acme', [[ANA, role]]);
 
-      const view = await new RenameOrganizationUseCase(bed).execute(
+      const view = await new UpdateOrganizationUseCase(bed).execute(
         tenantContextFor(ANA, acme, role),
         {
           name: 'Acme Brasil',
@@ -278,7 +318,7 @@ describe('RenameOrganizationUseCase (RF-05)', () => {
       const acme = await seedOrganization(bed, 'acme', [[ANA, role]]);
 
       await expect(
-        new RenameOrganizationUseCase(bed).execute(tenantContextFor(ANA, acme, role), {
+        new UpdateOrganizationUseCase(bed).execute(tenantContextFor(ANA, acme, role), {
           name: 'Tomada',
           version: 1,
         }),
@@ -290,7 +330,7 @@ describe('RenameOrganizationUseCase (RF-05)', () => {
   it('BR-008: refuses a stale version and an invalid name', async () => {
     const bed = createOrganizationsTestbed();
     const acme = await seedOrganization(bed, 'acme', [[ANA, 'owner']]);
-    const rename = new RenameOrganizationUseCase(bed);
+    const rename = new UpdateOrganizationUseCase(bed);
     const context = tenantContextFor(ANA, acme, 'owner');
     await rename.execute(context, { name: 'Primeira', version: 1 });
 
@@ -301,6 +341,86 @@ describe('RenameOrganizationUseCase (RF-05)', () => {
       InvalidOrganizationNameError,
     );
     expect(bed.organizations.rows.get(acme)).toMatchObject({ version: 2 });
+  });
+});
+
+describe('UpdateOrganizationUseCase — settings and capabilities (spec 006)', () => {
+  it('CA-03: an admin turns off "members can create projects" and members lose project:create', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [
+      [ANA, 'admin'],
+      [BRUNO, 'member'],
+    ]);
+
+    const view = await new UpdateOrganizationUseCase(bed).execute(
+      tenantContextFor(ANA, acme, 'admin'),
+      {
+        membersCanCreateProjects: false,
+        version: 1,
+      },
+    );
+
+    expect(view).toMatchObject({ membersCanCreateProjects: false, version: 2, name: 'Org acme' });
+    expect(view.capabilities).toContain('project:create');
+    const asMember = await new GetOrganizationUseCase(bed).execute(
+      tenantContextFor(BRUNO, acme, 'member'),
+    );
+    expect(asMember.capabilities).toEqual(['organization:read']);
+    expect(bed.securityEvents.events.at(-1)).toEqual({
+      type: 'organizations.settings_changed',
+      requestId: 'req-1',
+      organizationId: acme,
+      actorUserId: ANA,
+      membersCanCreateProjects: { from: true, to: false },
+    });
+  });
+
+  it('records the settings event only when the value changes', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [[ANA, 'owner']]);
+
+    await new UpdateOrganizationUseCase(bed).execute(tenantContextFor(ANA, acme, 'owner'), {
+      membersCanCreateProjects: true,
+      name: 'Nome novo',
+      version: 1,
+    });
+
+    expect(bed.securityEvents.types()).toEqual([]);
+  });
+
+  it('CA-09: decides on the role re-read under the organization lock', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [
+      [ANA, 'viewer'],
+      [BRUNO, 'owner'],
+    ]);
+
+    // O middleware ainda viu "admin"; a membership atual é viewer.
+    await expect(
+      new UpdateOrganizationUseCase(bed).execute(tenantContextFor(ANA, acme, 'admin'), {
+        membersCanCreateProjects: false,
+        version: 1,
+      }),
+    ).rejects.toBeInstanceOf(InsufficientRoleError);
+    expect(bed.organizations.locks).toEqual([acme]);
+    expect(bed.organizations.rows.get(acme)).toMatchObject({
+      membersCanCreateProjects: true,
+      version: 1,
+    });
+  });
+
+  it('CA-04: capabilities follow the role in "my organizations" and in the organization', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [[ANA, 'viewer']]);
+
+    const [mine] = await new ListMyOrganizationsUseCase(bed).execute(contextFor(ANA));
+    const view = await new GetOrganizationUseCase(bed).execute(
+      tenantContextFor(ANA, acme, 'viewer'),
+    );
+
+    expect(mine?.capabilities).toEqual(['organization:read']);
+    expect(view.capabilities).toEqual(['organization:read']);
+    expect(view.membersCanCreateProjects).toBe(true);
   });
 });
 

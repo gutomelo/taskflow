@@ -83,6 +83,8 @@ export const membersMessages = {
   loadFailed: 'Não foi possível carregar os membros.',
   retry: 'Tentar de novo',
   roleChanged: (name: string, role: string) => `${name} agora é ${role}.`,
+  capabilitiesReloadFailed:
+    'Seu papel mudou, mas não foi possível atualizar suas permissões. Recarregue a página.',
   removed: (name: string) => `${name} foi removido(a) da organização.`,
   errors: {
     LAST_OWNER: 'A organização precisa de pelo menos um proprietário. Promova outra pessoa antes.',
@@ -142,7 +144,10 @@ export const settingsMessages = {
   save: 'Salvar',
   saving: 'Salvando…',
   saved: 'Nome atualizado.',
-  readOnly: 'Só proprietários e administradores alteram o nome.',
+  readOnly: 'Só proprietários e administradores alteram as configurações.',
+  membersCanCreateProjects: 'Membros podem criar projetos',
+  membersCanCreateProjectsHint:
+    'Proprietários e administradores sempre podem. Leitores nunca podem.',
   loadFailed: 'Não foi possível carregar a organização.',
   retry: 'Tentar de novo',
   errors: {

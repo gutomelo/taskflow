@@ -7,6 +7,11 @@ export type OrganizationsSecurityEvent =
   | (Base & Readonly<{ type: 'organizations.created' }>)
   | (Base &
       Readonly<{
+        type: 'organizations.settings_changed';
+        membersCanCreateProjects: Readonly<{ from: boolean; to: boolean }>;
+      }>)
+  | (Base &
+      Readonly<{
         type: 'organizations.member_role_changed';
         targetUserId: string;
         fromRole: OrganizationRole;

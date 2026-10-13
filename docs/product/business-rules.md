@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002). A spec que implementa cada regra está indicada.
+Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 **implementada como função pura e testada** (spec 006; aplicada a projetos na spec 003); BR-024 **implementada e testada** quanto à configuração e às capacidades (spec 006; o endpoint de criação de projeto nasce na spec 003). A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -144,3 +144,13 @@ Só `owner` promove alguém a owner ou altera/remove um owner; `admin` gerencia 
 ### BR-022 — Slug da organização
 
 Único globalmente, 3–40 caracteres `[a-z0-9-]`, começando por letra, sem hífen no fim nem duplo; palavras reservadas recusadas contra impersonação (`admin`, `support`, `taskflow`, `security`…); imutável após a criação (`SLUG_TAKEN` 409, `INVALID_SLUG` 400).
+
+## Permissões (spec 006)
+
+### BR-023 — Papel efetivo no projeto
+
+Owner/admin da organização atuam como `manager` em todos os projetos. Member da organização tem o papel do projeto. Viewer da organização tem no máximo `viewer` em qualquer projeto (o papel da organização é teto; rebaixar na organização reduz o efetivo sem alterar dados do projeto). Sem participação no projeto ⇒ sem acesso: o projeto responde 404 e não aparece em listas.
+
+### BR-024 — Criação de projetos configurável
+
+Owner e admin sempre criam projetos. Members criam se a organização permitir ("membros podem criar projetos", padrão: sim). Viewers nunca criam. Alterar a configuração exige owner/admin e respeita BR-008 (versão da organização).

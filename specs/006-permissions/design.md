@@ -1,6 +1,6 @@
 # 006 — Permissões · Design técnico
 
-- **Status**: Rascunho (revisão 2)
+- **Status**: Aprovado (revisão 2)
 - **Requisitos**: [requirements.md](requirements.md)
 - **Revisão de arquitetura**: feita (revisão 2 incorpora os achados)
 - **Revisão de segurança**: feita (revisão 2 incorpora os achados)
@@ -106,6 +106,7 @@ O catálogo é espelhado em `libs/contracts` (o kernel não importa contracts); 
 3. **Papel de projeto para `tasks`/`boards`**: porta `ProjectAccess` (specs 004/005), nunca consulta direta; mutações de papel/membros de projeto relêem papéis sob lock do projeto.
 4. `task:assign` valida no caso de uso que o responsável tem papel efetivo não nulo no mesmo projeto (BR-003); o harness inclui `assigneeId` de B e de não participante de A.
 5. Preparação para RLS (ADR 0014): `organization_id NOT NULL` em toda tabela filha e FKs compostas `(organization_id, id)`.
+6. **Referências fora do caminho no harness** (achado Baixo da auditoria da T9): hoje `coverageGaps` só exige variante para parâmetros de caminho, porque nenhuma rota atual recebe ids na query ou no corpo. A primeira spec com referência por query ou corpo (ex.: `projectId`, `assigneeId`) declara essas referências no caso da rota e estende `coverageGaps` para exigir uma variante para cada uma. Junto com isso, troca a liberação de middlewares de contexto por nome de função (`CONTEXT_MIDDLEWARES`) por uma identidade explícita.
 
 ## Frontend
 

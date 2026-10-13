@@ -21,19 +21,40 @@ export const createOrganizationRequestSchema = z.strictObject({
 });
 export type CreateOrganizationRequest = z.infer<typeof createOrganizationRequestSchema>;
 
-export const renameOrganizationRequestSchema = z.strictObject({
-  name: nameField,
-  version: versionField,
-});
-export type RenameOrganizationRequest = z.infer<typeof renameOrganizationRequestSchema>;
+/** Permissões de organização (espelho do catálogo do kernel; paridade testada em `organizations/http`). */
+export const organizationPermissionSchema = z.enum([
+  'organization:read',
+  'organization:update',
+  'member:invite',
+  'member:change-role',
+  'member:remove',
+  'project:create',
+]);
+export type OrganizationPermission = z.infer<typeof organizationPermissionSchema>;
+
+/** Nome e/ou "membros podem criar projetos" (BR-024), com a versão (BR-008). */
+export const updateOrganizationRequestSchema = z
+  .strictObject({
+    name: nameField.optional(),
+    membersCanCreateProjects: z.boolean().optional(),
+    version: versionField,
+  })
+  .refine((value) => value.name !== undefined || value.membersCanCreateProjects !== undefined, {
+    message: 'Informe ao menos um campo para alterar',
+    path: ['(body)'],
+  });
+export type UpdateOrganizationRequest = z.infer<typeof updateOrganizationRequestSchema>;
 
 export const organizationSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   slug: z.string(),
+  membersCanCreateProjects: z.boolean(),
   version: z.int(),
   createdAt: z.iso.datetime(),
   myRole: organizationRoleSchema,
+  /** Capacidades do usuário (dica de interface; a API sempre decide). */
+  capabilities: z.array(organizationPermissionSchema),
 });
 export type OrganizationDto = z.infer<typeof organizationSchema>;
 
@@ -42,6 +63,7 @@ export const myOrganizationSchema = z.object({
   name: z.string(),
   slug: z.string(),
   role: organizationRoleSchema,
+  capabilities: z.array(organizationPermissionSchema),
 });
 export type MyOrganization = z.infer<typeof myOrganizationSchema>;
 
@@ -63,6 +85,12 @@ export const memberSchema = z.object({
   role: organizationRoleSchema,
   version: z.int(),
   joinedAt: z.iso.datetime(),
+  actions: z.object({
+    /** Papéis para os quais o usuário atual pode alterar este membro (sem o atual). */
+    changeRoleTo: z.array(organizationRoleSchema),
+    /** Se pode removê-lo (falso para si: sair tem ação própria). */
+    remove: z.boolean(),
+  }),
 });
 export type Member = z.infer<typeof memberSchema>;
 

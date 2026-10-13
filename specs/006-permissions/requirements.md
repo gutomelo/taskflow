@@ -1,10 +1,10 @@
 # 006 — Permissões · Requisitos
 
-- **Status**: Rascunho
+- **Status**: Aprovado
 - **Fase do roadmap**: 1 — MVP (ordem 3, antes de `003-projects`)
 - **Bounded contexts**: vocabulário compartilhado (`shared/kernel`); Organizations (`organizations`) adota o catálogo; Projects, Tasks e Boards consumirão nas specs 003–005
 - **Autor / data**: Claude Code (com decisões do usuário) / 2026-10-13
-- **Aprovado por / data**: —
+- **Aprovado por / data**: usuário / 2026-10-13
 
 ## Objetivo
 
@@ -69,15 +69,15 @@ Hoje a autorização está espalhada: a política de papéis da organização vi
 
 ## Critérios de aceitação (resumo)
 
-- [ ] CA-01 A matriz de organização e a de projeto respondem, para cada papel, exatamente o que está em `docs/security/authorization.md` (itens sem comportamento marcados como planejados e fora do catálogo); permissão inexistente é negada.
-- [ ] CA-02 Papel efetivo: owner/admin ⇒ manager; member ⇒ papel do projeto; viewer ⇒ no máximo viewer; sem participação ⇒ nenhum.
-- [ ] CA-03 Owner/admin desativam "membros podem criar projetos"; o member perde `project:create` nas capacidades; owner/admin mantêm.
-- [ ] CA-04 A resposta da organização traz as capacidades do usuário; um viewer não recebe `organization:update` nem `member:invite`.
-- [ ] CA-05 A lista de membros traz, por membro, as ações permitidas ao usuário atual (admin não recebe ações sobre owners).
-- [ ] CA-06 A interface esconde ações sem capacidade e não tem matriz própria; a API continua negando chamadas forjadas.
-- [ ] CA-07 Uma rota tenant-scoped sem caso de isolamento faz o teste de isolamento falhar; todas as rotas atuais passam.
-- [ ] CA-08 RLS: avaliação, gatilhos de reavaliação e decisão de adiamento registrados no ADR 0014, que substitui a parte de RLS do ADR 0004.
-- [ ] CA-09 Admin rebaixado durante a atualização da organização não grava nome nem configuração (decisão sob lock com releitura).
+- [x] CA-01 A matriz de organização e a de projeto respondem, para cada papel, exatamente o que está em `docs/security/authorization.md` (itens sem comportamento marcados como planejados e fora do catálogo); permissão inexistente é negada.
+- [x] CA-02 Papel efetivo: owner/admin ⇒ manager; member ⇒ papel do projeto; viewer ⇒ no máximo viewer; sem participação ⇒ nenhum.
+- [x] CA-03 Owner/admin desativam "membros podem criar projetos"; o member perde `project:create` nas capacidades; owner/admin mantêm.
+- [x] CA-04 A resposta da organização traz as capacidades do usuário; um viewer não recebe `organization:update` nem `member:invite`.
+- [x] CA-05 A lista de membros traz, por membro, as ações permitidas ao usuário atual (admin não recebe ações sobre owners).
+- [x] CA-06 A interface esconde ações sem capacidade e não tem matriz própria; a API continua negando chamadas forjadas.
+- [x] CA-07 Uma rota tenant-scoped sem caso de isolamento faz o teste de isolamento falhar; todas as rotas atuais passam.
+- [x] CA-08 RLS: avaliação, gatilhos de reavaliação e decisão de adiamento registrados no ADR 0014, que substitui a parte de RLS do ADR 0004.
+- [x] CA-09 Admin rebaixado durante a atualização da organização não grava nome nem configuração (decisão sob lock com releitura).
 
 ## Casos limite
 

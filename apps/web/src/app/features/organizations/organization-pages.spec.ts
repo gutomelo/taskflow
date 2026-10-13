@@ -86,7 +86,13 @@ describe('CreateOrganizationPage (RF-01, CA-01, CA-02)', () => {
 
     const request = await nextRequest(env.backend, CREATE);
     expect(request.request.body).toEqual({ name: 'Acme', slug: 'acme' });
-    request.flush({ ...acme, version: 1, createdAt: '2026-10-10T10:00:00.000Z', myRole: 'owner' });
+    request.flush({
+      ...acme,
+      membersCanCreateProjects: true,
+      version: 1,
+      createdAt: '2026-10-10T10:00:00.000Z',
+      myRole: 'owner',
+    });
     // A área da organização busca "minhas organizações" no servidor (a lista não estava carregada).
     (await nextRequest(env.backend, MINE)).flush({ items: [acme] });
     await settle();

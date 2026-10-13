@@ -1116,6 +1116,7 @@ export const OrganizationScalarFieldEnum = {
   id: 'id',
   name: 'name',
   slug: 'slug',
+  membersCanCreateProjects: 'membersCanCreateProjects',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -1280,6 +1281,13 @@ export type EnumUserTokenPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<
  * Reference to a field of type 'UserTokenPurpose[]'
  */
 export type ListEnumUserTokenPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserTokenPurpose[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 

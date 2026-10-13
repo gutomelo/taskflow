@@ -22,6 +22,7 @@ import {
   ChangeMemberRoleUseCase,
   InsufficientRoleError,
   RemoveMemberUseCase,
+  UpdateOrganizationUseCase,
 } from '@taskflow/backend/organizations/application';
 import {
   InMemoryUserDirectory,
@@ -245,5 +246,39 @@ describe('membership changes under concurrency (integration, T10)', () => {
     expect(
       (await prisma.membership.findFirst({ where: { organizationId, userId: target } }))?.role,
     ).toBe('viewer');
+  });
+
+  it('CA-09 (spec 006): an admin demoted while its organization update waits for the lock cannot save', async () => {
+    const [owner, admin] = [randomUUID(), randomUUID()];
+    const organizationId = await seed([
+      [owner, 'owner'],
+      [admin, 'admin'],
+    ]);
+    const saved = signal();
+    const save = memberships.save.bind(memberships);
+    vi.spyOn(memberships, 'save').mockImplementation(async (membership) => {
+      await save(membership);
+      saved.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    const deps = dependencies();
+
+    const demotion = new ChangeMemberRoleUseCase(deps).execute(as(owner, organizationId, 'owner'), {
+      userId: admin,
+      role: 'viewer',
+      version: 1,
+    });
+    await saved.promise;
+    // O middleware desta requisição ainda viu "admin".
+    const update = new UpdateOrganizationUseCase(deps).execute(as(admin, organizationId, 'admin'), {
+      membersCanCreateProjects: false,
+      name: 'Tomada',
+      version: 1,
+    });
+
+    await expect(demotion).resolves.toMatchObject({ role: 'viewer' });
+    await expect(update).rejects.toBeInstanceOf(InsufficientRoleError);
+    const row = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
+    expect([row.name, row.membersCanCreateProjects, row.version]).toEqual(['Acme', true, 1]);
   });
 });

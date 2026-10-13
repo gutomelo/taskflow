@@ -9,6 +9,7 @@ import type {
   MemberPage,
   OrganizationDto,
   OrganizationRole,
+  UpdateOrganizationRequest,
 } from '@taskflow/contracts';
 import { ContractViolationError } from '../../core/http/contract-guards';
 import {
@@ -41,9 +42,13 @@ export class OrganizationApi {
     return checked(await firstValueFrom(this.http.get<unknown>(url)), isOrganization, url);
   }
 
-  async rename(organizationId: string, name: string, version: number): Promise<OrganizationDto> {
+  /** Nome e/ou "membros podem criar projetos" (BR-024), com a versão (BR-008). */
+  async update(
+    organizationId: string,
+    request: UpdateOrganizationRequest,
+  ): Promise<OrganizationDto> {
     const url = tenantUrl(organizationId);
-    const body = await firstValueFrom(this.http.patch<unknown>(url, { name, version }));
+    const body = await firstValueFrom(this.http.patch<unknown>(url, request));
     return checked(body, isOrganization, url);
   }
 

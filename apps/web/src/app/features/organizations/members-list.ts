@@ -22,7 +22,6 @@ import { focusAfterRender } from '../../shared/forms/form-focus';
 import { commonErrorMessage, formMessages } from '../../shared/forms/form.messages';
 import { MembersStore } from './members.store';
 import { codeMessage, formatDate, membersMessages, ROLE_LABELS } from './organizations.messages';
-import { assignableRoles, canRemoveMember } from './role-policy';
 
 type Confirmation = Readonly<{ userId: string; kind: 'remove' | 'leave' }>;
 
@@ -118,7 +117,7 @@ type Confirmation = Readonly<{ userId: string; kind: 'remove' | 'leave' }>;
                   <button matButton="outlined" type="button" (click)="ask(member, 'leave')">
                     {{ m.leave }}
                   </button>
-                } @else if (canRemove(member)) {
+                } @else if (member.actions.remove) {
                   <button
                     matButton="outlined"
                     type="button"
@@ -171,19 +170,9 @@ export class MembersList implements OnInit {
     void this.store.load();
   }
 
+  /** Papel atual + os permitidos pela API (`actions`, spec 006); sem matriz no frontend. */
   protected rolesFor(member: Member): ReadonlyArray<OrganizationRole> {
-    const actor = this.active.role();
-    if (!actor) return [member.role];
-    return assignableRoles({
-      actor,
-      target: member.role,
-      isSelf: member.userId === this.auth.user()?.id,
-    });
-  }
-
-  protected canRemove(member: Member): boolean {
-    const actor = this.active.role();
-    return actor !== null && canRemoveMember({ actor, target: member.role, isSelf: false });
+    return [member.role, ...member.actions.changeRoleTo];
   }
 
   protected chosen(member: Member): OrganizationRole {
@@ -202,10 +191,16 @@ export class MembersList implements OnInit {
     const problem = await this.store.changeRole(member, role);
     this.picked.update(({ [member.userId]: _, ...rest }) => rest);
     if (problem) return this.fail(problem);
-    const current = this.active.organization();
-    // O próprio papel mudou: as ações disponíveis na interface mudam junto.
-    if (member.userId === this.auth.user()?.id && current) {
-      this.organizations.add({ ...current, role });
+    // O próprio papel mudou: capacidades da organização e ações sobre os outros membros mudam;
+    // ambas voltam da API (fonte única das regras). Se as capacidades não voltarem, a área da
+    // organização deixa de confiar nas antigas (`ActiveOrganizationStore.can`) e o usuário é avisado.
+    if (member.userId === this.auth.user()?.id) {
+      await Promise.all([
+        this.organizations
+          .reload()
+          .catch(() => this.error.set(this.messages.capabilitiesReloadFailed)),
+        this.store.load(),
+      ]);
     }
     this.feedback.set(
       this.messages.roleChanged(

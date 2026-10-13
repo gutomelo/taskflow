@@ -22,6 +22,25 @@ describe('Organization and Membership', () => {
     });
   });
 
+  it('BR-024: lets members create projects by default and reports whether a setting changed', () => {
+    const organization = Organization.create({
+      id: 'org-1',
+      name: OrganizationName.create('Acme'),
+      slug: OrganizationSlug.create('acme'),
+      now: T0,
+    });
+    const later = new Date(T0.getTime() + 1000);
+
+    expect(organization.settings).toEqual({ membersCanCreateProjects: true });
+    expect(organization.updateSettings({ membersCanCreateProjects: true }, later)).toBe(false);
+    expect(organization.toSnapshot().updatedAt).toEqual(T0);
+    expect(organization.updateSettings({ membersCanCreateProjects: false }, later)).toBe(true);
+    expect(organization.toSnapshot()).toMatchObject({
+      membersCanCreateProjects: false,
+      updatedAt: later,
+    });
+  });
+
   it('snapshots contain only the declared fields (no input leaking into persisted state)', () => {
     const organization = Organization.create({
       id: 'org-1',
@@ -40,6 +59,7 @@ describe('Organization and Membership', () => {
     expect(Object.keys(organization.toSnapshot()).sort()).toEqual([
       'createdAt',
       'id',
+      'membersCanCreateProjects',
       'name',
       'slug',
       'updatedAt',

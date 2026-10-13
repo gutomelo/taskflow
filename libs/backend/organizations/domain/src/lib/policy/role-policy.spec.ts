@@ -1,5 +1,5 @@
 import { ORGANIZATION_ROLES, type OrganizationRole } from '@taskflow/backend/shared/kernel';
-import { canChangeRole, canInvite, canManageMembers, canRemove } from './role-policy';
+import { canChangeRole, canInvite, canRemove, memberActions } from './role-policy';
 
 /**
  * Oráculo independente da BR-021 (matriz de `docs/security/authorization.md`), escrito de forma
@@ -64,7 +64,21 @@ describe('role policy (BR-021)', () => {
     );
   });
 
-  it('only owners and admins manage members', () => {
-    expect(ORGANIZATION_ROLES.filter(canManageMembers)).toEqual(['owner', 'admin']);
+  describe('memberActions (spec 006, capacidades)', () => {
+    it.each([
+      ['owner', 'member', false, ['owner', 'admin', 'viewer'], true],
+      ['owner', 'owner', false, ['admin', 'member', 'viewer'], true],
+      ['owner', 'owner', true, ['admin', 'member', 'viewer'], false],
+      ['admin', 'member', false, ['admin', 'viewer'], true],
+      ['admin', 'owner', false, [], false],
+      ['admin', 'admin', true, [], false],
+      ['member', 'viewer', false, [], false],
+      ['viewer', 'member', false, [], false],
+    ] as const)(
+      '%s acting on %s (self: %s) ⇒ changeRoleTo %j, remove %s',
+      (actor, target, isSelf, roles, remove) => {
+        expect(memberActions({ actor, target, isSelf })).toEqual({ changeRoleTo: roles, remove });
+      },
+    );
   });
 });

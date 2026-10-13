@@ -1,4 +1,8 @@
-import type { OrganizationRole } from '@taskflow/backend/shared/kernel';
+import {
+  hasOrganizationPermission,
+  ORGANIZATION_ROLES,
+  type OrganizationRole,
+} from '@taskflow/backend/shared/kernel';
 
 /**
  * Política de papéis da organização (BR-021; matriz de `docs/security/authorization.md`).
@@ -6,16 +10,9 @@ import type { OrganizationRole } from '@taskflow/backend/shared/kernel';
  * negação rápida. A regra "último owner" (BR-019) depende da contagem e fica no caso de uso.
  */
 
-const MANAGERS: ReadonlySet<OrganizationRole> = new Set(['owner', 'admin']);
-
-/** Editar a organização, listar/gerenciar convites, alterar e remover membros (com limites). */
-export function canManageMembers(actor: OrganizationRole): boolean {
-  return MANAGERS.has(actor);
-}
-
-/** Convidar: owner e admin; o papel do convite nunca é owner. */
+/** Convidar (e listar, reenviar, revogar): `member:invite`; o papel do convite nunca é owner. */
 export function canInvite(actor: OrganizationRole, role: OrganizationRole): boolean {
-  return MANAGERS.has(actor) && role !== 'owner';
+  return hasOrganizationPermission(actor, 'member:invite') && role !== 'owner';
 }
 
 export function canChangeRole(input: {
@@ -27,9 +24,9 @@ export function canChangeRole(input: {
   const { actor, target, newRole, isSelf } = input;
   // Ninguém altera o próprio papel, exceto o owner que se rebaixa (último owner: BR-019).
   if (isSelf) return actor === 'owner' && target === 'owner';
+  if (!hasOrganizationPermission(actor, 'member:change-role')) return false;
   if (actor === 'owner') return true;
-  if (actor === 'admin') return target !== 'owner' && newRole !== 'owner';
-  return false;
+  return target !== 'owner' && newRole !== 'owner';
 }
 
 export function canRemove(input: {
@@ -40,7 +37,27 @@ export function canRemove(input: {
   const { actor, target, isSelf } = input;
   // Sair é sempre permitido pela política (último owner: BR-019, no caso de uso).
   if (isSelf) return true;
+  if (!hasOrganizationPermission(actor, 'member:remove')) return false;
   if (actor === 'owner') return true;
-  if (actor === 'admin') return target !== 'owner';
-  return false;
+  return target !== 'owner';
+}
+
+/**
+ * Ações que o ator pode executar sobre um membro (capacidade de interface, spec 006): papéis
+ * para os quais pode alterá-lo **sem o atual** (vazio = não pode) e se pode removê-lo (falso para
+ * si — sair tem ação própria). Reflete BR-021, não BR-019: o último owner pode ver "rebaixar" e
+ * receber `LAST_OWNER`. Dica apenas; a decisão é do caso de uso sob lock.
+ */
+export function memberActions(input: {
+  readonly actor: OrganizationRole;
+  readonly target: OrganizationRole;
+  readonly isSelf: boolean;
+}): Readonly<{ changeRoleTo: ReadonlyArray<OrganizationRole>; remove: boolean }> {
+  const { actor, target, isSelf } = input;
+  return {
+    changeRoleTo: ORGANIZATION_ROLES.filter(
+      (newRole) => newRole !== target && canChangeRole({ actor, target, newRole, isSelf }),
+    ),
+    remove: !isSelf && canRemove({ actor, target, isSelf }),
+  };
 }

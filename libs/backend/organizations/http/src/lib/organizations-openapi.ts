@@ -20,12 +20,14 @@ import {
   organizationSchema,
   pageQuerySchema,
   removeMemberQuerySchema,
-  renameOrganizationRequestSchema,
+  organizationPermissionSchema,
+  updateOrganizationRequestSchema,
 } from '@taskflow/contracts';
 
 /** Componentes reutilizáveis do contexto organizations no documento OpenAPI. */
 export const organizationsOpenApiSchemas = {
   OrganizationRole: organizationRoleSchema,
+  OrganizationPermission: organizationPermissionSchema,
   InvitableRole: invitableRoleSchema,
   Organization: organizationSchema,
   MyOrganization: myOrganizationSchema,
@@ -126,10 +128,11 @@ export const organizationsOpenApiPaths: ZodOpenApiPathsObject = {
     },
     patch: {
       tags,
-      summary: 'Renomeia (owner, admin; BR-008)',
+      summary:
+        'Atualiza nome e/ou "membros podem criar projetos" (organization:update; BR-008, BR-024)',
       security: SECURITY.authenticatedWithCsrf,
       requestParams: organizationPath,
-      requestBody: json(renameOrganizationRequestSchema),
+      requestBody: json(updateOrganizationRequestSchema),
       responses: {
         '200': { description: 'Renomeada', ...json(organizationSchema) },
         '400': problemResponse('Nome inválido'),

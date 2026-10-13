@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
   ElementRef,
   inject,
   Injector,
@@ -49,7 +50,12 @@ import { codeMessage, settingsMessages } from './organizations.messages';
         >
           <mat-form-field>
             <mat-label>{{ m.name }}</mat-label>
-            <input matInput formControlName="name" required [readonly]="!active.canManage()" />
+            <input
+              matInput
+              formControlName="name"
+              required
+              [readonly]="!active.can('organization:update')"
+            />
             @if (form.controls.name.invalid) {
               <mat-error>{{ m.errors.INVALID_ORGANIZATION_NAME }}</mat-error>
             }
@@ -57,7 +63,24 @@ import { codeMessage, settingsMessages } from './organizations.messages';
           <p class="text-sm text-muted">
             <span class="font-medium">{{ m.slug }}:</span> {{ m.slugFixed(organization.slug) }}
           </p>
-          @if (active.canManage()) {
+          <div class="mt-4 flex items-start gap-3">
+            <input
+              id="members-can-create-projects"
+              type="checkbox"
+              class="mt-1 size-4"
+              formControlName="membersCanCreateProjects"
+              aria-describedby="members-can-create-projects-hint"
+            />
+            <div>
+              <label for="members-can-create-projects" class="font-medium">{{
+                m.membersCanCreateProjects
+              }}</label>
+              <p id="members-can-create-projects-hint" class="text-sm text-muted">
+                {{ m.membersCanCreateProjectsHint }}
+              </p>
+            </div>
+          </div>
+          @if (active.can('organization:update')) {
             <div class="mt-2">
               <button mat-flat-button type="submit" [disabled]="saving()">
                 {{ saving() ? m.saving : m.save }}
@@ -92,8 +115,19 @@ export class SettingsPage implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
+    membersCanCreateProjects: [true],
   });
   private readonly errorAlert = viewChild<ElementRef<HTMLElement>>('errorAlert');
+
+  constructor() {
+    // Sem `organization:update` a opção só é exibida (a API negaria a alteração). Reage às
+    // capacidades: o papel pode mudar com a página aberta.
+    effect(() => {
+      const control = this.form.controls.membersCanCreateProjects;
+      if (this.active.can('organization:update')) control.enable();
+      else control.disable();
+    });
+  }
 
   ngOnInit(): void {
     void this.load();
@@ -109,7 +143,7 @@ export class SettingsPage implements OnInit {
   }
 
   protected async save(organization: OrganizationDto): Promise<void> {
-    if (this.saving() || !this.active.canManage()) return;
+    if (this.saving() || !this.active.can('organization:update')) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -117,17 +151,19 @@ export class SettingsPage implements OnInit {
     this.saving.set(true);
     this.error.set(null);
     try {
-      const renamed = await this.api.rename(
-        organization.id,
-        this.form.getRawValue().name.trim(),
-        organization.version,
-      );
+      const { name, membersCanCreateProjects } = this.form.getRawValue();
+      const renamed = await this.api.update(organization.id, {
+        name: name.trim(),
+        membersCanCreateProjects,
+        version: organization.version,
+      });
       this.show(renamed);
       this.organizations.add({
         id: renamed.id,
         name: renamed.name,
         slug: renamed.slug,
         role: renamed.myRole,
+        capabilities: renamed.capabilities,
       });
       this.feedback.set(this.messages.saved);
     } catch (error) {
@@ -147,6 +183,9 @@ export class SettingsPage implements OnInit {
 
   private show(organization: OrganizationDto): void {
     this.organization.set(organization);
-    this.form.setValue({ name: organization.name });
+    this.form.setValue({
+      name: organization.name,
+      membersCanCreateProjects: organization.membersCanCreateProjects,
+    });
   }
 }

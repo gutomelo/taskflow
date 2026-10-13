@@ -5,10 +5,13 @@ import type {
   TenantRequestContext,
   TransactionRunner,
 } from '@taskflow/backend/shared/application';
-import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
+import {
+  hasOrganizationPermission,
+  type Clock,
+  type IdGenerator,
+} from '@taskflow/backend/shared/kernel';
 import {
   canInvite,
-  canManageMembers,
   type InvitationRepository,
   type MembershipRepository,
   type OrganizationRepository,
@@ -45,7 +48,8 @@ export class ResendInvitationUseCase {
   async execute(context: TenantRequestContext, invitationId: string): Promise<void> {
     const { organizationId, organizationRole } = context.tenant;
     const actorUserId = context.actor.userId;
-    if (!canManageMembers(organizationRole)) throw new InsufficientRoleError();
+    if (!hasOrganizationPermission(organizationRole, 'member:invite'))
+      throw new InsufficientRoleError();
     await this.delivery.consumeSenderLimits(actorUserId, organizationId);
 
     const role = await this.deps.transactions.run(async () => {

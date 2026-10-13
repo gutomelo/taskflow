@@ -148,4 +148,43 @@ export default [
       'no-console': 'error',
     },
   },
+  {
+    // ADR 0012 / spec 006: o tenant vem só do middleware. Com `mergeParams`, um parâmetro filho
+    // chamado `organizationId` teria precedência sobre o do prefixo — ninguém mais o lê.
+    files: ['**/*.ts'],
+    // Padrão com `**/`: os `eslint.config.mjs` dos projetos reexportam este arquivo e os caminhos
+    // passam a ser relativos ao projeto, então um caminho exato a partir da raiz não casaria.
+    ignores: ['**/tenant/tenant-context.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.property.name='params'][property.name='organizationId']",
+          message:
+            'Use tenantRequestContextFrom(request): params.organizationId só é lido em tenant-context.ts.',
+        },
+        {
+          selector:
+            "MemberExpression[object.property.name='params'][property.value='organizationId']",
+          message:
+            'Use tenantRequestContextFrom(request): params.organizationId só é lido em tenant-context.ts.',
+        },
+        {
+          // Apelido (`const { params } = request; params.organizationId`) e template literal.
+          selector:
+            "MemberExpression[object.name='params'][property.name='organizationId'], MemberExpression[object.property.name='params'] > TemplateLiteral.property > TemplateElement[value.raw='organizationId']",
+          message:
+            'Use tenantRequestContextFrom(request): params.organizationId só é lido em tenant-context.ts.',
+        },
+        {
+          // Desestruturação: `const { organizationId } = request.params` e `({ params: { organizationId } })`.
+          selector:
+            "VariableDeclarator[init.property.name='params'] > ObjectPattern > Property[key.name='organizationId'], Property[key.name='params'] > ObjectPattern > Property[key.name='organizationId']",
+          message:
+            'Use tenantRequestContextFrom(request): params.organizationId só é lido em tenant-context.ts.',
+        },
+      ],
+    },
+  },
 ];

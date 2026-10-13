@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockMyOrganizations } from './support/organizations';
 
 // T27: área autenticada no navegador real. Respostas da API simuladas (sem gravar no banco local).
 const ana = {
@@ -37,13 +38,7 @@ async function signIn(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/login', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ana) }),
   );
-  await page.route('**/api/v1/me/organizations', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(organizations),
-    }),
-  );
+  await mockMyOrganizations(page, organizations.items);
   await page.goto('/');
   await expect(page).toHaveURL(/\/login\?returnUrl=%2F$/);
   await page.getByLabel('E-mail').fill(ana.email);

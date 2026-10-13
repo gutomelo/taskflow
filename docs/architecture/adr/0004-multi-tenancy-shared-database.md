@@ -1,6 +1,6 @@
 # 0004 — Multi-tenancy com banco compartilhado e isolamento por `organizationId`
 
-- **Status**: Aceito (estratégia base) · RLS: **Proposto** — decisão final na spec 006
+- **Status**: Aceito (estratégia base) · RLS: **adiado para a Fase 4** — ver [0014](0014-rls-deferred.md)
 - **Data**: 2026-10-08
 - **Relacionados**: [multi-tenancy](../../security/multi-tenancy.md), specs 002 e 006
 

@@ -1,3 +1,4 @@
+import type { OrganizationPermission } from '@taskflow/contracts';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -20,17 +21,29 @@ export const ana = {
   emailVerified: true,
 };
 
+const MANAGER_CAPABILITIES: OrganizationPermission[] = [
+  'organization:read',
+  'organization:update',
+  'member:invite',
+  'member:change-role',
+  'member:remove',
+  'project:create',
+];
+const READ_ONLY_CAPABILITIES: OrganizationPermission[] = ['organization:read'];
+
 export const acme = {
   id: '0192a000-0000-7000-8000-000000000001',
   name: 'Acme',
   slug: 'acme',
   role: 'owner' as const,
+  capabilities: MANAGER_CAPABILITIES,
 };
 export const beta = {
   id: '0192a000-0000-7000-8000-000000000002',
   name: 'Beta',
   slug: 'beta',
   role: 'viewer' as const,
+  capabilities: READ_ONLY_CAPABILITIES,
 };
 
 /** Providers de produção de organizations + backend simulado. */

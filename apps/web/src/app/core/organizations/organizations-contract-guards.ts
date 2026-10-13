@@ -27,6 +27,12 @@ const isDate = (value: unknown): value is string =>
   typeof value === 'string' && ISO_DATE_TIME.test(value);
 const isNullableString = (value: unknown): value is string | null =>
   value === null || typeof value === 'string';
+/**
+ * Capacidades: lista de strings. Permissões desconhecidas (API mais nova que a SPA) são aceitas e
+ * simplesmente nunca casam com `can()` — falha fechado sem rejeitar a resposta inteira.
+ */
+const isCapabilities = (value: unknown): boolean =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 export function isOrganizationRole(value: unknown): value is OrganizationRole {
   return typeof value === 'string' && ROLES.has(value);
@@ -42,7 +48,8 @@ export function isMyOrganization(value: unknown): value is MyOrganization {
     isUuid(value['id']) &&
     typeof value['name'] === 'string' &&
     typeof value['slug'] === 'string' &&
-    isOrganizationRole(value['role'])
+    isOrganizationRole(value['role']) &&
+    isCapabilities(value['capabilities'])
   );
 }
 
@@ -56,15 +63,27 @@ export function isOrganization(value: unknown): value is OrganizationDto {
     isUuid(value['id']) &&
     typeof value['name'] === 'string' &&
     typeof value['slug'] === 'string' &&
+    typeof value['membersCanCreateProjects'] === 'boolean' &&
     Number.isInteger(value['version']) &&
     isDate(value['createdAt']) &&
-    isOrganizationRole(value['myRole'])
+    isOrganizationRole(value['myRole']) &&
+    isCapabilities(value['capabilities'])
+  );
+}
+
+function isMemberActions(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Array.isArray(value['changeRoleTo']) &&
+    value['changeRoleTo'].every(isOrganizationRole) &&
+    typeof value['remove'] === 'boolean'
   );
 }
 
 export function isMember(value: unknown): value is Member {
   return (
     isRecord(value) &&
+    isMemberActions(value['actions']) &&
     isUuid(value['userId']) &&
     isNullableString(value['name']) &&
     isNullableString(value['email']) &&

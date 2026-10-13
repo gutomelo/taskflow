@@ -221,6 +221,23 @@ describe('organizations persistence (integration, T6/T7)', () => {
       expect((await invitations.findById(organizationB, invitationOfB.id))?.isOpen).toBe(true);
     });
 
+    it('BR-024: persists the members-can-create-projects setting (default true) with the version', async () => {
+      const organizationId = await organization();
+      const loaded = present(await organizations.findById(organizationId), 'organization');
+      expect(loaded.settings).toEqual({ membersCanCreateProjects: true });
+
+      loaded.updateSettings({ membersCanCreateProjects: false }, new Date());
+      await organizations.save(loaded);
+
+      const reloaded = present(await organizations.findById(organizationId), 'organization');
+      expect(reloaded.toSnapshot()).toMatchObject({ membersCanCreateProjects: false, version: 2 });
+      // Linhas anteriores à migration recebem o default.
+      const raw = await prisma.$queryRaw<Array<{ value: boolean }>>`
+        SELECT column_default = 'true' AS value FROM information_schema.columns
+        WHERE table_name = 'organizations' AND column_name = 'members_can_create_projects'`;
+      expect(raw[0]?.value).toBe(true);
+    });
+
     it('applies optimistic locking (BR-008) to organizations and memberships', async () => {
       const organizationId = await organization();
       const userId = await member(organizationId);

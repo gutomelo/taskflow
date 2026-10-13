@@ -108,7 +108,20 @@ describe('AcceptInvitationUseCase (RF-08, BR-020)', () => {
 
     const view = await new AcceptInvitationUseCase(bed).execute(contextFor('bia'), { token });
 
-    expect(view).toEqual({ id: acme, name: 'Org acme', slug: 'acme', role: 'admin' });
+    expect(view).toEqual({
+      id: acme,
+      name: 'Org acme',
+      slug: 'acme',
+      role: 'admin',
+      capabilities: [
+        'organization:read',
+        'organization:update',
+        'member:invite',
+        'member:change-role',
+        'member:remove',
+        'project:create',
+      ],
+    });
     expect((await bed.memberships.find(acme, 'bia'))?.role).toBe('admin');
     const stored = (await bed.invitations.findById(acme, invitationId))?.toSnapshot();
     expect(stored).toMatchObject({ acceptedByUserId: 'bia', acceptedAt: bed.clock.now() });

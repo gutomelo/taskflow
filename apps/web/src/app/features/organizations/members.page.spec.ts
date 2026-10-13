@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { OrganizationRole } from '@taskflow/contracts';
+import type { OrganizationPermission, OrganizationRole } from '@taskflow/contracts';
 import {
   acme,
   ana,
@@ -19,14 +19,80 @@ const BIA = '0192a000-0000-7000-8000-0000000000b1';
 const EVA = '0192a000-0000-7000-8000-0000000000e1';
 const JOINED = '2026-10-01T10:00:00.000Z';
 
-const member = (userId: string, name: string, role: OrganizationRole, version = 1) => ({
+type Actions = { changeRoleTo: OrganizationRole[]; remove: boolean };
+const NONE: Actions = { changeRoleTo: [], remove: false };
+
+/** Membro como a API devolve, com as ações que ela calculou para o usuário atual (spec 006). */
+const member = (
+  userId: string,
+  name: string,
+  role: OrganizationRole,
+  version = 1,
+  actions: Actions = NONE,
+) => ({
   userId,
   name,
   email: `${name.toLowerCase()}@exemplo.com`,
   role,
   version,
   joinedAt: JOINED,
+  actions,
 });
+
+/** Capacidades que a API devolve por papel (simulação; a regra vive no backend). */
+const CAPABILITIES: Record<OrganizationRole, OrganizationPermission[]> = {
+  owner: [
+    'organization:read',
+    'organization:update',
+    'member:invite',
+    'member:change-role',
+    'member:remove',
+    'project:create',
+  ],
+  admin: [
+    'organization:read',
+    'organization:update',
+    'member:invite',
+    'member:change-role',
+    'member:remove',
+    'project:create',
+  ],
+  member: ['organization:read', 'project:create'],
+  viewer: ['organization:read'],
+};
+
+/** Ana, Bia (member) e Eva (owner) com as ações que a API calcularia para o papel de Ana. */
+function defaultMembers(myRole: OrganizationRole) {
+  const asOwner = myRole === 'owner';
+  const asAdmin = myRole === 'admin';
+  return [
+    member(
+      ana.id,
+      'Ana',
+      myRole,
+      1,
+      asOwner ? { changeRoleTo: ['admin', 'member', 'viewer'], remove: false } : NONE,
+    ),
+    member(
+      BIA,
+      'Bia',
+      'member',
+      1,
+      asOwner
+        ? { changeRoleTo: ['owner', 'admin', 'viewer'], remove: true }
+        : asAdmin
+          ? { changeRoleTo: ['admin', 'viewer'], remove: true }
+          : NONE,
+    ),
+    member(
+      EVA,
+      'Eva',
+      'owner',
+      1,
+      asOwner ? { changeRoleTo: ['admin', 'member', 'viewer'], remove: true } : NONE,
+    ),
+  ];
+}
 
 const invitation = {
   id: '0192a000-0000-7000-8000-0000000000c1',
@@ -44,19 +110,14 @@ const problem = (code: string, status: number) =>
     { status, statusText: code },
   ] as const;
 
-async function open(
-  myRole: OrganizationRole,
-  members = [
-    member(ana.id, 'Ana', myRole),
-    member(BIA, 'Bia', 'member'),
-    member(EVA, 'Eva', 'owner'),
-  ],
-) {
+async function open(myRole: OrganizationRole, members = defaultMembers(myRole)) {
   const env = setupOrganizationsTesting(organizationsRoutes);
   env.auth.signIn(ana);
   const harness = await RouterTestingHarness.create();
   const navigation = harness.navigateByUrl('/o/acme/members');
-  (await nextRequest(env.backend, MINE)).flush({ items: [{ ...acme, role: myRole }] });
+  (await nextRequest(env.backend, MINE)).flush({
+    items: [{ ...acme, role: myRole, capabilities: CAPABILITIES[myRole] }],
+  });
   await navigation;
   (await nextRequest(env.backend, MEMBERS)).flush({ items: members, nextCursor: null });
   if (myRole === 'owner' || myRole === 'admin') {
@@ -100,11 +161,15 @@ describe('MembersPage (RF-09…RF-12)', () => {
 
   it('CA-07: the owner changes a role explicitly (select + save) with the version', async () => {
     const env = await open('owner', [
-      member(ana.id, 'Ana', 'owner'),
-      member(BIA, 'Bia', 'member', 3),
+      member(ana.id, 'Ana', 'owner', 1, {
+        changeRoleTo: ['admin', 'member', 'viewer'],
+        remove: false,
+      }),
+      member(BIA, 'Bia', 'member', 3, { changeRoleTo: ['owner', 'admin', 'viewer'], remove: true }),
     ]);
     const bia = rowOf(env, 'Bia');
-    expect(options(selectIn(bia))).toEqual(['owner', 'admin', 'member', 'viewer']);
+    // Papel atual primeiro, depois os que a API permitiu (spec 006: sem matriz no frontend).
+    expect(options(selectIn(bia))).toEqual(['member', 'owner', 'admin', 'viewer']);
 
     choose(selectIn(bia), 'admin');
     await stable(env.harness);
@@ -118,10 +183,18 @@ describe('MembersPage (RF-09…RF-12)', () => {
     expect(live(env)).toBe('Bia agora é administrador(a).');
   });
 
+  it('CA-06: shows only what the API allows — a forged list without actions has no controls', async () => {
+    const env = await open('owner', [member(ana.id, 'Ana', 'owner'), member(BIA, 'Bia', 'member')]);
+    const list = root(env).querySelector('ul[aria-label="Membros da organização"]');
+
+    expect(list?.querySelectorAll('select')).toHaveLength(0);
+    expect(buttonIn(rowOf(env, 'Bia'), 'Remover Bia')).toBeUndefined();
+  });
+
   it('CA-07: an admin cannot promote to owner nor touch owners', async () => {
     const env = await open('admin');
 
-    expect(options(selectIn(rowOf(env, 'Bia')))).toEqual(['admin', 'member', 'viewer']);
+    expect(options(selectIn(rowOf(env, 'Bia')))).toEqual(['member', 'admin', 'viewer']);
     expect(selectIn(rowOf(env, 'Eva'))).toBeNull();
     expect(buttonIn(rowOf(env, 'Eva'), 'Remover Eva')).toBeUndefined();
     expect(buttonIn(rowOf(env, 'Bia'), 'Remover Bia')).toBeDefined();
@@ -136,27 +209,57 @@ describe('MembersPage (RF-09…RF-12)', () => {
     expect(buttonIn(rowOf(env, 'Ana'), 'Sair da organização')).toBeDefined();
   });
 
-  it('review #5: stepping down updates the own role in the interface at once', async () => {
-    const env = await open('owner', [
-      member(ana.id, 'Ana', 'owner'),
-      member(EVA, 'Eva', 'owner'),
-      member(BIA, 'Bia', 'member'),
-    ]);
+  it('stepping down reloads capabilities and actions from the API (spec 006)', async () => {
+    const env = await open('owner');
     choose(selectIn(rowOf(env, 'Ana')), 'admin');
     await stable(env.harness);
     buttonIn(rowOf(env, 'Ana'), 'Salvar papel')?.click();
     (await nextRequest(env.backend, `${MEMBERS}/${ana.id}`)).flush(
       member(ana.id, 'Ana', 'admin', 2),
     );
+    // A interface recarrega a organização e a lista: as regras voltam da API.
+    (await nextRequest(env.backend, MINE)).flush({
+      items: [{ ...acme, role: 'admin', capabilities: CAPABILITIES.admin }],
+    });
+    (await nextRequest(env.backend, MEMBERS)).flush({
+      items: defaultMembers('admin'),
+      nextCursor: null,
+    });
     await stable(env.harness);
 
-    // Agora admin: sem opção owner para os outros e sem remover owners.
-    expect(options(selectIn(rowOf(env, 'Bia')))).toEqual(['admin', 'member', 'viewer']);
+    expect(options(selectIn(rowOf(env, 'Bia')))).toEqual(['member', 'admin', 'viewer']);
     expect(buttonIn(rowOf(env, 'Eva'), 'Remover Eva')).toBeUndefined();
   });
 
+  it('a failed capability reload after stepping down hides gated actions and asks to reload', async () => {
+    const env = await open('owner');
+    expect(root(env).textContent).toContain('Convites');
+    choose(selectIn(rowOf(env, 'Ana')), 'viewer');
+    await stable(env.harness);
+    buttonIn(rowOf(env, 'Ana'), 'Salvar papel')?.click();
+    (await nextRequest(env.backend, `${MEMBERS}/${ana.id}`)).flush(
+      member(ana.id, 'Ana', 'viewer', 2),
+    );
+    (await nextRequest(env.backend, MINE)).flush(...problem('INTERNAL_ERROR', 500));
+    (await nextRequest(env.backend, MEMBERS)).flush({
+      items: defaultMembers('viewer'),
+      nextCursor: null,
+    });
+    await stable(env.harness);
+
+    // Capacidades antigas (owner) não são mais usadas: convites somem e o usuário é avisado.
+    expect(root(env).textContent).not.toContain('Convites');
+    expect(alertText(env)).toContain('Recarregue a página');
+  });
+
   it('CA-08: shows LAST_OWNER in an alert that receives focus', async () => {
-    const env = await open('owner', [member(ana.id, 'Ana', 'owner'), member(BIA, 'Bia', 'member')]);
+    const env = await open('owner', [
+      member(ana.id, 'Ana', 'owner', 1, {
+        changeRoleTo: ['admin', 'member', 'viewer'],
+        remove: false,
+      }),
+      member(BIA, 'Bia', 'member'),
+    ]);
     choose(selectIn(rowOf(env, 'Ana')), 'admin');
     await stable(env.harness);
     buttonIn(rowOf(env, 'Ana'), 'Salvar papel')?.click();

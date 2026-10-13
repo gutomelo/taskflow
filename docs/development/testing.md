@@ -77,6 +77,8 @@ Spec 001: unitários de domínio, aplicação, HTTP e frontend; integração com
 
 Spec 002: domínio com política de papéis tabela-driven; casos de uso com fakes; integração com PostgreSQL para repositórios, concorrência (lock da organização, rebaixamento mútuo, aceite × revogação) e **isolamento A/B pela API real** (`apps/api`, alvo `integration-test`); Mailpit para convites; componentes Angular com rotas reais; E2E da jornada real CA-11. Mutation testing manual registrado por tarefa. Evidências em `specs/002-organizations/tasks.md`.
 
+Spec 006: matrizes do kernel transcritas do documento (tabela-driven, chaves hostis) e paridade de catálogo kernel × contracts; **harness de isolamento** em `apps/api/src/testing` — varredura da tabela de rotas real (`route-coverage.spec.ts`, unitário) e casos gerados por rota com snapshot de todas as tabelas com `organization_id` e ids canário (`organizations-isolation.integration.spec.ts`). Toda rota tenant-scoped nova precisa de caso em `isolation-cases.ts`. Evidências em `specs/006-permissions/tasks.md`.
+
 ### Fase 0
 
 Implementado e executado: unitários de contratos, configuração e health da API (Supertest), componente de status do web, integração das probes de PostgreSQL/Redis com Testcontainers e um E2E de fumaça. Resultados na seção de validação de `specs/000-foundation/tasks.md`.

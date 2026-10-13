@@ -26,7 +26,7 @@ import {
   ListMyOrganizationsUseCase,
   LookupInvitationUseCase,
   RemoveMemberUseCase,
-  RenameOrganizationUseCase,
+  UpdateOrganizationUseCase,
   ResendInvitationUseCase,
   ResolveTenantMembershipUseCase,
   RevokeInvitationUseCase,
@@ -75,7 +75,7 @@ function buildApp(bed: OrganizationsTestbed) {
       createOrganization: new CreateOrganizationUseCase(bed),
       listMyOrganizations: new ListMyOrganizationsUseCase(bed),
       getOrganization: new GetOrganizationUseCase(bed),
-      renameOrganization: new RenameOrganizationUseCase(bed),
+      updateOrganization: new UpdateOrganizationUseCase(bed),
       listMembers: new ListMembersUseCase(bed),
       changeMemberRole: new ChangeMemberRoleUseCase(bed),
       removeMember: new RemoveMemberUseCase(bed),
@@ -273,7 +273,22 @@ describe('organizations HTTP API (spec 002)', () => {
 
     expect(response.status).toBe(200);
     expect(myOrganizationListSchema.parse(response.body)).toEqual({
-      items: [{ id: acme, name: 'Org acme', slug: 'acme', role: 'owner' }],
+      items: [
+        {
+          id: acme,
+          name: 'Org acme',
+          slug: 'acme',
+          role: 'owner',
+          capabilities: [
+            'organization:read',
+            'organization:update',
+            'member:invite',
+            'member:change-role',
+            'member:remove',
+            'project:create',
+          ],
+        },
+      ],
     });
   });
 
@@ -302,6 +317,74 @@ describe('organizations HTTP API (spec 002)', () => {
         version: 2,
       });
       expect([stale.status, problem(stale).code]).toEqual([409, 'VERSION_CONFLICT']);
+    });
+  });
+
+  describe('permissions (spec 006)', () => {
+    it('CA-03: owner/admin turn off "members can create projects" with the version; members lose project:create', async () => {
+      const { bed, ana, bia } = setup();
+      const acme = await seed(bed, [
+        [ANA, 'admin'],
+        [BIA, 'member'],
+        [EVA, 'owner'],
+      ]);
+
+      const updated = await ana.patch(`/organizations/${acme}`, {
+        membersCanCreateProjects: false,
+        version: 1,
+      });
+      const asMember = await bia.get(`/organizations/${acme}`);
+      const forbidden = await bia.patch(`/organizations/${acme}`, {
+        membersCanCreateProjects: true,
+        version: 2,
+      });
+      const stale = await ana.patch(`/organizations/${acme}`, {
+        membersCanCreateProjects: true,
+        version: 1,
+      });
+
+      expect(organizationSchema.parse(updated.body)).toMatchObject({
+        membersCanCreateProjects: false,
+        version: 2,
+      });
+      expect(organizationSchema.parse(asMember.body).capabilities).toEqual(['organization:read']);
+      expect([forbidden.status, problem(forbidden).code]).toEqual([403, 'INSUFFICIENT_ROLE']);
+      expect([stale.status, problem(stale).code]).toEqual([409, 'VERSION_CONFLICT']);
+    });
+
+    it('rejects an update without any field and fields outside the contract', async () => {
+      const { bed, ana } = setup();
+      const acme = await seed(bed, [[ANA, 'owner']]);
+
+      const empty = await ana.patch(`/organizations/${acme}`, { version: 1 });
+      const extra = await ana.patch(`/organizations/${acme}`, {
+        version: 1,
+        capabilities: ['organization:update'],
+      });
+
+      expect([empty.status, problem(empty).code]).toEqual([400, 'VALIDATION_FAILED']);
+      expect([extra.status, problem(extra).code]).toEqual([400, 'VALIDATION_FAILED']);
+    });
+
+    it('CA-04 / CA-05: a viewer gets read-only capabilities and no member actions', async () => {
+      const { bed, eva } = setup();
+      const acme = await seed(bed, [
+        [ANA, 'owner'],
+        [EVA, 'viewer'],
+      ]);
+
+      const organization = organizationSchema.parse((await eva.get(`/organizations/${acme}`)).body);
+      const members = memberPageSchema.parse(
+        (await eva.get(`/organizations/${acme}/members`)).body,
+      );
+      const mine = myOrganizationListSchema.parse((await eva.get('/me/organizations')).body);
+
+      expect(organization.capabilities).toEqual(['organization:read']);
+      expect(mine.items[0]?.capabilities).toEqual(['organization:read']);
+      expect(members.items.map((member) => member.actions)).toEqual([
+        { changeRoleTo: [], remove: false },
+        { changeRoleTo: [], remove: false },
+      ]);
     });
   });
 
@@ -490,7 +573,20 @@ describe('organizations HTTP API (spec 002)', () => {
         403,
         'INVITATION_FOR_ANOTHER_ACCOUNT',
       ]);
-      expect(accepted.body).toEqual({ id: acme, name: 'Org acme', slug: 'acme', role: 'admin' });
+      expect(accepted.body).toEqual({
+        id: acme,
+        name: 'Org acme',
+        slug: 'acme',
+        role: 'admin',
+        capabilities: [
+          'organization:read',
+          'organization:update',
+          'member:invite',
+          'member:change-role',
+          'member:remove',
+          'project:create',
+        ],
+      });
       expect([reused.status, problem(reused).code]).toEqual([400, 'INVALID_OR_EXPIRED_INVITATION']);
     });
   });

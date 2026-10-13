@@ -80,8 +80,20 @@ describe('AppShell', () => {
     await render();
     backend.expectOne(ORGANIZATIONS).flush({
       items: [
-        { id: '0192a000-0000-7000-8000-000000000001', name: 'Acme', slug: 'acme', role: 'owner' },
-        { id: '0192a000-0000-7000-8000-000000000002', name: 'Beta', slug: 'beta', role: 'viewer' },
+        {
+          id: '0192a000-0000-7000-8000-000000000001',
+          name: 'Acme',
+          slug: 'acme',
+          role: 'owner',
+          capabilities: [],
+        },
+        {
+          id: '0192a000-0000-7000-8000-000000000002',
+          name: 'Beta',
+          slug: 'beta',
+          role: 'viewer',
+          capabilities: [],
+        },
       ],
     });
     await settle();

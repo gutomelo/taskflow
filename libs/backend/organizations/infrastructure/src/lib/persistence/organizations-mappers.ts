@@ -29,6 +29,7 @@ export function toOrganization(row: OrganizationRow): Organization {
     id: row.id,
     name: OrganizationName.create(row.name),
     slug: OrganizationSlug.create(row.slug),
+    membersCanCreateProjects: row.membersCanCreateProjects,
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

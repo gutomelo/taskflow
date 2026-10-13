@@ -22,7 +22,7 @@ export {
   type InvitableRole,
   type InvitationSnapshot,
 } from './lib/invitation/invitation';
-export { canChangeRole, canInvite, canManageMembers, canRemove } from './lib/policy/role-policy';
+export { canChangeRole, canInvite, canRemove, memberActions } from './lib/policy/role-policy';
 export type {
   InvitationRepository,
   MembershipRepository,

@@ -23,9 +23,9 @@ import type {
   MyOrganizationView,
   OrganizationView,
   RemoveMemberUseCase,
-  RenameOrganizationUseCase,
   ResendInvitationUseCase,
   RevokeInvitationUseCase,
+  UpdateOrganizationUseCase,
 } from '@taskflow/backend/organizations/application';
 import {
   changeMemberRoleRequestSchema,
@@ -36,7 +36,7 @@ import {
   memberUserIdParamSchema,
   pageQuerySchema,
   removeMemberQuerySchema,
-  renameOrganizationRequestSchema,
+  updateOrganizationRequestSchema,
   type InvitationDto,
   type InvitationPage,
   type InvitationPreview,
@@ -56,7 +56,7 @@ export interface OrganizationsHttpDependencies {
     createOrganization: Executes<CreateOrganizationUseCase>;
     listMyOrganizations: Executes<ListMyOrganizationsUseCase>;
     getOrganization: Executes<GetOrganizationUseCase>;
-    renameOrganization: Executes<RenameOrganizationUseCase>;
+    updateOrganization: Executes<UpdateOrganizationUseCase>;
     listMembers: Executes<ListMembersUseCase>;
     changeMemberRole: Executes<ChangeMemberRoleUseCase>;
     removeMember: Executes<RemoveMemberUseCase>;
@@ -120,9 +120,17 @@ const invitationNotFound = () =>
 const toOrganizationDto = (view: OrganizationView): OrganizationDto => ({
   ...view,
   createdAt: view.createdAt.toISOString(),
+  capabilities: [...view.capabilities],
 });
-const toMyOrganization = (view: MyOrganizationView): MyOrganization => ({ ...view });
-const toMember = (view: MemberView): Member => ({ ...view, joinedAt: view.joinedAt.toISOString() });
+const toMyOrganization = (view: MyOrganizationView): MyOrganization => ({
+  ...view,
+  capabilities: [...view.capabilities],
+});
+const toMember = (view: MemberView): Member => ({
+  ...view,
+  joinedAt: view.joinedAt.toISOString(),
+  actions: { changeRoleTo: [...view.actions.changeRoleTo], remove: view.actions.remove },
+});
 const toInvitation = (view: InvitationView): InvitationDto => ({
   ...view,
   invitedBy: { ...view.invitedBy },
@@ -209,9 +217,9 @@ export function createOrganizationsRouters(
   });
 
   tenantRouter.patch('/', async (request, response) => {
-    const view = await useCases.renameOrganization.execute(
+    const view = await useCases.updateOrganization.execute(
       tenantRequestContextFrom(request),
-      parseBody(request, renameOrganizationRequestSchema),
+      parseBody(request, updateOrganizationRequestSchema),
     );
     response.json(toOrganizationDto(view) satisfies OrganizationDto);
   });

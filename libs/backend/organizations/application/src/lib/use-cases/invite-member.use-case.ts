@@ -6,12 +6,16 @@ import type {
   TenantRequestContext,
   TransactionRunner,
 } from '@taskflow/backend/shared/application';
-import { EmailAddress, type Clock, type IdGenerator } from '@taskflow/backend/shared/kernel';
+import {
+  EmailAddress,
+  type Clock,
+  type IdGenerator,
+  hasOrganizationPermission,
+} from '@taskflow/backend/shared/kernel';
 import {
   AlreadyAMemberError,
   assertInvitableRole,
   canInvite,
-  canManageMembers,
   Invitation,
   type InvitationRepository,
   type MembershipRepository,
@@ -61,7 +65,8 @@ export class InviteMemberUseCase {
   ): Promise<InviteMemberResult> {
     const { organizationId, organizationRole } = context.tenant;
     const actorUserId = context.actor.userId;
-    if (!canManageMembers(organizationRole)) throw new InsufficientRoleError();
+    if (!hasOrganizationPermission(organizationRole, 'member:invite'))
+      throw new InsufficientRoleError();
     const email = EmailAddress.create(command.email);
     const role = assertInvitableRole(command.role);
     await this.delivery.consumeSenderLimits(actorUserId, organizationId);
