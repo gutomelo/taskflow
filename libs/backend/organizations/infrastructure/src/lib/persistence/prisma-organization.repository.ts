@@ -70,4 +70,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR NO KEY UPDATE`;
     return locked.length > 0;
   }
+
+  async lockForShare(organizationId: string): Promise<Organization | null> {
+    const transaction = this.transactions.transactionalClient(
+      'OrganizationRepository.lockForShare',
+    );
+    // FOR SHARE conflita com o FOR NO KEY UPDATE das mutações de membership (spec 003): papéis e
+    // configuração lidos aqui não mudam até o commit. Mutações de projetos correm em paralelo.
+    const locked = await transaction.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR SHARE`;
+    if (locked.length === 0) return null;
+    const row = await transaction.organization.findUnique({ where: { id: organizationId } });
+    return row ? toOrganization(row) : null;
+  }
 }

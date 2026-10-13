@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { EmailAddress } from '@taskflow/backend/shared/kernel';
+import type { EmailAddress, OrganizationRole } from '@taskflow/backend/shared/kernel';
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
 import {
   FakeTransactionRunner,
@@ -29,6 +29,7 @@ import {
 } from '@taskflow/backend/organizations/domain';
 import type { InvitationEmailTemplates } from '../lib/ports/invitation-email-templates';
 import type { InvitationTokenGenerator } from '../lib/ports/invitation-token-generator';
+import type { MembershipRoleChanges } from '../lib/ports/membership-role-changes';
 import {
   MAX_USER_ACCOUNTS_PER_QUERY,
   type UserAccount,
@@ -114,6 +115,12 @@ export class InMemoryOrganizationRepository implements OrganizationRepository, T
     this.locks.push(organizationId);
     return this.rows.has(organizationId);
   }
+  /** Travas para compartilhamento pedidas (spec 003). */
+  readonly shareLocks: string[] = [];
+  async lockForShare(organizationId: string) {
+    this.shareLocks.push(organizationId);
+    return this.findById(organizationId);
+  }
 }
 
 const membershipKey = (organizationId: string, userId: string) => `${organizationId}|${userId}`;
@@ -146,6 +153,29 @@ export class InMemoryMembershipRepository implements MembershipRepository, Trans
     const items = all.slice(start, start + page.limit).map((row) => Membership.restore(row));
     const next = start + page.limit;
     return { items, nextCursor: next < all.length ? String(next) : null };
+  }
+  async listPageExcluding(
+    organizationId: string,
+    filter: Readonly<{
+      excludeUserIds: ReadonlyArray<string>;
+      roles: ReadonlyArray<OrganizationRole>;
+    }>,
+    page: PageRequest,
+  ): Promise<Page<Membership>> {
+    const all = this.inOrganization(organizationId).filter(
+      (row) => !filter.excludeUserIds.includes(row.userId) && filter.roles.includes(row.role),
+    );
+    const start = page.cursor === null ? 0 : Number(page.cursor);
+    const items = all.slice(start, start + page.limit).map((row) => Membership.restore(row));
+    const next = start + page.limit;
+    return { items, nextCursor: next < all.length ? String(next) : null };
+  }
+  async rolesOf(organizationId: string, userIds: ReadonlyArray<string>) {
+    return new Map(
+      this.inOrganization(organizationId)
+        .filter((row) => userIds.includes(row.userId))
+        .map((row) => [row.userId, row.role] as const),
+    );
   }
   async listForUser(userId: string) {
     return this.all()
@@ -344,6 +374,16 @@ export class RecordingOrganizationsSecurityEvents implements OrganizationsSecuri
   }
 }
 
+/** Registra as notificações de mudança de papel (porta da spec 003) e devolve `affected`. */
+export class RecordingMembershipRoleChanges implements MembershipRoleChanges {
+  readonly changes: Parameters<MembershipRoleChanges['roleChanged']>[0][] = [];
+  affected = 0;
+  async roleChanged(change: Parameters<MembershipRoleChanges['roleChanged']>[0]) {
+    this.changes.push(change);
+    return { affectedProjectParticipations: this.affected };
+  }
+}
+
 /** Templates que expõem os dados recebidos (o texto real é testado na infraestrutura). */
 export const fakeInvitationEmailTemplates: InvitationEmailTemplates = {
   invitation: ({ to, ...data }) => {
@@ -373,6 +413,7 @@ export function createOrganizationsTestbed() {
     appUrl: 'https://app.taskflow.test',
     rateLimiter: new InMemoryRateLimiter(),
     securityEvents: new RecordingOrganizationsSecurityEvents(),
+    membershipRoleChanges: new RecordingMembershipRoleChanges(),
     pseudonymizer: fakePseudonymizer,
     clock: new FixedClock(),
     idGenerator: new SequentialIds(),

@@ -17,6 +17,8 @@ export type OrganizationsSecurityEvent =
         fromRole: OrganizationRole;
         toRole: OrganizationRole;
         revokedInvitations: number;
+        /** Participações em projetos rebaixadas a viewer na mesma transação (BR-027, spec 003). */
+        cappedProjectParticipations: number;
       }>)
   | (Base &
       Readonly<{

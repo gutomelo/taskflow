@@ -18,17 +18,21 @@ import {
   AcceptInvitationUseCase,
   ChangeMemberRoleUseCase,
   CreateOrganizationUseCase,
+  GetMemberRolesUseCase,
   GetOrganizationUseCase,
   InviteMemberUseCase,
   ListInvitationsUseCase,
+  ListMembersExcludingUseCase,
   ListMembersUseCase,
   ListMyOrganizationsUseCase,
+  LockOrganizationForShareUseCase,
   LookupInvitationUseCase,
   RemoveMemberUseCase,
   UpdateOrganizationUseCase,
   ResendInvitationUseCase,
   ResolveTenantMembershipUseCase,
   RevokeInvitationUseCase,
+  type MembershipRoleChanges,
   type OrganizationsSecurityEventRecorder,
   type UserDirectory,
 } from '@taskflow/backend/organizations/application';
@@ -54,6 +58,8 @@ export interface OrganizationsModuleDependencies {
   readonly users: UserDirectory;
   readonly authenticate: RequestHandler;
   readonly csrf: CsrfProtection;
+  /** Spec 003: reação de `projects` à mudança de papel (adaptador do composition root). */
+  readonly membershipRoleChanges: MembershipRoleChanges;
 }
 
 export interface OrganizationsModule {
@@ -64,6 +70,12 @@ export interface OrganizationsModule {
   /** Resolvedor do middleware de tenant (ADR 0012). */
   readonly resolveTenant: TenantContextOptions['resolve'];
   readonly domainErrors: Readonly<Record<string, DomainErrorMapping>>;
+  /** Consultas para a porta `OrganizationAccess` de `projects` (spec 003). */
+  readonly access: Readonly<{
+    lockForShare: LockOrganizationForShareUseCase;
+    rolesOf: GetMemberRolesUseCase;
+    membersExcluding: ListMembersExcludingUseCase;
+  }>;
 }
 
 /** Composition root do contexto Organizations (spec 002). */
@@ -88,6 +100,7 @@ export function createOrganizationsModule(
     rateLimiter: deps.rateLimiter,
     pseudonymizer: deps.pseudonymizer,
     securityEvents,
+    membershipRoleChanges: deps.membershipRoleChanges,
     // Mesmo gerador criptográfico de `identity` (256 bits, SHA-256), compatível com a porta.
     tokens: new CryptoSecretTokenGenerator(),
     idGenerator: deps.idGenerator,
@@ -121,5 +134,10 @@ export function createOrganizationsModule(
     tenantRouter,
     resolveTenant: (input) => resolveMembership.execute(input),
     domainErrors: organizationsErrorMappings,
+    access: {
+      lockForShare: new LockOrganizationForShareUseCase({ organizations, memberships }),
+      rolesOf: new GetMemberRolesUseCase({ memberships }),
+      membersExcluding: new ListMembersExcludingUseCase({ memberships }),
+    },
   };
 }

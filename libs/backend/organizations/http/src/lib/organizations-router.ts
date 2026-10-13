@@ -3,6 +3,7 @@ import type { RateLimiter, RateLimitPolicy } from '@taskflow/backend/shared/appl
 import {
   createRateLimit,
   HttpError,
+  noStore,
   parseBody,
   requestContextFrom,
   tenantRequestContextFrom,
@@ -82,11 +83,6 @@ export interface OrganizationsRouters {
    */
   readonly tenantRouter: Router;
 }
-
-const noStore: RequestHandler = (_request, response, next) => {
-  response.set('Cache-Control', 'no-store');
-  next();
-};
 
 /** Parâmetro de rota malformado responde como recurso inexistente (sem oráculo, sem 500). */
 function parseParams<TSchema extends z.ZodType>(

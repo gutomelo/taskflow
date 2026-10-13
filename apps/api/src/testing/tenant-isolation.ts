@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { TENANT_PATH_PREFIX } from '@taskflow/backend/shared/http';
+import { noStore, TENANT_PATH_PREFIX } from '@taskflow/backend/shared/http';
 
 // Harness de isolamento (spec 006, RF-08). Toda leitura dos internos do router do Express 5
 // (`router.stack`, `layer.slash`, `layer.match`) fica neste arquivo e falha fechada: uma estrutura
@@ -9,8 +9,11 @@ import { TENANT_PATH_PREFIX } from '@taskflow/backend/shared/http';
 export type RouteKey = string;
 
 const PREFIX_SAMPLE = '/organizations/00000000-0000-7000-8000-000000000000/sample';
-/** Middlewares sem rota permitidos dentro dos routers de contexto (não respondem sozinhos). */
-const CONTEXT_MIDDLEWARES: ReadonlySet<string> = new Set(['noStore']);
+/**
+ * Middlewares sem rota permitidos dentro dos routers de contexto (não respondem sozinhos),
+ * reconhecidos pela **identidade** da função: outro handler com o mesmo nome não passa.
+ */
+const CONTEXT_MIDDLEWARES: ReadonlySet<unknown> = new Set([noStore]);
 
 type Layer = Router['stack'][number];
 
@@ -78,7 +81,7 @@ export function listTenantRoutes(tenantScope: Router): RouteKey[] {
     if (!child) return [];
     if (!isSlash(layer)) throw new Error('tenant scope: context router mounted with its own path');
     return walk(child, TENANT_PATH_PREFIX, 'tenant context router', (inner) =>
-      CONTEXT_MIDDLEWARES.has(inner.name),
+      CONTEXT_MIDDLEWARES.has(inner.handle),
     );
   });
 }
@@ -116,10 +119,35 @@ export const methodOf = (route: RouteKey) => (route.split(' ')[0] ?? '').toLower
  */
 export type IsolationExpectation = 'not-found' | 'no-leak';
 
-/** Cobertura: cada rota do tenant tem caso e cada parâmetro de caminho tem variante. */
+/** Schema de entrada declarado num caso (Zod `object`): só as chaves importam aqui. */
+export type InputSchema = Readonly<{ shape: Readonly<Record<string, unknown>> }>;
+
+/**
+ * Referências de entrada que precisam de variante (spec 003, obrigação 6 da spec 006): campos que
+ * apontam para outro recurso (`…Id`) e o cursor de paginação (`no-leak`).
+ */
+export function inputReferences(schema: InputSchema | null): string[] {
+  return schema
+    ? Object.keys(schema.shape).filter((key) => key.endsWith('Id') || key === 'cursor')
+    : [];
+}
+
+/** Caso de isolamento como o harness o enxerga (corpo e query declarados, `null` = nenhum). */
+export type DeclaredCase = Readonly<{
+  body: InputSchema | null;
+  query: InputSchema | null;
+  references: Readonly<Record<string, unknown>>;
+}>;
+
+const BODY_METHODS = new Set(['post', 'put', 'patch']);
+
+/**
+ * Cobertura: cada rota do tenant tem caso; cada parâmetro de caminho e cada referência de corpo
+ * ou query (derivada do schema declarado) tem variante; rota que recebe corpo declara o schema.
+ */
 export function coverageGaps(
   routes: ReadonlyArray<RouteKey>,
-  cases: Readonly<Record<RouteKey, Readonly<{ references: Readonly<Record<string, unknown>> }>>>,
+  cases: Readonly<Record<RouteKey, DeclaredCase>>,
 ): string[] {
   const gaps: string[] = [];
   for (const route of routes) {
@@ -131,6 +159,19 @@ export function coverageGaps(
     for (const param of pathParams(route)) {
       if (!Object.hasOwn(declared.references, param))
         gaps.push(`${route}: no variant for :${param}`);
+    }
+    if (BODY_METHODS.has(methodOf(route)) && !declared.body) {
+      // POST sem corpo (ex.: reenviar convite) declara um schema vazio, nunca omite.
+      gaps.push(`${route}: no body schema declared`);
+    }
+    for (const [where, schema] of [
+      ['body', declared.body],
+      ['query', declared.query],
+    ] as const) {
+      for (const field of inputReferences(schema)) {
+        if (!Object.hasOwn(declared.references, field))
+          gaps.push(`${route}: no variant for ${where}.${field}`);
+      }
     }
   }
   for (const route of Object.keys(cases)) {

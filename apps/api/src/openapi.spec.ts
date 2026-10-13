@@ -65,7 +65,38 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
         expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
       }
     }
-    expect(Object.keys(paths).filter((path) => path.includes('organizations'))).toHaveLength(8);
+    expect(
+      Object.keys(paths).filter(
+        (path) => path.includes('organizations') && !path.includes('/projects'),
+      ),
+    ).toHaveLength(8);
+  });
+
+  it('spec 003: describes every projects endpoint, with 404 for no access', () => {
+    const base = '/api/v1/organizations/{organizationId}/projects';
+    const expected: Array<[string, string]> = [
+      ['get', base],
+      ['post', base],
+      ['get', `${base}/by-key/{key}`],
+      ['get', `${base}/{projectId}`],
+      ['patch', `${base}/{projectId}`],
+      ['post', `${base}/{projectId}/archive`],
+      ['post', `${base}/{projectId}/restore`],
+      ['get', `${base}/{projectId}/workflow`],
+      ['get', `${base}/{projectId}/members`],
+      ['post', `${base}/{projectId}/members`],
+      ['get', `${base}/{projectId}/member-candidates`],
+      ['patch', `${base}/{projectId}/members/{userId}`],
+      ['delete', `${base}/{projectId}/members/{userId}`],
+    ];
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of expected) {
+      const operation = paths[path]?.[method as 'get'];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
+    }
+    expect(Object.keys(paths).filter((path) => path.includes('/projects'))).toHaveLength(9);
   });
 
   it('documents errors as Problem Details and cookie/CSRF security schemes', () => {

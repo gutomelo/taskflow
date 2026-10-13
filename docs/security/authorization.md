@@ -1,6 +1,6 @@
 # Autorização
 
-Status: vocabulário e matrizes **implementados** na spec 006 como Shared Kernel (`libs/backend/shared/kernel`, [ADR 0013](../architecture/adr/0013-authorization-shared-kernel.md)), com testes tabela-driven que transcrevem as tabelas abaixo. Permissões **de organização** com comportamento: **implementadas e testadas** (specs 002 e 006). Permissões **de projeto**: matriz e papel efetivo (BR-023) **implementados como funções puras e testados**; o uso pelos casos de uso é **planejado** nas specs 003–005. Itens marcados como planejados não estão no catálogo e, portanto, são negados.
+Status: vocabulário e matrizes **implementados** na spec 006 como Shared Kernel (`libs/backend/shared/kernel`, [ADR 0013](../architecture/adr/0013-authorization-shared-kernel.md)), com testes tabela-driven que transcrevem as tabelas abaixo. Permissões **de organização** com comportamento: **implementadas e testadas** (specs 002 e 006). Permissões **de projeto**: matriz e papel efetivo (BR-023) **implementados e aplicados** pelos casos de uso de `projects` (spec 003: `project:read`, `project:update`, `project:archive`, `project-member:manage`); as permissões de tarefas, comentários, sprints e quadro serão aplicadas nas specs 004–007. Itens marcados como planejados não estão no catálogo e, portanto, são negados.
 
 ## Modelo
 
@@ -10,13 +10,13 @@ Autorização = **RBAC** (papel efetivo) **+** **checagem no recurso** (o usuár
 - **Papéis de projeto** (`ProjectMember.role`): `manager`, `member`, `viewer`.
 - **Papel efetivo em um projeto** (BR-023, `effectiveProjectRole`): `owner`/`admin` da organização atuam como `manager` em todos os projetos; `member` usa o papel do projeto; `viewer` da organização tem no máximo `viewer` (o papel da organização é teto); sem `ProjectMember` → sem acesso ao projeto (404, fora das listas).
 
-| Papel do brief     | Representação                                               |
-| ------------------ | ----------------------------------------------------------- |
-| Organization Owner | `Membership.role = owner` (exatamente ≥ 1 por organização)  |
-| Organization Admin | `Membership.role = admin`                                   |
-| Project Manager    | `ProjectMember.role = manager` (ou owner/admin da org)      |
-| Project Member     | `ProjectMember.role = member`                               |
-| Viewer             | `ProjectMember.role = viewer` ou `Membership.role = viewer` |
+| Papel do brief     | Representação                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| Organization Owner | `Membership.role = owner` (exatamente ≥ 1 por organização)                                      |
+| Organization Admin | `Membership.role = admin`                                                                       |
+| Project Manager    | `ProjectMember.role = manager` (ou owner/admin da org, sem participação gravada — spec 003, D1) |
+| Project Member     | `ProjectMember.role = member`                                                                   |
+| Viewer             | `ProjectMember.role = viewer` ou `Membership.role = viewer`                                     |
 
 ## Matriz de permissões
 
@@ -72,6 +72,8 @@ O frontend **não tem matriz própria**. A API devolve:
 - `actions` em cada item de `GET /organizations/{id}/members` e na resposta de alteração de papel: `changeRoleTo` (papéis para os quais o usuário atual pode alterar aquele membro) e `remove`, calculadas pela política de BR-021.
 
 Capacidades são **dica de interface**: a interface só esconde ou desabilita ações; o caso de uso sempre decide de novo, com o estado relido.
+
+Nos projetos (spec 003), o mesmo padrão: `GET …/projects/{id}` e `…/by-key/{key}` devolvem `myRole` (papel efetivo) e `capabilities` (permissões `allow`, descontado o arquivamento: arquivado ⇒ só ler e restaurar); cada participante traz `actions` (`changeRoleTo`, `remove`, `leave`) e cada candidato `allowedRoles` (teto). Quem não participa recebe 404 com o mesmo corpo de um projeto inexistente; participante sem permissão recebe 403 antes de qualquer erro de estado.
 
 ## Onde a autorização acontece
 

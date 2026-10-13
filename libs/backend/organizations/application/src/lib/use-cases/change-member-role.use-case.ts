@@ -16,6 +16,7 @@ import {
   type MembershipRepository,
   type OrganizationRepository,
 } from '@taskflow/backend/organizations/domain';
+import type { MembershipRoleChanges } from '../ports/membership-role-changes';
 import type { UserDirectory } from '../ports/user-directory';
 import { toMemberView, type MemberView } from '../shared/member-view';
 import { lockOrganizationAndRereadActor } from '../shared/membership-lock';
@@ -35,6 +36,8 @@ export interface ChangeMemberRoleDependencies {
   readonly users: UserDirectory;
   readonly transactions: TransactionRunner;
   readonly securityEvents: OrganizationsSecurityEventRecorder;
+  /** Spec 003: quem reage à mudança de papel na mesma transação (BR-027 em `projects`). */
+  readonly membershipRoleChanges: MembershipRoleChanges;
   readonly clock: Clock;
 }
 
@@ -73,22 +76,50 @@ export class ChangeMemberRoleUseCase {
       });
       if (!allowed) throw new RoleChangeNotAllowedError();
       if (fromRole === command.role) {
-        return { target, fromRole, revokedInvitations: 0, changed: false, actorRole: actor.role };
+        return {
+          target,
+          fromRole,
+          revokedInvitations: 0,
+          cappedProjectParticipations: 0,
+          changed: false,
+          actorRole: actor.role,
+        };
       }
 
       const now = this.deps.clock.now();
       target.changeRole(command.role, now);
       await this.deps.memberships.save(target);
+      // Sempre que o papel muda; quem reage decide (`organizations` não conhece BR-027).
+      const { affectedProjectParticipations } = await this.deps.membershipRoleChanges.roleChanged({
+        organizationId,
+        userId: command.userId,
+        fromRole,
+        toRole: command.role,
+      });
       // Quem deixa de poder convidar perde os convites abertos que criou (design, "Convites").
       const revokedInvitations = hasOrganizationPermission(command.role, 'member:invite')
         ? 0
         : await this.deps.invitations.revokeOpenInvitedBy(organizationId, command.userId, now);
       // O papel do ator depois da operação: o novo, se ele alterou o próprio papel.
       const actorRole = command.userId === actorUserId ? command.role : actor.role;
-      return { target, fromRole, revokedInvitations, changed: true, actorRole };
+      return {
+        target,
+        fromRole,
+        revokedInvitations,
+        cappedProjectParticipations: affectedProjectParticipations,
+        changed: true,
+        actorRole,
+      };
     });
 
-    const { target, fromRole, revokedInvitations, changed, actorRole } = outcome;
+    const {
+      target,
+      fromRole,
+      revokedInvitations,
+      cappedProjectParticipations,
+      changed,
+      actorRole,
+    } = outcome;
     if (changed) {
       this.deps.securityEvents.record({
         type: 'organizations.member_role_changed',
@@ -99,6 +130,7 @@ export class ChangeMemberRoleUseCase {
         fromRole,
         toRole: command.role,
         revokedInvitations,
+        cappedProjectParticipations,
       });
     }
     const account = (await this.deps.users.getAccounts([command.userId])).get(command.userId);

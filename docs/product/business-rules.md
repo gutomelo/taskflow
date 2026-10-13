@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 **implementada como função pura e testada** (spec 006; aplicada a projetos na spec 003); BR-024 **implementada e testada** quanto à configuração e às capacidades (spec 006; o endpoint de criação de projeto nasce na spec 003). A spec que implementa cada regra está indicada.
+Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); BR-004 implementada só na parte do workflow padrão (spec 003; transições na 005). A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -32,7 +32,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Invariante**: todo responsável (`assignee`) de uma tarefa é membro ativo do projeto, com papel que permite receber tarefas (não viewer).
 - **Erros**: `ASSIGNEE_NOT_PROJECT_MEMBER` (422).
 - **Pós-condição**: evento `TaskAssigned` após commit.
-- **Casos limite**: ao remover um membro do projeto, suas atribuições abertas são desfeitas (ou bloqueiam a remoção) — decisão registrada na spec 003/004; atribuir a si mesmo segue a mesma regra.
+- **Casos limite**: ao remover um membro do projeto, suas atribuições abertas são desfeitas — remover alguém da organização ou sair **nunca** pode ser bloqueado por tarefas (spec 003, transição para a 004: FK `ON DELETE SET NULL (assignee_user_id)`, ADR 0015); atribuir a si mesmo segue a mesma regra.
 
 ## BR-004 — Movimentação respeita transições configuradas
 
@@ -41,6 +41,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Erros**: `TRANSITION_NOT_ALLOWED` (422).
 - **Interação**: mover para coluna de categoria `done` dispara as validações de BR-001 e BR-006.
 - **Casos limite**: mover dentro da mesma coluna é só reordenação (BR-009); workflow padrão é criado com o projeto (`todo → in_progress → done`, com volta permitida).
+- **Estado**: o workflow padrão ("A fazer", "Em andamento", "Concluído", com transições de ida e volta entre vizinhos) é **implementado** na spec 003 e criado com o projeto; validar transições ao mover é da spec 005.
 
 ## BR-005 — Sprint concluída não recebe tarefas
 
@@ -154,3 +155,17 @@ Owner/admin da organização atuam como `manager` em todos os projetos. Member d
 ### BR-024 — Criação de projetos configurável
 
 Owner e admin sempre criam projetos. Members criam se a organização permitir ("membros podem criar projetos", padrão: sim). Viewers nunca criam. Alterar a configuração exige owner/admin e respeita BR-008 (versão da organização).
+
+## Projetos (spec 003)
+
+### BR-025 — Chave do projeto
+
+2 a 10 caracteres, letras maiúsculas sem acento e dígitos, começando por letra (`[A-Z][A-Z0-9]{1,9}`); única na organização, incluindo projetos arquivados; definida na criação e imutável. A API não normaliza (minúsculas são recusadas; a interface converte ao digitar). Erros: `INVALID_PROJECT_KEY` (400), `PROJECT_KEY_TAKEN` (409).
+
+### BR-026 — Projeto arquivado é somente leitura
+
+Arquivado não aceita edição, novas participações nem mudanças de papel (`PROJECT_ARCHIVED`, 409); continua legível por quem tem acesso e sai da lista padrão. Remover participante e sair continuam permitidos. Arquivar e restaurar exigem `project:archive`, são idempotentes (já no estado pedido ⇒ 200 com a versão atual) e, fora disso, exigem a versão (BR-008). As specs 004/005 estendem a regra a tarefas e quadros.
+
+### BR-027 — Participação no projeto
+
+Só membros da organização participam (`MEMBER_NOT_FOUND`, 404, igual para inexistente e de outra organização). O papel gravado nunca passa do teto: viewer na organização ⇒ só `viewer` (`PROJECT_ROLE_ABOVE_CEILING`, 422). Owner e admin da organização não são gravados como participantes (`ALREADY_MANAGES_ALL_PROJECTS`, 422 — já gerenciam todos os projetos). Sair ou ser removido da organização apaga as participações (FK em cascata, ADR 0015); ser rebaixado a viewer na organização rebaixa as participações a `viewer` na mesma transação, com versão incrementada, e promover de volta não as restaura. Participar duas vezes ⇒ `ALREADY_A_PROJECT_MEMBER` (409). Sair do projeto é sempre permitido a quem participa.

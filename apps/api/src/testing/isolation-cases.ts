@@ -1,5 +1,20 @@
 import type { Response } from 'supertest';
-import type { IsolationExpectation, RouteKey } from './tenant-isolation';
+import { z } from 'zod';
+import {
+  addProjectMemberRequestSchema,
+  changeMemberRoleRequestSchema,
+  changeProjectMemberRoleRequestSchema,
+  createProjectRequestSchema,
+  inviteMemberRequestSchema,
+  pageQuerySchema,
+  projectListQuerySchema,
+  projectVersionRequestSchema,
+  removeMemberQuerySchema,
+  removeProjectMemberQuerySchema,
+  updateOrganizationRequestSchema,
+  updateProjectRequestSchema,
+} from '@taskflow/contracts';
+import type { InputSchema, IsolationExpectation, RouteKey } from './tenant-isolation';
 
 /** Cliente HTTP autenticado (sessão + CSRF) usado nos casos. */
 export interface TestClient {
@@ -9,82 +24,279 @@ export interface TestClient {
   delete(path: string): Promise<Response>;
 }
 
-/** Duas organizações semeadas: o ator é **owner de A** (papel de maior privilégio). */
+/**
+ * Duas organizações semeadas, cada uma com projeto, participantes e workflow (spec 003). Dois
+ * atores sob o prefixo de A:
+ * - **owner de A** (papel de maior privilégio, papel efetivo `manager` em tudo);
+ * - **membro de A e de B** (`member` nos dois, manager do projeto de A e participante de um
+ *   projeto de B): exercita o caminho de visibilidade por participação — uma consulta que
+ *   esqueça `organizationId` aparece com ele, não com o owner.
+ */
 export interface IsolationWorld {
   readonly orgA: string;
   readonly orgB: string;
-  /** Ids reais de recursos de B, por nome de parâmetro de caminho. */
+  /** Recursos reais de A, para trocar **uma** referência por vez (as demais continuam válidas). */
+  readonly ofA: Readonly<{ projectId: string; key: string; participantUserId: string }>;
+  /** Ids, chaves e cursores reais de B, por nome de referência. */
   readonly ofB: Readonly<Record<string, string>>;
   readonly asOwnerOfA: TestClient;
+  readonly asDualMember: TestClient;
+  /** Pertence às duas organizações: aparece legitimamente nas respostas de A (fora dos canários). */
+  readonly dualMemberUserId: string;
 }
 
 export type IsolationVariant = Readonly<{
   expect: IsolationExpectation;
-  call: (world: IsolationWorld) => Promise<Response>;
+  /** Código do Problem Details esperado em `not-found` (prova que a referência trocada foi a barrada). */
+  code?: string;
+  /** Quem executa: só o owner de A (rotas que exigem papel de organização) ou os dois atores. */
+  actors: 'owner-of-A' | 'both';
+  call: (world: IsolationWorld, actor: TestClient) => Promise<Response>;
 }>;
 
-export type IsolationCase = Readonly<{ references: Readonly<Record<string, IsolationVariant>> }>;
+export type IsolationCase = Readonly<{
+  /** Schema do corpo (`null` = sem corpo). Obrigatório: esquecer não compila (obrigação 6 da 006). */
+  body: InputSchema | null;
+  /** Schema da query (`null` = sem query). */
+  query: InputSchema | null;
+  references: Readonly<Record<string, IsolationVariant>>;
+}>;
 
-const notFound = (call: IsolationVariant['call']): IsolationVariant => ({
-  expect: 'not-found',
-  call,
-});
-const noLeak = (call: IsolationVariant['call']): IsolationVariant => ({ expect: 'no-leak', call });
+const notFound = (
+  code: string,
+  call: IsolationVariant['call'],
+  actors: IsolationVariant['actors'] = 'both',
+): IsolationVariant => ({ expect: 'not-found', code, actors, call });
+const noLeak = (
+  call: IsolationVariant['call'],
+  actors: IsolationVariant['actors'] = 'both',
+): IsolationVariant => ({ expect: 'no-leak', actors, call });
+
+/** POST sem corpo (ações): declara um objeto vazio, nunca omite. */
+const emptyBody = z.strictObject({});
+
+const org = (world: IsolationWorld) => `/organizations/${world.orgA}`;
+const projectOfA = (world: IsolationWorld) => `${org(world)}/projects/${world.ofA.projectId}`;
+const projectOfB = (world: IsolationWorld) => `${org(world)}/projects/${world.ofB['projectId']}`;
+
+/** Variante "projeto de B sob o prefixo de A" para rotas `/projects/:projectId/...`. */
+const foreignProject = (
+  suffix: string,
+  send: (actor: TestClient, path: string) => Promise<Response> = (actor, path) => actor.get(path),
+) => notFound('PROJECT_NOT_FOUND', (world, actor) => send(actor, `${projectOfB(world)}${suffix}`));
 
 /**
- * Casos por rota do escopo do tenant (spec 006, CA-07). Além destes, o harness gera para **toda**
- * rota a chamada com o prefixo de B (⇒ 404). Cada parâmetro de caminho precisa de variante com id
- * real de B sob o prefixo de A; referências no corpo ou na query (specs 003+) também entram aqui.
+ * Casos por rota do escopo do tenant (spec 006, CA-07; spec 003, CA-09). Além destes, o harness
+ * gera para **toda** rota a chamada com o prefixo de B (⇒ 404). Cada parâmetro de caminho e cada
+ * referência de corpo ou query (derivada do schema declarado) precisa de variante.
  */
 export const ISOLATION_CASES: Readonly<Record<RouteKey, IsolationCase>> = {
-  'GET /organizations/:organizationId': { references: {} },
-  'PATCH /organizations/:organizationId': { references: {} },
+  // --- organizations (specs 002 e 006) ---
+  'GET /organizations/:organizationId': { body: null, query: null, references: {} },
+  'PATCH /organizations/:organizationId': {
+    body: updateOrganizationRequestSchema,
+    query: null,
+    references: {},
+  },
   'GET /organizations/:organizationId/members': {
+    body: null,
+    query: pageQuerySchema,
     references: {
-      list: noLeak((world) => world.asOwnerOfA.get(`/organizations/${world.orgA}/members`)),
+      list: noLeak((world, actor) => actor.get(`${org(world)}/members`)),
+      cursor: noLeak((world, actor) =>
+        actor.get(`${org(world)}/members?cursor=${world.ofB['membersCursor']}`),
+      ),
     },
   },
   'PATCH /organizations/:organizationId/members/:userId': {
+    body: changeMemberRoleRequestSchema,
+    query: null,
     references: {
-      userId: notFound((world) =>
-        world.asOwnerOfA.patch(`/organizations/${world.orgA}/members/${world.ofB['userId']}`, {
+      userId: notFound(
+        'MEMBER_NOT_FOUND',
+        (world, actor) =>
+          actor.patch(`${org(world)}/members/${world.ofB['userId']}`, {
+            role: 'viewer',
+            version: 1,
+          }),
+        'owner-of-A',
+      ),
+    },
+  },
+  'DELETE /organizations/:organizationId/members/:userId': {
+    body: null,
+    query: removeMemberQuerySchema,
+    references: {
+      userId: notFound(
+        'MEMBER_NOT_FOUND',
+        (world, actor) => actor.delete(`${org(world)}/members/${world.ofB['userId']}?version=1`),
+        'owner-of-A',
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/invitations': {
+    body: null,
+    query: pageQuerySchema,
+    references: {
+      list: noLeak((world, actor) => actor.get(`${org(world)}/invitations`), 'owner-of-A'),
+      cursor: noLeak(
+        (world, actor) =>
+          actor.get(`${org(world)}/invitations?cursor=${world.ofB['membersCursor']}`),
+        'owner-of-A',
+      ),
+    },
+  },
+  // Corpo sem ids (só e-mail e papel): o caso gerado (prefixo de B) basta.
+  'POST /organizations/:organizationId/invitations': {
+    body: inviteMemberRequestSchema,
+    query: null,
+    references: {},
+  },
+  'POST /organizations/:organizationId/invitations/:invitationId/resend': {
+    body: emptyBody,
+    query: null,
+    references: {
+      invitationId: notFound(
+        'INVITATION_NOT_FOUND',
+        (world, actor) =>
+          actor.post(`${org(world)}/invitations/${world.ofB['invitationId']}/resend`),
+        'owner-of-A',
+      ),
+    },
+  },
+  'DELETE /organizations/:organizationId/invitations/:invitationId': {
+    body: null,
+    query: null,
+    references: {
+      invitationId: notFound(
+        'INVITATION_NOT_FOUND',
+        (world, actor) => actor.delete(`${org(world)}/invitations/${world.ofB['invitationId']}`),
+        'owner-of-A',
+      ),
+    },
+  },
+
+  // --- projects (spec 003) ---
+  'GET /organizations/:organizationId/projects': {
+    body: null,
+    query: projectListQuerySchema,
+    references: {
+      list: noLeak((world, actor) => actor.get(`${org(world)}/projects`)),
+      archived: noLeak((world, actor) => actor.get(`${org(world)}/projects?status=archived`)),
+      cursor: noLeak((world, actor) =>
+        actor.get(`${org(world)}/projects?cursor=${world.ofB['projectsCursor']}`),
+      ),
+    },
+  },
+  // Corpo sem ids; a chave de B criada em A é só uma chave de A (sem vazamento).
+  'POST /organizations/:organizationId/projects': {
+    body: createProjectRequestSchema,
+    query: null,
+    references: {},
+  },
+  'GET /organizations/:organizationId/projects/by-key/:key': {
+    body: null,
+    query: null,
+    references: {
+      key: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.get(`${org(world)}/projects/by-key/${world.ofB['key']}`),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/projects/:projectId': {
+    body: null,
+    query: null,
+    references: { projectId: foreignProject('') },
+  },
+  'PATCH /organizations/:organizationId/projects/:projectId': {
+    body: updateProjectRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('', (actor, path) =>
+        actor.patch(path, { description: 'Tomado', version: 1 }),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/projects/:projectId/archive': {
+    body: projectVersionRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/archive', (actor, path) => actor.post(path, { version: 1 })),
+    },
+  },
+  'POST /organizations/:organizationId/projects/:projectId/restore': {
+    body: projectVersionRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/restore', (actor, path) => actor.post(path, { version: 1 })),
+    },
+  },
+  'GET /organizations/:organizationId/projects/:projectId/workflow': {
+    body: null,
+    query: null,
+    references: { projectId: foreignProject('/workflow') },
+  },
+  'GET /organizations/:organizationId/projects/:projectId/members': {
+    body: null,
+    query: pageQuerySchema,
+    references: {
+      projectId: foreignProject('/members'),
+      cursor: noLeak((world, actor) =>
+        actor.get(`${projectOfA(world)}/members?cursor=${world.ofB['projectMembersCursor']}`),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/projects/:projectId/member-candidates': {
+    body: null,
+    query: pageQuerySchema,
+    references: {
+      projectId: foreignProject('/member-candidates'),
+      list: noLeak((world, actor) => actor.get(`${projectOfA(world)}/member-candidates`)),
+      cursor: noLeak((world, actor) =>
+        actor.get(`${projectOfA(world)}/member-candidates?cursor=${world.ofB['membersCursor']}`),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/projects/:projectId/members': {
+    body: addProjectMemberRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/members', (actor, path) =>
+        actor.post(path, { userId: '00000000-0000-7000-8000-000000000001', role: 'viewer' }),
+      ),
+      // Projeto de A válido; só a pessoa é de B (membro só de B).
+      userId: notFound('MEMBER_NOT_FOUND', (world, actor) =>
+        actor.post(`${projectOfA(world)}/members`, { userId: world.ofB['userId'], role: 'viewer' }),
+      ),
+    },
+  },
+  'PATCH /organizations/:organizationId/projects/:projectId/members/:userId': {
+    body: changeProjectMemberRoleRequestSchema,
+    query: null,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.patch(`${projectOfB(world)}/members/${world.ofA.participantUserId}`, {
+          role: 'viewer',
+          version: 1,
+        }),
+      ),
+      userId: notFound('PROJECT_MEMBER_NOT_FOUND', (world, actor) =>
+        actor.patch(`${projectOfA(world)}/members/${world.ofB['participantUserId']}`, {
           role: 'viewer',
           version: 1,
         }),
       ),
     },
   },
-  'DELETE /organizations/:organizationId/members/:userId': {
+  'DELETE /organizations/:organizationId/projects/:projectId/members/:userId': {
+    body: null,
+    query: removeProjectMemberQuerySchema,
     references: {
-      userId: notFound((world) =>
-        world.asOwnerOfA.delete(
-          `/organizations/${world.orgA}/members/${world.ofB['userId']}?version=1`,
-        ),
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.delete(`${projectOfB(world)}/members/${world.ofA.participantUserId}?version=1`),
       ),
-    },
-  },
-  'GET /organizations/:organizationId/invitations': {
-    references: {
-      list: noLeak((world) => world.asOwnerOfA.get(`/organizations/${world.orgA}/invitations`)),
-    },
-  },
-  // Corpo sem ids (só e-mail e papel): o caso gerado (prefixo de B) basta.
-  'POST /organizations/:organizationId/invitations': { references: {} },
-  'POST /organizations/:organizationId/invitations/:invitationId/resend': {
-    references: {
-      invitationId: notFound((world) =>
-        world.asOwnerOfA.post(
-          `/organizations/${world.orgA}/invitations/${world.ofB['invitationId']}/resend`,
-        ),
-      ),
-    },
-  },
-  'DELETE /organizations/:organizationId/invitations/:invitationId': {
-    references: {
-      invitationId: notFound((world) =>
-        world.asOwnerOfA.delete(
-          `/organizations/${world.orgA}/invitations/${world.ofB['invitationId']}`,
-        ),
+      userId: notFound('PROJECT_MEMBER_NOT_FOUND', (world, actor) =>
+        actor.delete(`${projectOfA(world)}/members/${world.ofB['participantUserId']}?version=1`),
       ),
     },
   },

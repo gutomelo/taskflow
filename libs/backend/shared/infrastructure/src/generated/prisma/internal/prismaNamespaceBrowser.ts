@@ -58,6 +58,10 @@ export const ModelName = {
   Organization: 'Organization',
   Membership: 'Membership',
   Invitation: 'Invitation',
+  Project: 'Project',
+  ProjectMember: 'ProjectMember',
+  WorkflowStatus: 'WorkflowStatus',
+  WorkflowTransition: 'WorkflowTransition',
   OutboxEvent: 'OutboxEvent'
 } as const
 
@@ -177,6 +181,58 @@ export const InvitationScalarFieldEnum = {
 } as const
 
 export type InvitationScalarFieldEnum = (typeof InvitationScalarFieldEnum)[keyof typeof InvitationScalarFieldEnum]
+
+
+export const ProjectScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  key: 'key',
+  name: 'name',
+  description: 'description',
+  archivedAt: 'archivedAt',
+  createdByUserId: 'createdByUserId',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProjectScalarFieldEnum = (typeof ProjectScalarFieldEnum)[keyof typeof ProjectScalarFieldEnum]
+
+
+export const ProjectMemberScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  userId: 'userId',
+  role: 'role',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProjectMemberScalarFieldEnum = (typeof ProjectMemberScalarFieldEnum)[keyof typeof ProjectMemberScalarFieldEnum]
+
+
+export const WorkflowStatusScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  name: 'name',
+  category: 'category',
+  position: 'position'
+} as const
+
+export type WorkflowStatusScalarFieldEnum = (typeof WorkflowStatusScalarFieldEnum)[keyof typeof WorkflowStatusScalarFieldEnum]
+
+
+export const WorkflowTransitionScalarFieldEnum = {
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  fromStatusId: 'fromStatusId',
+  toStatusId: 'toStatusId'
+} as const
+
+export type WorkflowTransitionScalarFieldEnum = (typeof WorkflowTransitionScalarFieldEnum)[keyof typeof WorkflowTransitionScalarFieldEnum]
 
 
 export const OutboxEventScalarFieldEnum = {

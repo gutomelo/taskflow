@@ -12,7 +12,7 @@ Referências: ADR 0004 (multi-tenancy), ADR 0006 (concorrência), skill `/databa
 ## Schema
 
 - Schema multi-arquivo: `prisma/schema.prisma` contém só `generator` e `datasource`; modelos em `prisma/models/<contexto>.prisma` (um arquivo por bounded context; `shared.prisma` para infraestrutura compartilhada). `prisma.config.ts` aponta para o **diretório** `prisma`. Migrations em `prisma/migrations/`.
-- Relações Prisma entre arquivos de contextos diferentes são proibidas (contextos não referenciam tabelas uns dos outros); referências entre contextos são IDs sem FK ou passam por portas. Client gerado em `libs/backend/shared/infrastructure/src/generated/prisma` (não versionado).
+- Relações Prisma entre arquivos de contextos diferentes são proibidas (contextos não referenciam tabelas uns dos outros), exceto sob os critérios do ADR 0015 e listadas em `docs/architecture/bounded-contexts.md` (FK para a organização e para a membership); as demais referências entre contextos são IDs sem FK ou passam por portas. Client gerado em `libs/backend/shared/infrastructure/src/generated/prisma` (não versionado).
 - Modelos em PascalCase inglês, tabelas/colunas em snake_case via `@@map`/`@map`.
 - IDs: UUID v7 gerado na aplicação (ordenável, sem enumeração). Timestamps `created_at`/`updated_at` em `timestamptz`.
 - Toda tabela tenant-scoped tem `organization_id NOT NULL` com FK, e **todo índice de consulta começa por `organization_id`**.

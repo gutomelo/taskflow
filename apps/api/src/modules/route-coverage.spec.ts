@@ -1,8 +1,10 @@
 import { Router, type RequestHandler } from 'express';
+import { z } from 'zod';
 import {
   createAuthenticate,
   createCsrfProtection,
   createTenantScope,
+  noStore as sharedNoStore,
 } from '@taskflow/backend/shared/http';
 import {
   ChangePasswordUseCase,
@@ -38,6 +40,22 @@ import {
   UpdateOrganizationUseCase,
 } from '@taskflow/backend/organizations/application';
 import { createOrganizationsTestbed } from '@taskflow/backend/organizations/application/testing';
+import {
+  AddProjectMemberUseCase,
+  ArchiveProjectUseCase,
+  ChangeProjectMemberRoleUseCase,
+  CreateProjectUseCase,
+  GetProjectUseCase,
+  GetWorkflowUseCase,
+  ListMemberCandidatesUseCase,
+  ListProjectMembersUseCase,
+  ListProjectsUseCase,
+  RemoveProjectMemberUseCase,
+  RestoreProjectUseCase,
+  UpdateProjectUseCase,
+} from '@taskflow/backend/projects/application';
+import { createProjectsTestbed } from '@taskflow/backend/projects/application/testing';
+import { createProjectsRouter } from '@taskflow/backend/projects/http';
 import { createOrganizationsRouters } from '@taskflow/backend/organizations/http';
 import { GLOBAL_ROUTES, ISOLATION_CASES } from '../testing/isolation-cases';
 import {
@@ -114,11 +132,30 @@ function composed() {
     rateLimiter: bed.rateLimiter,
   });
   const resolve = new ResolveTenantMembershipUseCase(bed);
+  const projectsBed = createProjectsTestbed();
+  const projectsRouter = createProjectsRouter({
+    useCases: {
+      createProject: new CreateProjectUseCase(projectsBed),
+      listProjects: new ListProjectsUseCase(projectsBed),
+      getProject: new GetProjectUseCase(projectsBed),
+      getWorkflow: new GetWorkflowUseCase(projectsBed),
+      updateProject: new UpdateProjectUseCase(projectsBed),
+      archiveProject: new ArchiveProjectUseCase(projectsBed),
+      restoreProject: new RestoreProjectUseCase(projectsBed),
+      listMembers: new ListProjectMembersUseCase(projectsBed),
+      listMemberCandidates: new ListMemberCandidatesUseCase(projectsBed),
+      addMember: new AddProjectMemberUseCase(projectsBed),
+      changeMemberRole: new ChangeProjectMemberRoleUseCase(projectsBed),
+      removeMember: new RemoveProjectMemberUseCase(projectsBed),
+    },
+    rateLimiter: projectsBed.rateLimiter,
+  });
   return composeApiRouters({
     identityRouter,
     authenticate,
     csrf,
     organizations: { ...routers, resolveTenant: (input) => resolve.execute(input) },
+    projects: { tenantRouter: projectsRouter },
   });
 }
 
@@ -169,9 +206,47 @@ describe('isolation harness fails closed', () => {
   it('reports a missing variant for a path parameter', () => {
     const routes = listTenantRoutes(scopeWith((router) => router.delete('/things/:thingId', noop)));
 
-    expect(coverageGaps(routes, { [routes[0] ?? '']: { references: {} } })).toEqual([
-      'DELETE /organizations/:organizationId/things/:thingId: no variant for :thingId',
+    expect(
+      coverageGaps(routes, { [routes[0] ?? '']: { body: null, query: null, references: {} } }),
+    ).toEqual(['DELETE /organizations/:organizationId/things/:thingId: no variant for :thingId']);
+  });
+
+  it('spec 003: derives body and query references from the declared schemas', () => {
+    const routes = listTenantRoutes(
+      scopeWith((router) => router.post('/things', noop).get('/things', noop)),
+    );
+    const [post = '', get = ''] = routes;
+
+    expect(
+      coverageGaps(routes, {
+        [post]: {
+          body: z.object({ ownerId: z.uuid(), name: z.string() }),
+          query: null,
+          references: {},
+        },
+        [get]: { body: null, query: z.object({ cursor: z.string() }), references: {} },
+      }),
+    ).toEqual([
+      'POST /organizations/:organizationId/things: no variant for body.ownerId',
+      'GET /organizations/:organizationId/things: no variant for query.cursor',
     ]);
+  });
+
+  it('spec 003: a route that takes a body must declare its schema', () => {
+    const routes = listTenantRoutes(scopeWith((router) => router.patch('/things', noop)));
+
+    expect(
+      coverageGaps(routes, { [routes[0] ?? '']: { body: null, query: null, references: {} } }),
+    ).toEqual(['PATCH /organizations/:organizationId/things: no body schema declared']);
+  });
+
+  it('accepts only the shared noStore middleware, by identity (not by name)', () => {
+    const noStore: RequestHandler = (_request, _response, next) => next();
+
+    expect(() => listTenantRoutes(scopeWith((router) => router.use(noStore)))).toThrow(
+      'is not an allowed middleware',
+    );
+    expect(listTenantRoutes(scopeWith((router) => router.use(sharedNoStore)))).toEqual([]);
   });
 
   it('rejects a context router mounted with its own path and unknown route-less layers', () => {

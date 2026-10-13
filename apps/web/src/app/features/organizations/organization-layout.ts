@@ -49,6 +49,7 @@ export class OrganizationLayout {
   protected readonly messages = organizationMessages;
   protected readonly links: ReadonlyArray<{ path: string; label: string }> = [
     { path: '.', label: organizationMessages.home },
+    { path: 'projects', label: organizationMessages.projects },
     { path: 'members', label: organizationMessages.members },
     { path: 'settings', label: organizationMessages.settings },
   ];

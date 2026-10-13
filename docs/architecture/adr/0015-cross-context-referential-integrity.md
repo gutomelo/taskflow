@@ -1,6 +1,6 @@
 # 0015 — Integridade referencial entre bounded contexts no banco
 
-- **Status**: Proposto (decisão com a aprovação da spec 003)
+- **Status**: Aceito (2026-10-13, com a aprovação da spec 003)
 - **Data**: 2026-10-13
 - **Decisores**: usuário (product owner); arquitetura (Claude Code, revisão da spec 003)
 - **Relacionados**: [ADR 0003](0003-modular-monolith-clean-architecture.md), [ADR 0013](0013-authorization-shared-kernel.md), [ADR 0014](0014-rls-deferred.md), [spec 003](../../../specs/003-projects/design.md), [spec 006](../../../specs/006-permissions/design.md), [bounded contexts](../bounded-contexts.md)
@@ -48,7 +48,9 @@ Adotamos **C**, restrita por critérios.
    - (c) é composta com `organization_id` (ADR 0014);
    - (d) a ação é `CASCADE`, `RESTRICT` ou `SET NULL (coluna)`, sem alterar dados de negócio além de apagar ou desligar a referência; `RESTRICT` nunca pode bloquear a revogação de acesso (remover da organização, sair);
    - (e) está listada na tabela de exceções de `bounded-contexts.md` com a spec que a introduziu.
-2. Primeira exceção: `project_members (organization_id, user_id) → memberships (organization_id, user_id) ON DELETE CASCADE ON UPDATE RESTRICT` (spec 003; obrigação 2 da spec 006).
+2. Exceções da spec 003:
+   - `project_members (organization_id, user_id) → memberships (organization_id, user_id) ON DELETE CASCADE ON UPDATE RESTRICT` (obrigação 2 da spec 006);
+   - `projects (organization_id) → organizations (id) ON DELETE CASCADE ON UPDATE RESTRICT` (toda tabela tenant-scoped tem FK para a organização, `.claude/rules/database.md`; incluída na revisão 3 do design da spec 003).
 3. A back-relation exigida pelo Prisma no modelo fornecedor é **inerte**:
    - o código do contexto fornecedor não a usa, o que é barrado por `no-restricted-syntax` em `eslint.config.mjs`;
    - um comentário no modelo aponta para este ADR.

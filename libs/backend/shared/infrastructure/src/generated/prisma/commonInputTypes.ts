@@ -280,6 +280,40 @@ export type UuidNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
 }
 
+export type EnumProjectRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProjectRole | Prisma.EnumProjectRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel> | $Enums.ProjectRole
+}
+
+export type EnumProjectRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProjectRole | Prisma.EnumProjectRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProjectRoleWithAggregatesFilter<$PrismaModel> | $Enums.ProjectRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel>
+}
+
+export type EnumStatusCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.StatusCategory | Prisma.EnumStatusCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel> | $Enums.StatusCategory
+}
+
+export type EnumStatusCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StatusCategory | Prisma.EnumStatusCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStatusCategoryWithAggregatesFilter<$PrismaModel> | $Enums.StatusCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel>
+}
+
 export type JsonFilter<$PrismaModel = never> =
 | Prisma.PatchUndefined<
     Prisma.Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
@@ -604,6 +638,40 @@ export type NestedUuidNullableWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedStringNullableFilter<$PrismaModel>
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumProjectRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProjectRole | Prisma.EnumProjectRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel> | $Enums.ProjectRole
+}
+
+export type NestedEnumProjectRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProjectRole | Prisma.EnumProjectRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProjectRole[] | Prisma.ListEnumProjectRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProjectRoleWithAggregatesFilter<$PrismaModel> | $Enums.ProjectRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProjectRoleFilter<$PrismaModel>
+}
+
+export type NestedEnumStatusCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.StatusCategory | Prisma.EnumStatusCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel> | $Enums.StatusCategory
+}
+
+export type NestedEnumStatusCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StatusCategory | Prisma.EnumStatusCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StatusCategory[] | Prisma.ListEnumStatusCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStatusCategoryWithAggregatesFilter<$PrismaModel> | $Enums.StatusCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStatusCategoryFilter<$PrismaModel>
 }
 
 export type NestedJsonFilter<$PrismaModel = never> =

@@ -16,10 +16,15 @@ import {
 } from '@taskflow/backend/shared/infrastructure';
 import { createApp } from './app';
 import { loadConfig } from './config/env';
+import { createMembershipRoleChanges } from './modules/adapters/membership-role-changes.adapter';
+import { createOrganizationAccess } from './modules/adapters/organization-access.adapter';
+import { createProjectUserDirectory } from './modules/adapters/project-user-directory.adapter';
 import { createUserDirectory } from './modules/adapters/user-directory.adapter';
+import { mergeDomainErrors } from './modules/domain-errors';
 import { composeApiRouters } from './modules/api-routers';
 import { createIdentityModule } from './modules/identity.module';
 import { createOrganizationsModule } from './modules/organizations.module';
+import { createProjectsFoundation, createProjectsModule } from './modules/projects.module';
 import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
@@ -70,11 +75,20 @@ async function bootstrap(): Promise<void> {
     clock: new SystemClock(),
   };
   const identity = await createIdentityModule({ ...shared, config, redis });
+  // Ordem de montagem (spec 003): `projects` reage a mudanças de papel em `organizations`.
+  const projectsFoundation = createProjectsFoundation(shared);
   const organizations = createOrganizationsModule({
     ...shared,
+    membershipRoleChanges: createMembershipRoleChanges(projectsFoundation),
     users: createUserDirectory(identity),
     authenticate: identity.authenticate,
     csrf: identity.csrf,
+  });
+  const projects = createProjectsModule({
+    ...shared,
+    foundation: projectsFoundation,
+    organizationAccess: createOrganizationAccess(organizations),
+    users: createProjectUserDirectory(identity),
   });
   // ADR 0012: `authenticate → csrf → tenantContext` uma vez sobre /organizations/:organizationId.
   const { apiRouters } = composeApiRouters({
@@ -82,6 +96,7 @@ async function bootstrap(): Promise<void> {
     authenticate: identity.authenticate,
     csrf: identity.csrf,
     organizations,
+    projects,
   });
 
   const app = createApp({
@@ -89,7 +104,11 @@ async function bootstrap(): Promise<void> {
     logger,
     probes: [createPostgresProbe(prisma), createRedisProbe(redis)],
     apiRouters,
-    domainErrors: { ...identity.domainErrors, ...organizations.domainErrors },
+    domainErrors: mergeDomainErrors(
+      identity.domainErrors,
+      organizations.domainErrors,
+      projects.domainErrors,
+    ),
     // RF-14: documentação interativa apenas fora de produção.
     ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),
   });

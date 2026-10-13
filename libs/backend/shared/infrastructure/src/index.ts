@@ -28,13 +28,20 @@ export {
   type Redis,
   type RedisClientOptions,
 } from './lib/cache/redis-client.factory';
-export { isUniqueConstraintViolation } from './lib/persistence/prisma-errors';
+export {
+  isForeignKeyViolation,
+  isUniqueConstraintViolation,
+} from './lib/persistence/prisma-errors';
 /** Tipos das linhas do banco para os mapeadores dos repositórios (nunca saem da infraestrutura). */
 export type {
   Invitation as InvitationRow,
   Membership as MembershipRow,
   Organization as OrganizationRow,
   OutboxEvent as OutboxEventRow,
+  Project as ProjectRow,
+  ProjectMember as ProjectMemberRow,
+  WorkflowStatus as WorkflowStatusRow,
+  WorkflowTransition as WorkflowTransitionRow,
   RefreshToken as RefreshTokenRow,
   Session as SessionRow,
   User as UserRow,

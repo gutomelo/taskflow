@@ -7,8 +7,9 @@
 // - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.
 // - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.
 // - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).
-// - Relações entre arquivos são permitidas pelo Prisma, mas entre contextos diferentes são
-//   proibidas pela arquitetura: contextos não referenciam tabelas uns dos outros.
+// - Relações entre arquivos são permitidas pelo Prisma, mas entre contextos diferentes só sob os
+//   critérios do ADR 0015 (exceções listadas em docs/architecture/bounded-contexts.md); fora deles,
+//   contextos não referenciam tabelas uns dos outros.
 
 generator client {
   provider     = "prisma-client"

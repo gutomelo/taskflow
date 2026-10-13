@@ -1,4 +1,4 @@
-import type { EmailAddress } from '@taskflow/backend/shared/kernel';
+import type { EmailAddress, OrganizationRole } from '@taskflow/backend/shared/kernel';
 import type { Invitation } from '../invitation/invitation';
 import type { Membership } from '../membership/membership';
 import type { Organization } from '../organization/organization';
@@ -23,6 +23,12 @@ export interface OrganizationRepository {
    * serializa mutações de membership e convites (BR-019/BR-021). `false` se não existir.
    */
   lockForMembershipChange(organizationId: string): Promise<boolean>;
+  /**
+   * Trava a organização para compartilhamento até o fim da transação (`FOR SHARE`) e a devolve:
+   * conflita com `lockForMembershipChange`, então mudanças de papel e mutações de projetos que
+   * dependem de papéis ficam serializadas (spec 003). `null` se não existir. Só em transação.
+   */
+  lockForShare(organizationId: string): Promise<Organization | null>;
 }
 
 /** Todas as operações recebem `organizationId` e o aplicam em leitura **e** escrita. */
@@ -31,6 +37,23 @@ export interface MembershipRepository {
   add(membership: Membership): Promise<void>;
   find(organizationId: string, userId: string): Promise<Membership | null>;
   listPage(organizationId: string, page: PageRequest): Promise<Page<Membership>>;
+  /**
+   * Página de membros com um dos papéis indicados e fora de `excludeUserIds` (candidatos a
+   * projeto, spec 003). Filtro na consulta: as páginas ficam cheias.
+   */
+  listPageExcluding(
+    organizationId: string,
+    filter: Readonly<{
+      excludeUserIds: ReadonlyArray<string>;
+      roles: ReadonlyArray<OrganizationRole>;
+    }>,
+    page: PageRequest,
+  ): Promise<Page<Membership>>;
+  /** Papéis dos usuários indicados que são membros (os demais ficam de fora do mapa). */
+  rolesOf(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>>;
   /** Consulta global do próprio usuário ("minhas organizações"). */
   listForUser(userId: string): Promise<ReadonlyArray<Membership>>;
   countForUser(userId: string): Promise<number>;

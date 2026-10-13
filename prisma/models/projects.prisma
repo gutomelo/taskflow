@@ -1,0 +1,109 @@
+// Bounded context: Projects (spec 003). Tabelas pertencem exclusivamente a este contexto.
+// `created_by_user_id` referencia `identity` sem FK. Exceções registradas no ADR 0015:
+// `projects.organization_id → organizations` e `project_members (organization_id, user_id) →
+// memberships`, em cascata (não existe projeto sem organização nem participação sem membership). Toda FK interna é composta com `organization_id` (ADR 0014).
+
+/// Papéis de projeto (matriz em docs/security/authorization.md; teto pela organização, BR-023).
+enum ProjectRole {
+  manager
+  member
+  viewer
+
+  @@map("project_role")
+}
+
+/// Categoria estável de um status do workflow (BR-004); o nome é dado do projeto.
+enum StatusCategory {
+  todo
+  in_progress
+  done
+
+  @@map("status_category")
+}
+
+/// Projeto da organização. Chave única na organização e imutável (BR-025) — CHECK de formato na
+/// migration. Arquivado (`archived_at`) é somente leitura (BR-026).
+model Project {
+  id              String    @id @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  key             String    @db.VarChar(10)
+  name            String    @db.VarChar(80)
+  description     String?   @db.VarChar(2000)
+  archivedAt      DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdByUserId String    @map("created_by_user_id") @db.Uuid
+  /// Optimistic locking (BR-008).
+  version         Int       @default(1)
+  createdAt       DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  /// ADR 0015: toda tabela tenant-scoped tem FK para a organização (.claude/rules/database.md).
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  members      ProjectMember[]
+  statuses     WorkflowStatus[]
+
+  /// Alvo das FKs compostas (ADR 0014).
+  @@unique([organizationId, id])
+  @@unique([organizationId, key])
+  /// Lista por organização, estado e nome (keyset por nome, id).
+  @@index([organizationId, archivedAt, name, id])
+  @@map("projects")
+}
+
+/// Participação de um membro da organização num projeto (BR-027).
+model ProjectMember {
+  id             String      @id @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  projectId      String      @map("project_id") @db.Uuid
+  userId         String      @map("user_id") @db.Uuid
+  role           ProjectRole
+  /// Optimistic locking (BR-008); o rebaixamento propagado (BR-027) também incrementa.
+  version        Int         @default(1)
+  createdAt      DateTime    @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project    Project    @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+  /// ADR 0015: única FK entre contextos. Remover ou sair da organização apaga as participações.
+  membership Membership @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([organizationId, projectId, userId])
+  /// Participantes por projeto (keyset por entrada, usuário).
+  @@index([organizationId, projectId, createdAt, userId])
+  /// Visibilidade ("meus projetos") e rebaixamento propagado.
+  @@index([organizationId, userId])
+  @@map("project_members")
+}
+
+/// Status do workflow do projeto (BR-004). Padrão criado com o projeto; editável na spec 005.
+model WorkflowStatus {
+  id             String         @id @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  projectId      String         @map("project_id") @db.Uuid
+  name           String         @db.VarChar(40)
+  category       StatusCategory
+  position       Int
+
+  project         Project              @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+  transitionsFrom WorkflowTransition[] @relation("TransitionFrom")
+  transitionsTo   WorkflowTransition[] @relation("TransitionTo")
+
+  /// Alvo das FKs das transições (e de `tasks.status_id` na spec 004): mesmo projeto garantido.
+  @@unique([organizationId, projectId, id])
+  /// Não único: a spec 005 reordena e decide a unicidade da ordem.
+  @@index([organizationId, projectId, position])
+  @@map("workflow_statuses")
+}
+
+/// Transição permitida entre dois status do mesmo projeto (BR-004).
+model WorkflowTransition {
+  organizationId String @map("organization_id") @db.Uuid
+  projectId      String @map("project_id") @db.Uuid
+  fromStatusId   String @map("from_status_id") @db.Uuid
+  toStatusId     String @map("to_status_id") @db.Uuid
+
+  from WorkflowStatus @relation("TransitionFrom", fields: [organizationId, projectId, fromStatusId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+  to   WorkflowStatus @relation("TransitionTo", fields: [organizationId, projectId, toStatusId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@id([projectId, fromStatusId, toStatusId])
+  @@index([organizationId, projectId, toStatusId])
+  @@map("workflow_transitions")
+}

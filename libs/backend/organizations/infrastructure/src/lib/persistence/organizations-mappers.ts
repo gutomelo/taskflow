@@ -18,7 +18,7 @@ import type {
 } from '@taskflow/backend/shared/infrastructure';
 
 /** Papel lido do banco: valor fora do enum é dado corrompido — falha alto, nunca concede. */
-function roleFrom(value: string): OrganizationRole {
+export function roleFrom(value: string): OrganizationRole {
   if (!isOrganizationRole(value))
     throw new Error(`Unknown organization role in database: ${value}`);
   return value;

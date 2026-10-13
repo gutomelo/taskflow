@@ -36,3 +36,21 @@ export const OrganizationRole = {
 } as const
 
 export type OrganizationRole = (typeof OrganizationRole)[keyof typeof OrganizationRole]
+
+
+export const ProjectRole = {
+  manager: 'manager',
+  member: 'member',
+  viewer: 'viewer'
+} as const
+
+export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
+
+
+export const StatusCategory = {
+  todo: 'todo',
+  in_progress: 'in_progress',
+  done: 'done'
+} as const
+
+export type StatusCategory = (typeof StatusCategory)[keyof typeof StatusCategory]

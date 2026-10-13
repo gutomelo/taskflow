@@ -15,14 +15,14 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
 - Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
 
-## Fase 1 — MVP · Em andamento (specs 001, 002 e 006 concluídas)
+## Fase 1 — MVP · Em andamento (specs 001, 002, 006 e 003 concluídas)
 
 | Ordem | Spec                 | Conteúdo                                                                                                                      |
 | ----- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1     | `001-authentication` | **Concluída.** Registro, login, logout, refresh rotativo, recuperação de senha, sessões.                                      |
 | 2     | `002-organizations`  | **Concluída.** Organizações (tenant), membros, convites, troca de organização ativa. Equipes adiadas para a spec que as usar. |
 | 3     | `006-permissions`    | **Concluída.** Papéis, matriz de permissões (Shared Kernel), capacidades na API, harness de isolamento (RLS: ADR 0014).       |
-| 4     | `003-projects`       | Projetos, membros do projeto, configurações, arquivamento.                                                                    |
+| 4     | `003-projects`       | **Concluída.** Projetos com chave, participantes com teto, workflow padrão, arquivamento (ADR 0015).                          |
 | 5     | `004-tasks`          | Tarefas, prioridade, responsáveis, prazos, subtarefas, dependências (BR-001, 003, 006, 008).                                  |
 | 6     | `005-kanban`         | Quadros, colunas, transições configuráveis, ordenação, movimentação (BR-004, 009).                                            |
 

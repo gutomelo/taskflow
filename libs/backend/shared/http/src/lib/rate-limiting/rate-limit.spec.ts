@@ -59,6 +59,22 @@ describe('createRateLimit', () => {
       .expect(204);
     expect(consumed.size).toBe(0);
   });
+
+  it('fails closed (500) when a required key is missing, instead of skipping the limit', async () => {
+    const { limiter, consumed } = createFakeLimiter();
+    const app = createTestApp((testApp) => {
+      testApp.post(
+        '/required',
+        createRateLimit({ limiter, policy, key: () => undefined, requireKey: true }),
+        (_req, res) => {
+          res.status(204).end();
+        },
+      );
+    });
+
+    await request(app).post('/required').expect(500);
+    expect(consumed.size).toBe(0);
+  });
 });
 
 describe('clientIpKey', () => {

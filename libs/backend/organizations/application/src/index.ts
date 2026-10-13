@@ -36,6 +36,13 @@ export {
   type UpdateOrganizationDependencies,
 } from './lib/use-cases/update-organization.use-case';
 export { ResolveTenantMembershipUseCase } from './lib/use-cases/resolve-tenant-membership.use-case';
+export {
+  GetMemberRolesUseCase,
+  ListMembersExcludingUseCase,
+  LockOrganizationForShareUseCase,
+  type OrganizationAccessSnapshot,
+} from './lib/use-cases/organization-access.use-cases';
+export type { MembershipRoleChanges } from './lib/ports/membership-role-changes';
 export type { MemberView, Viewer } from './lib/shared/member-view';
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type PageQuery } from './lib/shared/pagination';
 export { ListMembersUseCase } from './lib/use-cases/list-members.use-case';

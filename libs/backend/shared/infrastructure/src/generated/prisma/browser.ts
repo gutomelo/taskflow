@@ -54,6 +54,27 @@ export type Membership = Prisma.MembershipModel
  */
 export type Invitation = Prisma.InvitationModel
 /**
+ * Model Project
+ * Projeto da organização. Chave única na organização e imutável (BR-025) — CHECK de formato na
+ * migration. Arquivado (`archived_at`) é somente leitura (BR-026).
+ */
+export type Project = Prisma.ProjectModel
+/**
+ * Model ProjectMember
+ * Participação de um membro da organização num projeto (BR-027).
+ */
+export type ProjectMember = Prisma.ProjectMemberModel
+/**
+ * Model WorkflowStatus
+ * Status do workflow do projeto (BR-004). Padrão criado com o projeto; editável na spec 005.
+ */
+export type WorkflowStatus = Prisma.WorkflowStatusModel
+/**
+ * Model WorkflowTransition
+ * Transição permitida entre dois status do mesmo projeto (BR-004).
+ */
+export type WorkflowTransition = Prisma.WorkflowTransitionModel
+/**
  * Model OutboxEvent
  * Transactional Outbox (ADR 0011): eventos de integração gravados na mesma transação
  * da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.

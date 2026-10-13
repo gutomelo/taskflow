@@ -7,7 +7,7 @@
 ```gherkin
 Dado uma organização com "membros podem criar projetos" ligada
 Quando owner, admin e member criam projetos com chave e nome válidos
-Então os três projetos são criados, cada criador participa como manager (ver D1) e cada projeto tem os status "A fazer", "Em andamento" e "Concluído" com transições de ida e volta
+Então os três projetos são criados, o member criador participa como manager, owner e admin não são gravados como participantes (D1), e cada projeto tem os status "A fazer", "Em andamento" e "Concluído" com transições de ida e volta
 E um viewer recebe 403
 Quando a configuração é desligada
 Então o member recebe 403 e owner/admin continuam criando
@@ -76,7 +76,9 @@ Quando adiciona um viewer da organização como manager ou member
 Então recebe 422 PROJECT_ROLE_ABOVE_CEILING
 Quando adiciona quem já participa
 Então recebe 409 ALREADY_A_PROJECT_MEMBER
-E os candidatos listados trazem só os papéis permitidos pelo teto
+Quando adiciona um owner ou admin da organização
+Então recebe 422 ALREADY_MANAGES_ALL_PROJECTS
+E os candidatos listados excluem owner/admin e trazem só os papéis permitidos pelo teto
 ```
 
 ### CA-07 — Alterar papel, remover, sair e IDOR
@@ -128,21 +130,32 @@ E na jornada E2E real: criar projeto, adicionar participante, arquivar e restaur
 
 ## Testes obrigatórios
 
-- [ ] Domínio: BR-025, BR-026, BR-027, capacidades, ações, workflow padrão
-- [ ] Casos de uso com fakes: sucesso, 403/404, erros de regra, ordem de decisão
-- [ ] Integração: restrições do banco, cascata, portas na mesma transação, concorrência, harness ampliado, bateria intra-tenant
-- [ ] HTTP: contratos, 400/403/404/409/422/429, OpenAPI
-- [ ] Frontend: lista, criação, área do projeto, ações por capacidade
-- [ ] E2E: jornada real de projetos; jornadas existentes verdes
+- [x] Domínio: BR-025, BR-026, BR-027, capacidades, ações, workflow padrão
+- [x] Casos de uso com fakes: sucesso, 403/404, erros de regra, ordem de decisão
+- [x] Integração: restrições do banco, cascata, portas na mesma transação, concorrência, harness ampliado, bateria intra-tenant
+- [x] HTTP: contratos, 400/403/404/409/422/429, OpenAPI
+- [x] Frontend: lista, criação, área do projeto, ações por capacidade
+- [x] E2E: jornada real de projetos; jornadas existentes verdes
 
 ## Evidências de validação
 
-| Critério | Evidência (comando + resultado) | Data |
-| -------- | ------------------------------- | ---- |
+| Critério | Evidência (comando + resultado)                                                                                                                                                               | Data       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| CA-01    | `project.use-cases.spec.ts` (CreateProject: D1, member manager, workflow, BR-024); `projects-composition.integration.spec.ts` (configuração × criação); E2E `projects-journey` ✔              | 2026-10-13 |
+| CA-02    | `project.spec.ts` (BR-025); `project.use-cases.spec.ts` (CA-02, 403 antes de chave em uso); `projects-schema.integration.spec.ts`; `projects-router.spec.ts` ✔                                | 2026-10-13 |
+| CA-03    | `project.use-cases.spec.ts` (CA-03); `projects-authorization.integration.spec.ts` (404 idêntico em toda rota; 403 antes de erros de estado) ✔                                                 | 2026-10-13 |
+| CA-04    | `project.use-cases.spec.ts` (CA-04); `project-policy.spec.ts` ✔                                                                                                                               | 2026-10-13 |
+| CA-05    | `project.use-cases.spec.ts` (BR-026, idempotência, versão); `projects-router.spec.ts`; `project-settings.page.spec.ts`; E2E ✔                                                                 | 2026-10-13 |
+| CA-06    | `project-member.use-cases.spec.ts` (CA-06); `projects-router.spec.ts`; `project-members.page.spec.ts` ✔                                                                                       | 2026-10-13 |
+| CA-07    | `project-member.use-cases.spec.ts` (CA-07, IDOR); `projects-authorization.integration.spec.ts` (IDOR P1 × P2) ✔                                                                               | 2026-10-13 |
+| CA-08    | `projects-composition.integration.spec.ts` (BR-027 rebaixar/promover, remover/reconvidar, CA-08 nas duas ordens); `apply-organization-role-change.use-case.spec.ts` ✔                         | 2026-10-13 |
+| CA-09    | `organizations-isolation.integration.spec.ts` (22 rotas, ator duplo, códigos conferidos); `route-coverage.spec.ts` ✔                                                                          | 2026-10-13 |
+| CA-10    | `projects-list.page.spec.ts`, `create-project.page.spec.ts`, `project-area.spec.ts`, `project-settings.page.spec.ts`, `project-members.page.spec.ts`; Playwright `projects-journey.spec.ts` ✔ | 2026-10-13 |
+| Gate     | `pnpm verify` ✔ 66/66; `pnpm test:integration` ✔ 154; Playwright ✔ 19/19                                                                                                                      | 2026-10-13 |
 
 ## Definição de concluído
 
-- [ ] CA-01 a CA-10 comprovados por testes executados
-- [ ] `pnpm verify`, `pnpm test:integration` e E2E passando
-- [ ] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
-- [ ] ADR 0015 aceito; documentação e roadmap atualizados
+- [x] CA-01 a CA-10 comprovados por testes executados
+- [x] `pnpm verify`, `pnpm test:integration` e E2E passando
+- [x] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
+- [x] ADR 0015 aceito; documentação e roadmap atualizados

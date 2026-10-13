@@ -27,3 +27,9 @@ export type {
   SecurityEventBase,
   SecurityEventRecorder,
 } from './lib/observability/security-event-recorder';
+export {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  toPageRequest,
+  type PageQuery,
+} from './lib/pagination/pagination';

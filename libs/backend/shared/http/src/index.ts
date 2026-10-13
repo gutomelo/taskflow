@@ -48,3 +48,4 @@ export {
   TENANT_PATH_PREFIX,
   type TenantScopeOptions,
 } from './lib/tenant/tenant-scope';
+export { noStore } from './lib/caching/no-store';

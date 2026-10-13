@@ -56,4 +56,14 @@ Para cada recurso tenant-scoped: usuário da organização A **não** consegue l
 - a integração (`organizations-isolation.integration.spec.ts`) executa para cada rota: 401 sem sessão, 404 sem membership e as variantes por referência com ids **reais** de B sob o prefixo de A;
 - um snapshot genérico de todas as tabelas com `organization_id` (via `information_schema`) prova que B fica inalterado, e ids canário de B (inclusive contas que só existem em B) não podem aparecer em nenhuma resposta.
 
+Desde a spec 003 (obrigação 6 da 006 e revisão de segurança), o harness também:
+
+- exige que cada caso declare os schemas de corpo e query (de `libs/contracts`, ou `null` explícito); `coverageGaps` deriva deles as referências `…Id` e `cursor` e exige variante para cada uma;
+- confere o **código** do Problem Details esperado em cada variante (não só o 404);
+- semeia projetos, participantes, workflow e cursores reais nos dois lados e troca **uma** referência por vez;
+- roda as variantes também com um usuário **membro de A e de B**, participante de projetos dos dois lados — o ator que revela consultas de participação sem `organizationId`;
+- reconhece o middleware `noStore` por identidade, não por nome.
+
+A autorização **dentro** da organização tem bateria própria (`projects-authorization.integration.spec.ts`), gerada das rotas de projeto: quem não participa recebe 404 idêntico a "não existe"; participante sem permissão recebe 403 antes de erros de estado; IDOR entre projetos ⇒ 404.
+
 Uma spec que cria rota tenant-scoped só acrescenta os casos dela; tabelas novas entram no snapshot automaticamente.

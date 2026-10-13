@@ -1,38 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { Router, type Express, type RequestHandler } from 'express';
-import { pino } from 'pino';
-import request, { type Response } from 'supertest';
+import type { Response } from 'supertest';
+import type { PrismaClient } from '@taskflow/backend/shared/infrastructure';
 import {
-  fakePseudonymizer,
-  InMemoryRateLimiter,
-} from '@taskflow/backend/shared/application/testing';
-import { createCsrfProtection, HttpError } from '@taskflow/backend/shared/http';
-import {
-  createPrismaClient,
-  PrismaOutboxWriter,
-  PrismaTransactionRunner,
-  SystemClock,
-  UuidV7Generator,
-  type PrismaClient,
-} from '@taskflow/backend/shared/infrastructure';
-import {
-  startPostgresTestDatabase,
-  type PostgresTestDatabase,
-} from '@taskflow/backend/shared/infrastructure/testing';
-import { InMemoryUserDirectory } from '@taskflow/backend/organizations/application/testing';
-import {
-  invitationSchema,
+  invitationPageSchema,
+  memberPageSchema,
   myOrganizationListSchema,
   organizationSchema,
   problemDetailsSchema,
+  projectMemberPageSchema,
+  projectPageSchema,
+  projectSchema,
 } from '@taskflow/contracts';
-import { createApp } from '../app';
+import { startIntegrationApi, type IntegrationApi } from '../testing/integration-api';
 import { ISOLATION_CASES, type IsolationWorld, type TestClient } from '../testing/isolation-cases';
-import { concretePath, listTenantRoutes, methodOf, pathParams } from '../testing/tenant-isolation';
-import { composeApiRouters } from './api-routers';
-import { createOrganizationsModule } from './organizations.module';
+import { concretePath, methodOf, pathParams } from '../testing/tenant-isolation';
 
-const APP_ORIGIN = 'http://localhost:4200';
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
 /**
@@ -43,102 +25,38 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
  * em respostas de A.
  */
 describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)', () => {
-  let database: PostgresTestDatabase;
+  let api: IntegrationApi;
   let prisma: PrismaClient;
-  let app: Express;
-  let tenantRoutes: string[];
-  const users = new InMemoryUserDirectory();
-  const [ana, bob, bia] = [randomUUID(), randomUUID(), randomUUID()];
+  let tenantRoutes: ReadonlyArray<string>;
+  // ana: owner de A; bob: owner de B; bia: membro só de B; dual: membro de A e de B; carol: membro só de A.
+  const [ana, bob, bia, dual, carol] = [
+    randomUUID(),
+    randomUUID(),
+    randomUUID(),
+    randomUUID(),
+    randomUUID(),
+  ];
 
   beforeAll(async () => {
-    database = await startPostgresTestDatabase();
-    prisma = createPrismaClient({ databaseUrl: database.connectionUri });
-    const transactions = new PrismaTransactionRunner(prisma);
-    const csrf = createCsrfProtection({
-      appOrigin: APP_ORIGIN,
-      secret: 's'.repeat(43),
-      secureCookie: true,
-    });
-    // Sessão já verificada (como `createAuthenticate`), vinda de um header de teste.
-    const authenticate: RequestHandler = (req, _res, next) => {
-      const userId = req.get('x-test-user');
-      if (!userId) {
-        next(new HttpError(401, 'UNAUTHENTICATED', 'Sessão necessária'));
-        return;
-      }
-      req.actor = { userId, sessionId: `s-${userId}` };
-      next();
-    };
-    const organizations = createOrganizationsModule({
-      logger: pino({ level: 'silent' }),
-      transactions,
-      outbox: new PrismaOutboxWriter(transactions),
-      rateLimiter: new InMemoryRateLimiter(),
-      pseudonymizer: fakePseudonymizer,
-      idGenerator: new UuidV7Generator(),
-      clock: new SystemClock(),
-      users,
-      authenticate,
-      csrf,
-    });
-    // No lugar do router de identidade: só a emissão do cookie CSRF ligada à sessão de teste.
-    const identityRouter = Router().get('/test/csrf', authenticate, (req, res) => {
-      csrf.issue(res, req.actor?.sessionId);
-      res.status(204).end();
-    });
-    const composed = composeApiRouters({ identityRouter, authenticate, csrf, organizations });
-    tenantRoutes = listTenantRoutes(composed.tenantScope);
-    app = createApp({
-      config: { trustProxy: false, jsonBodyLimit: '100kb', healthCheckTimeoutMs: 100 },
-      logger: pino({ level: 'silent' }),
-      probes: [],
-      apiRouters: composed.apiRouters,
-      domainErrors: organizations.domainErrors,
-    });
-    for (const [id, email] of [
-      [ana, 'ana@exemplo.com'],
-      [bob, 'bob@exemplo.com'],
-      [bia, 'bia@exemplo.com'],
+    api = await startIntegrationApi();
+    prisma = api.prisma;
+    tenantRoutes = api.tenantRoutes;
+    for (const [id, name] of [
+      [ana, 'ana'],
+      [bob, 'bob'],
+      [bia, 'bia'],
+      [dual, 'dual'],
+      [carol, 'carol'],
     ] as const) {
-      users.add({ id, name: email.split('@')[0] ?? email, email, emailVerified: true });
+      api.addAccount(id, `${name}@exemplo.com`);
     }
   });
 
   afterAll(async () => {
-    await prisma?.$disconnect();
-    await database?.stop();
+    await api?.stop();
   });
 
-  function clientFor(userId: string): TestClient {
-    let token = '';
-    const csrfToken = async (): Promise<string> => {
-      if (token) return token;
-      const response = await request(app).get('/api/v1/test/csrf').set('x-test-user', userId);
-      const raw = response.headers['set-cookie'];
-      const cookie = (Array.isArray(raw) ? raw : [raw]).find((value) =>
-        value?.startsWith('__Host-tf_csrf='),
-      );
-      const issued = cookie?.split(';')[0]?.slice('__Host-tf_csrf='.length) ?? '';
-      token = issued;
-      return issued;
-    };
-    const mutate = async (method: 'post' | 'patch' | 'delete', path: string, body?: object) => {
-      const value = await csrfToken();
-      return request(app)
-        [method](`/api/v1${path}`)
-        .set('x-test-user', userId)
-        .set('Cookie', [`__Host-tf_csrf=${value}`])
-        .set('Origin', APP_ORIGIN)
-        .set('X-CSRF-Token', value)
-        .send(body);
-    };
-    return {
-      get: (path) => request(app).get(`/api/v1${path}`).set('x-test-user', userId),
-      post: (path, body) => mutate('post', path, body),
-      patch: (path, body) => mutate('patch', path, body),
-      delete: (path) => mutate('delete', path),
-    };
-  }
+  const clientFor = (userId: string): TestClient => api.clientFor(userId);
 
   /** Tabelas tenant-scoped descobertas no próprio banco: tabela nova entra sem mudar o teste. */
   async function tenantTables(): Promise<string[]> {
@@ -169,45 +87,127 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
     );
   }
 
-  async function world(): Promise<IsolationWorld> {
-    const asAna = clientFor(ana);
-    const asBob = clientFor(bob);
-    const create = async (client: TestClient, slug: string) => {
-      const response = await client.post('/organizations', { name: `Org ${slug}`, slug });
-      expect(response.status).toBe(201);
-      return organizationSchema.parse(response.body).id;
-    };
-    const orgA = await create(asAna, `a-${randomUUID().slice(0, 8)}`);
-    const orgB = await create(asBob, `b-${randomUUID().slice(0, 8)}`);
-    const invitation = await asBob.post(`/organizations/${orgB}/invitations`, {
-      email: `convidada-${randomUUID().slice(0, 6)}@exemplo.com`,
-      role: 'member',
-    });
-    expect(invitation.status).toBe(201);
-    await prisma.membership.create({
+  function addMembership(organizationId: string, userId: string) {
+    return prisma.membership.create({
       data: {
         id: randomUUID(),
-        organizationId: orgB,
-        userId: bia,
+        organizationId,
+        userId,
         role: 'member',
         createdAt: new Date(),
         updatedAt: new Date(),
       },
     });
+  }
+
+  /** Cursor real de B: segunda página de uma lista de B (opaco, aponta para linhas de B). */
+  async function cursorOf(response: Promise<Response>): Promise<string> {
+    const body: unknown = (await response).body;
+    const parsed = memberPageSchema
+      .or(projectPageSchema)
+      .or(projectMemberPageSchema)
+      .or(invitationPageSchema)
+      .parse(body);
+    if (!parsed.nextCursor) throw new Error('expected a second page in B');
+    return parsed.nextCursor;
+  }
+
+  async function world(): Promise<IsolationWorld> {
+    const asAna = clientFor(ana);
+    const asBob = clientFor(bob);
+    const asDual = clientFor(dual);
+    const create = async (client: TestClient, slug: string) => {
+      const response = await client.post('/organizations', { name: `Org ${slug}`, slug });
+      expect(response.status).toBe(201);
+      return organizationSchema.parse(response.body).id;
+    };
+    const createProject = async (client: TestClient, organizationId: string, key: string) => {
+      const response = await client.post(`/organizations/${organizationId}/projects`, {
+        key,
+        name: `Projeto ${key}`,
+      });
+      expect(response.status, key).toBe(201);
+      return projectSchema.parse(response.body);
+    };
+    const addParticipant = async (
+      client: TestClient,
+      organizationId: string,
+      projectId: string,
+      userId: string,
+    ) => {
+      const response = await client.post(
+        `/organizations/${organizationId}/projects/${projectId}/members`,
+        {
+          userId,
+          role: 'member',
+        },
+      );
+      expect(response.status).toBe(201);
+    };
+    const suffix = randomUUID()
+      .slice(0, 4)
+      .toUpperCase()
+      .replace(/[^A-Z]/g, 'Q');
+    const orgA = await create(asAna, `a-${randomUUID().slice(0, 8)}`);
+    const orgB = await create(asBob, `b-${randomUUID().slice(0, 8)}`);
+    for (const invitee of ['convidada', 'outra']) {
+      const invitation = await asBob.post(`/organizations/${orgB}/invitations`, {
+        email: `${invitee}-${randomUUID().slice(0, 6)}@exemplo.com`,
+        role: 'member',
+      });
+      expect(invitation.status).toBe(201);
+    }
+    const invitations = invitationPageSchema.parse(
+      (await asBob.get(`/organizations/${orgB}/invitations`)).body,
+    );
+    await addMembership(orgB, bia);
+    await addMembership(orgB, dual);
+    await addMembership(orgA, dual);
+    await addMembership(orgA, carol);
+
+    // A: projeto do membro duplo (vira manager), com carol participante.
+    const projectA = await createProject(asDual, orgA, `A${suffix}`);
+    await addParticipant(asDual, orgA, projectA.id, carol);
+    // B: dois projetos (cursor), com bia e o membro duplo participantes do primeiro.
+    const projectB = await createProject(asBob, orgB, `B${suffix}`);
+    await createProject(asBob, orgB, `C${suffix}`);
+    await addParticipant(asBob, orgB, projectB.id, bia);
+    await addParticipant(asBob, orgB, projectB.id, dual);
+
     return {
       orgA,
       orgB,
-      ofB: { userId: bia, invitationId: invitationSchema.parse(invitation.body).id },
+      ofA: { projectId: projectA.id, key: projectA.key, participantUserId: carol },
+      ofB: {
+        userId: bia,
+        invitationId: invitations.items[0]?.id ?? '',
+        projectId: projectB.id,
+        key: projectB.key,
+        participantUserId: bia,
+        membersCursor: await cursorOf(asBob.get(`/organizations/${orgB}/members?limit=1`)),
+        projectsCursor: await cursorOf(asBob.get(`/organizations/${orgB}/projects?limit=1`)),
+        projectMembersCursor: await cursorOf(
+          asBob.get(`/organizations/${orgB}/projects/${projectB.id}/members?limit=1`),
+        ),
+      },
       asOwnerOfA: asAna,
+      asDualMember: asDual,
+      dualMemberUserId: dual,
     };
   }
 
   /** Ids de B que não podem aparecer em nenhuma resposta de A (canários). */
-  async function canariesOf(organizationId: string): Promise<Set<string>> {
-    // Inclui ids de contas que só pertencem a B (bob, bia): A não pode descobri-las.
-    return new Set(
-      ((await snapshotOf(organizationId)).match(UUID) ?? []).map((id) => id.toLowerCase()),
+  async function canariesOf(
+    organizationId: string,
+    shared: ReadonlyArray<string>,
+  ): Promise<Set<string>> {
+    // Inclui ids de contas que só pertencem a B (bob, bia) e de projetos, status e participações
+    // de B. Fora: quem pertence às duas organizações (aparece legitimamente em A).
+    const ids = ((await snapshotOf(organizationId)).match(UUID) ?? []).map((id) =>
+      id.toLowerCase(),
     );
+    const excluded = new Set(shared.map((id) => id.toLowerCase()));
+    return new Set(ids.filter((id) => !excluded.has(id)));
   }
 
   /**
@@ -239,7 +239,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
   it('CA-07: every tenant route answers 404 to the owner of A under the prefix of B (generated cases)', async () => {
     const setup = await world();
     const before = await snapshotOf(setup.orgB);
-    const canaries = await canariesOf(setup.orgB);
+    const canaries = await canariesOf(setup.orgB, [setup.dualMemberUserId]);
 
     for (const route of tenantRoutes) {
       const values = {
@@ -260,18 +260,27 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
   it('CA-07: every declared reference to a real id of B under the prefix of A is isolated', async () => {
     const setup = await world();
     const before = await snapshotOf(setup.orgB);
-    const canaries = await canariesOf(setup.orgB);
+    const canaries = await canariesOf(setup.orgB, [setup.dualMemberUserId]);
 
+    const actors = [
+      ['owner of A', setup.asOwnerOfA],
+      ['member of A and B', setup.asDualMember],
+    ] as const;
     for (const route of tenantRoutes) {
       for (const [reference, variant] of Object.entries(ISOLATION_CASES[route]?.references ?? {})) {
-        const response = await variant.call(setup);
-        const label = `${route} › ${reference}`;
-        if (variant.expect === 'not-found') {
-          expect(response.status, label).toBe(404);
-        } else {
-          expect(response.status, label).toBeLessThan(300);
+        for (const [actorName, actor] of actors) {
+          if (variant.actors === 'owner-of-A' && actor !== setup.asOwnerOfA) continue;
+          const response = await variant.call(setup, actor);
+          const label = `${route} › ${reference} › ${actorName}`;
+          if (variant.expect === 'not-found') {
+            expect(response.status, label).toBe(404);
+            if (variant.code)
+              expect(problemDetailsSchema.parse(response.body).code, label).toBe(variant.code);
+          } else {
+            expect(response.status, label).toBeLessThan(300);
+          }
+          expectNoLeak(response, canaries);
         }
-        expectNoLeak(response, canaries);
       }
     }
     expect(await snapshotOf(setup.orgB)).toEqual(before);

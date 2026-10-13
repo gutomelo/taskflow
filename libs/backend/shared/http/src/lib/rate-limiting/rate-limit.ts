@@ -8,12 +8,24 @@ export interface RateLimitOptions {
   readonly policy: RateLimitPolicy;
   /** Chave do sujeito limitado; `undefined` pula o limite (ex.: campo ausente). */
   readonly key: (request: Request) => string | undefined;
+  /**
+   * Chave obrigatória (ex.: por usuário dentro do escopo do tenant, que sempre autentica): sem
+   * ela, a montagem está errada — falha fechado (500) em vez de pular o limite em silêncio.
+   */
+  readonly requireKey?: boolean;
 }
 
-export function createRateLimit({ limiter, policy, key }: RateLimitOptions): RequestHandler {
+export function createRateLimit({
+  limiter,
+  policy,
+  key,
+  requireKey = false,
+}: RateLimitOptions): RequestHandler {
   return async (request, _response, next) => {
     const subject = key(request);
     if (subject === undefined) {
+      if (requireKey)
+        throw new Error(`Rate limit ${policy.name} without a key: check the mounting`);
       next();
       return;
     }

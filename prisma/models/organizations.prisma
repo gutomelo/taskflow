@@ -1,6 +1,8 @@
 // Bounded context: Organizations & Teams (spec 002). Tabelas pertencem exclusivamente a este contexto.
 // `user_id`, `invited_by_user_id` e `accepted_by_user_id` referenciam usuários de `identity` sem FK
-// (contextos não referenciam tabelas uns dos outros — ADR 0003).
+// (contextos não referenciam tabelas uns dos outros — ADR 0003). Exceções (ADR 0015): `projects` →
+// `organizations` e `project_members` → `memberships`; as back-relations `projects` e
+// `projectParticipations` são inertes (barradas por lint).
 
 /// Papéis organizacionais (BR-021; matriz em docs/security/authorization.md).
 enum OrganizationRole {
@@ -26,6 +28,8 @@ model Organization {
 
   memberships Membership[]
   invitations Invitation[]
+  /// ADR 0015: exigida pelo Prisma para a FK de `projects`; nunca usada pelo código de `organizations`.
+  projects    Project[]
 
   @@map("organizations")
 }
@@ -40,7 +44,9 @@ model Membership {
   createdAt      DateTime         @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// ADR 0015: exigida pelo Prisma para a FK de `projects`; nunca usada pelo código de `organizations`.
+  projectParticipations ProjectMember[]
 
   /// Usado pelo middleware de tenant (uma consulta por requisição).
   @@unique([organizationId, userId])

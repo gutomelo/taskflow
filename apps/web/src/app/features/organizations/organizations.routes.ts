@@ -52,6 +52,52 @@ export const organizationsRoutes: Route[] = [
           import('./organization-home.page').then((module) => module.OrganizationHomePage),
       },
       {
+        path: 'projects',
+        title: 'Projetos · TaskFlow',
+        loadComponent: () =>
+          import('../projects/projects-list.page').then((module) => module.ProjectsListPage),
+      },
+      {
+        path: 'projects/new',
+        title: 'Novo projeto · TaskFlow',
+        loadComponent: () =>
+          import('../projects/create-project.page').then((module) => module.CreateProjectPage),
+      },
+      {
+        // Recriada quando a chave muda: o store do projeto nunca mistura dois projetos.
+        path: 'projects/:key',
+        data: { [RECREATE_ON_PARAM_CHANGE]: true },
+        loadComponent: () =>
+          import('../projects/project-layout').then((module) => module.ProjectLayout),
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            title: 'Projeto · TaskFlow',
+            loadComponent: () =>
+              import('../projects/project-overview.page').then(
+                (module) => module.ProjectOverviewPage,
+              ),
+          },
+          {
+            path: 'members',
+            title: 'Participantes · TaskFlow',
+            loadComponent: () =>
+              import('../projects/project-members.page').then(
+                (module) => module.ProjectMembersPage,
+              ),
+          },
+          {
+            path: 'settings',
+            title: 'Configurações do projeto · TaskFlow',
+            loadComponent: () =>
+              import('../projects/project-settings.page').then(
+                (module) => module.ProjectSettingsPage,
+              ),
+          },
+        ],
+      },
+      {
         path: 'members',
         title: 'Membros · TaskFlow',
         loadComponent: () => import('./members.page').then((module) => module.MembersPage),

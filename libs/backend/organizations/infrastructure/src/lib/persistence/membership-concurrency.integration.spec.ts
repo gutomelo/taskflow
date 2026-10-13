@@ -26,6 +26,7 @@ import {
 } from '@taskflow/backend/organizations/application';
 import {
   InMemoryUserDirectory,
+  RecordingMembershipRoleChanges,
   RecordingOrganizationsSecurityEvents,
 } from '@taskflow/backend/organizations/application/testing';
 import { PrismaInvitationRepository } from './prisma-invitation.repository';
@@ -88,6 +89,7 @@ describe('membership changes under concurrency (integration, T10)', () => {
       transactions,
       users: new InMemoryUserDirectory(),
       securityEvents: new RecordingOrganizationsSecurityEvents(),
+      membershipRoleChanges: new RecordingMembershipRoleChanges(),
       clock: new FixedClock(new Date()),
     };
   }

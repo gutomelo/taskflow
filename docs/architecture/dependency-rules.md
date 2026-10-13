@@ -99,6 +99,23 @@ Todas com `scope:backend` e `domain:organizations`. Não importam `identity` (ve
 
 Subcaminho de teste: `@taskflow/backend/organizations/application/testing` (fakes em memória e testbed).
 
+Desde a spec 003, a aplicação de `organizations` também expõe `LockOrganizationForShare`, `GetMemberRoles` e `ListMembersExcluding` (servem à porta `OrganizationAccess` de `projects`) e chama a porta `MembershipRoleChanges` em `ChangeMemberRole`. O lint `organizationsMustNotReachProjects` (exportado por `eslint.config.mjs` e incluído nos configs das bibliotecas de `organizations`) barra a back-relation do ADR 0015 e os modelos de `projects`.
+
+## Bibliotecas do contexto Projects (implementadas, spec 003)
+
+Todas com `scope:backend` e `domain:projects`. Não importam `organizations` nem `identity`: papéis, configuração e contas chegam pelas portas `OrganizationAccess` e `UserDirectory`, ligadas em `apps/api/src/modules/adapters`.
+
+| Projeto                                | Tipo             | Alias                                       | Conteúdo                                                                                                                                                                                |
+| -------------------------------------- | ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/backend/projects/domain`         | `domain`         | `@taskflow/backend/projects/domain`         | `Project`, `ProjectKey` (BR-025), `ProjectName`, descrição, `ProjectMember` com teto (BR-027), `projectCapabilities`, `participantActions`, `defaultWorkflow`, contratos de repositório |
+| `libs/backend/projects/application`    | `application`    | `@taskflow/backend/projects/application`    | Casos de uso (projetos e participantes, com lock da organização e do projeto e ordem de decisão fixa), `ApplyOrganizationRoleChange`, portas, limites, eventos `projects.*`             |
+| `libs/backend/projects/infrastructure` | `infrastructure` | `@taskflow/backend/projects/infrastructure` | Repositórios Prisma (visibilidade na mesma consulta, lock `FOR NO KEY UPDATE`, keyset, `P2002`/`P2003` traduzidos)                                                                      |
+| `libs/backend/projects/http`           | `presentation`   | `@taskflow/backend/projects/http`           | `createProjectsRouter` (só rotas tenant-scoped relativas), mapeamento de erros, limites, OpenAPI                                                                                        |
+
+Subcaminho de teste: `@taskflow/backend/projects/application/testing` (fakes em memória e testbed).
+
+Na spec 003 entraram em `shared/*`, por terem dois contextos usuários: `toPageRequest` e os tetos de paginação (`shared/application`), `noStore` (`shared/http`, reconhecido por identidade pelo harness) e `isForeignKeyViolation` (`shared/infrastructure`). `apps/api` junta os mapas de erro com `mergeDomainErrors`, que falha na montagem se dois contextos mapearem o mesmo código de formas diferentes.
+
 ## Restrições por tipo (frontend)
 
 | Origem             | Pode depender de                                                                            |

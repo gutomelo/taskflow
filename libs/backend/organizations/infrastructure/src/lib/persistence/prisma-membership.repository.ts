@@ -1,4 +1,4 @@
-import { VersionConflictError } from '@taskflow/backend/shared/kernel';
+import { VersionConflictError, type OrganizationRole } from '@taskflow/backend/shared/kernel';
 import {
   AlreadyAMemberError,
   type Membership,
@@ -11,7 +11,7 @@ import {
   type PrismaTransactionRunner,
 } from '@taskflow/backend/shared/infrastructure';
 import { afterPosition, decodeCursor, encodeCursor } from './keyset-cursor';
-import { toMembership } from './organizations-mappers';
+import { roleFrom, toMembership } from './organizations-mappers';
 
 /** Toda operação aplica `organizationId` em leitura **e** escrita (isolamento entre tenants). */
 export class PrismaMembershipRepository implements MembershipRepository {
@@ -48,6 +48,44 @@ export class PrismaMembershipRepository implements MembershipRepository {
       items: items.map(toMembership),
       nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
     };
+  }
+
+  async listPageExcluding(
+    organizationId: string,
+    {
+      excludeUserIds,
+      roles,
+    }: Readonly<{ excludeUserIds: ReadonlyArray<string>; roles: ReadonlyArray<OrganizationRole> }>,
+    { limit, cursor }: PageRequest,
+  ): Promise<Page<Membership>> {
+    const rows = await this.transactions.client().membership.findMany({
+      where: {
+        organizationId,
+        userId: { notIn: [...excludeUserIds] },
+        role: { in: [...roles] },
+        ...afterPosition(decodeCursor(cursor)),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+    });
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return {
+      items: items.map(toMembership),
+      nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
+    };
+  }
+
+  async rolesOf(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await this.transactions.client().membership.findMany({
+      where: { organizationId, userId: { in: [...userIds] } },
+      select: { userId: true, role: true },
+    });
+    return new Map(rows.map((row) => [row.userId, roleFrom(row.role)]));
   }
 
   async listForUser(userId: string): Promise<ReadonlyArray<Membership>> {

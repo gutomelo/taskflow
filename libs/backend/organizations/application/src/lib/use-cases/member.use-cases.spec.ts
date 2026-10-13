@@ -164,6 +164,70 @@ describe('ListMembersUseCase (RF-09)', () => {
   });
 });
 
+describe('ChangeMemberRole × projects (spec 003, port MembershipRoleChanges)', () => {
+  it('notifies every role change inside the transaction and counts capped participations in the event', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['bia', 'member'],
+    ]);
+    bed.membershipRoleChanges.affected = 2;
+    const insideTransaction: boolean[] = [];
+    const roleChanged = bed.membershipRoleChanges.roleChanged.bind(bed.membershipRoleChanges);
+    vi.spyOn(bed.membershipRoleChanges, 'roleChanged').mockImplementation(async (change) => {
+      insideTransaction.push(bed.transactions.inTransaction);
+      return roleChanged(change);
+    });
+
+    await new ChangeMemberRoleUseCase(bed).execute(as('ana', acme, 'owner'), {
+      userId: 'bia',
+      role: 'viewer',
+      version: 1,
+    });
+
+    expect(bed.membershipRoleChanges.changes).toEqual([
+      { organizationId: acme, userId: 'bia', fromRole: 'member', toRole: 'viewer' },
+    ]);
+    expect(insideTransaction).toEqual([true]);
+    expect(bed.securityEvents.events.at(-1)).toMatchObject({ cappedProjectParticipations: 2 });
+  });
+
+  it('does not notify when the role stays the same', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['bia', 'member'],
+    ]);
+
+    await new ChangeMemberRoleUseCase(bed).execute(as('ana', acme, 'owner'), {
+      userId: 'bia',
+      role: 'member',
+      version: 1,
+    });
+
+    expect(bed.membershipRoleChanges.changes).toEqual([]);
+  });
+
+  it('a failure while reacting rolls the role change back (same transaction)', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seed(bed, [
+      ['ana', 'owner'],
+      ['bia', 'member'],
+    ]);
+    vi.spyOn(bed.membershipRoleChanges, 'roleChanged').mockRejectedValue(new Error('boom'));
+
+    await expect(
+      new ChangeMemberRoleUseCase(bed).execute(as('ana', acme, 'owner'), {
+        userId: 'bia',
+        role: 'viewer',
+        version: 1,
+      }),
+    ).rejects.toThrow('boom');
+    expect(await roleOf(bed, acme, 'bia')).toBe('member');
+    expect(bed.securityEvents.events).toEqual([]);
+  });
+});
+
 describe('member actions (spec 006, CA-05)', () => {
   it('an admin listing members gets no actions on owners and the allowed roles for others', async () => {
     const bed = createOrganizationsTestbed();
@@ -252,6 +316,7 @@ describe('ChangeMemberRoleUseCase (RF-10, BR-021, BR-019)', () => {
         fromRole: 'member',
         toRole: 'owner',
         revokedInvitations: 0,
+        cappedProjectParticipations: 0,
       },
     ]);
   });

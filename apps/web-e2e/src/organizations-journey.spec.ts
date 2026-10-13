@@ -1,32 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
+import { confirmEmail, password, register } from './support/accounts';
 import { linkIn, waitForEmail } from './support/mailpit';
 
 // CA-11 (spec 002, T22): jornada real — web, API, worker e Mailpit, sem simulações. Grava dados:
 // rode contra um banco descartável (docs/development/testing.md).
-
-const password = () => `Jornada-${randomUUID().slice(0, 8)}-9`;
-
-/** Confirma o e-mail pelo link do Mailpit, entrando na conta no caminho (BR-017). */
-async function confirmEmail(page: Page, email: string, secret: string): Promise<void> {
-  const verification = await waitForEmail(email, 'Confirme seu e-mail no TaskFlow');
-  await page.goto(linkIn(verification, '/verify-email'));
-  await page.getByRole('button', { name: 'Entrar para confirmar' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Entrar no TaskFlow' })).toBeVisible();
-  await page.getByLabel('E-mail', { exact: true }).fill(email);
-  await page.getByLabel('Senha', { exact: true }).fill(secret);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await page.getByRole('button', { name: 'Confirmar e-mail' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'E-mail confirmado' })).toBeVisible();
-}
-
-async function register(page: Page, name: string, email: string, secret: string): Promise<void> {
-  await page.getByLabel('Nome').fill(name);
-  await page.getByLabel('E-mail').fill(email);
-  await page.getByLabel('Senha', { exact: true }).fill(secret);
-  await page.getByRole('button', { name: 'Criar conta' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Confira seu e-mail' })).toBeVisible();
-}
 
 const membersList = (page: Page) => page.getByRole('list', { name: 'Membros da organização' });
 const memberRow = (page: Page, name: string) =>

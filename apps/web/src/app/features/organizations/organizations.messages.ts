@@ -13,6 +13,7 @@ export const organizationMessages = {
   youAreIn: (organization: string, role: string) => `Você está em “${organization}” como ${role}.`,
   sectionNav: 'Seções da organização',
   home: 'Início',
+  projects: 'Projetos',
   members: 'Membros',
   settings: 'Configurações',
   securityTitle: 'Segurança da conta',

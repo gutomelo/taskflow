@@ -45,6 +45,17 @@
       "@taskflow/backend/identity/infrastructure": [
         "./libs/backend/identity/infrastructure/src/index.ts"
       ],
+      "@taskflow/backend/projects/application": [
+        "./libs/backend/projects/application/src/index.ts"
+      ],
+      "@taskflow/backend/projects/application/testing": [
+        "./libs/backend/projects/application/src/testing.ts"
+      ],
+      "@taskflow/backend/projects/domain": ["./libs/backend/projects/domain/src/index.ts"],
+      "@taskflow/backend/projects/http": ["./libs/backend/projects/http/src/index.ts"],
+      "@taskflow/backend/projects/infrastructure": [
+        "./libs/backend/projects/infrastructure/src/index.ts"
+      ],
       "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"],
       "@taskflow/backend/shared/application/testing": [
         "./libs/backend/shared/application/src/testing.ts"
