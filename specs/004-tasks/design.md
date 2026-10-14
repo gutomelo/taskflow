@@ -1,6 +1,6 @@
 # 004 — Tarefas · Design técnico
 
-- **Status**: Rascunho (revisão 2)
+- **Status**: Aprovado (revisão 2; D1–D5 como recomendados)
 - **Requisitos**: [requirements.md](requirements.md)
 - **Revisão de arquitetura**: feita (revisão 2 incorpora os achados)
 - **Revisão de segurança**: feita (revisão 2 incorpora os achados)
@@ -164,7 +164,7 @@ Sob `/api/v1/organizations/{organizationId}`; aninhamento além de projeto vira 
 
 Nenhum ADR novo: cabe nos ADRs 0003, 0013 e 0015. Atualizações no mesmo commit da spec: `bounded-contexts.md` (seta `TSK → ORG`, exceções, invariante de locks), design da 003 (revisão registrando a substituição das obrigações 2 e 3), `business-rules.md` (BR-001, BR-003, BR-028, BR-029).
 
-## Pontos de decisão para aprovação
+## Decisões da aprovação (2026-10-14: D1–D5 aprovados como recomendados)
 
 - **D1 — Esclarecimento da BR-001**: a invariante vale sempre — criar ou tornar obrigatória, reabrir ou tirar de `done` uma subtarefa obrigatória de pai concluído, ou reabrir um pai em `done` com obrigatória pendente ⇒ 422 `PARENT_TASK_COMPLETED` / `TASK_HAS_PENDING_REQUIRED_SUBTASKS` (o código canônico `TASK_ALREADY_COMPLETED` da BR-001 é renomeado para `PARENT_TASK_COMPLETED`).
 - **D2 — BR-006 como precondição**: concluída pode ganhar bloqueador; reabrir o bloqueador não "desconclui".

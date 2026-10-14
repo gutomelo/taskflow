@@ -11,13 +11,17 @@ import {
   CreateProjectUseCase,
   GetProjectUseCase,
   GetWorkflowUseCase,
+  ListAssignableUsersUseCase,
   ListMemberCandidatesUseCase,
   ListProjectMembersUseCase,
   ListProjectsUseCase,
+  LockProjectForContributionUseCase,
   RemoveProjectMemberUseCase,
+  ResolveProjectForReadUseCase,
   RestoreProjectUseCase,
   UpdateProjectUseCase,
   type OrganizationAccess,
+  type ProjectContributorChanges,
   type ProjectsSecurityEventRecorder,
   type UserDirectory,
 } from '@taskflow/backend/projects/application';
@@ -30,10 +34,12 @@ export interface ProjectsFoundationDependencies {
   /** A mesma instância usada por `organizations` (as portas rodam na transação do chamador). */
   readonly transactions: PrismaTransactionRunner & TransactionRunner;
   readonly clock: Clock;
+  /** Spec 004: reação de `tasks` a quem deixou de contribuir (adaptador do composition root). */
+  readonly contributorChanges: ProjectContributorChanges;
 }
 
 /**
- * Passo 1 da ordem de montagem (design da spec 003): repositórios de `projects` e a reação a
+ * Passo 2 da ordem de montagem (design da spec 004; passo 1 na 003): repositórios de `projects` e a reação a
  * mudanças de papel, que dependem só deles. Vem antes de `createOrganizationsModule`, que recebe
  * a reação pela porta `MembershipRoleChanges` — sem ciclo de construção.
  */
@@ -43,8 +49,10 @@ export function createProjectsFoundation(deps: ProjectsFoundationDependencies) {
   return {
     projects,
     projectMembers,
+    contributorChanges: deps.contributorChanges,
     applyOrganizationRoleChange: new ApplyOrganizationRoleChangeUseCase({
       projectMembers,
+      contributorChanges: deps.contributorChanges,
       clock: deps.clock,
     }),
   };
@@ -76,6 +84,7 @@ export function createProjectsModule(deps: ProjectsModuleDependencies) {
     projects: foundation.projects,
     projectMembers: foundation.projectMembers,
     organizationAccess: deps.organizationAccess,
+    contributorChanges: foundation.contributorChanges,
     users: deps.users,
     transactions: deps.transactions,
     rateLimiter: deps.rateLimiter,
@@ -99,6 +108,12 @@ export function createProjectsModule(deps: ProjectsModuleDependencies) {
   };
   return {
     useCases,
+    /** Consultas para a porta `ProjectAccess` de `tasks` (spec 004); sem rota HTTP. */
+    contribution: {
+      lockForContribution: new LockProjectForContributionUseCase(shared),
+      resolveForRead: new ResolveProjectForReadUseCase(shared),
+      assignableUsers: new ListAssignableUsersUseCase(shared),
+    },
     /** Rotas tenant-scoped, montadas pelo composition root no `createTenantScope`. */
     tenantRouter: createProjectsRouter({ useCases, rateLimiter: deps.rateLimiter }),
     domainErrors: projectsErrorMappings,

@@ -58,3 +58,12 @@ export {
   type RemoveProjectMemberCommand,
 } from './lib/use-cases/project-member.use-cases';
 export type { MemberCandidateView, ProjectMemberView } from './lib/shared/project-member-views';
+export type { ProjectContributorChanges } from './lib/ports/project-contributor-changes';
+export {
+  ListAssignableUsersUseCase,
+  LockProjectForContributionUseCase,
+  ResolveProjectForReadUseCase,
+  type AssignableUser,
+  type ProjectContribution,
+  type ProjectForRead,
+} from './lib/use-cases/contribution.use-cases';

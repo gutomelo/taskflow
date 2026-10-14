@@ -49,6 +49,14 @@ export interface MembershipRepository {
     }>,
     page: PageRequest,
   ): Promise<Page<Membership>>;
+  /**
+   * Trava as memberships dos usuários indicados `FOR SHARE` até o commit e devolve os papéis
+   * (spec 004): mudança de papel ou remoção dessas pessoas esperam. Só em transação.
+   */
+  lockRolesForShare(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>>;
   /** Papéis dos usuários indicados que são membros (os demais ficam de fora do mapa). */
   rolesOf(
     organizationId: string,

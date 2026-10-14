@@ -102,3 +102,24 @@ export type WorkflowTransition = Prisma.WorkflowTransitionModel
  * da alteração de negócio e publicados no BullMQ pelo worker. Payload sem dados sensíveis.
  */
 export type OutboxEvent = Prisma.OutboxEventModel
+/**
+ * Model Task
+ * Tarefa ou subtarefa (um nível). Número `CHAVE-N` por projeto, nunca reutilizado (BR-028).
+ */
+export type Task = Prisma.TaskModel
+/**
+ * Model TaskDependency
+ * "`blocked` bloqueada por `blocking`" (BR-006), sempre no mesmo projeto.
+ */
+export type TaskDependency = Prisma.TaskDependencyModel
+/**
+ * Model TaskCounter
+ * BR-028: próximo número por projeto (`upsert` atômico).
+ */
+export type TaskCounter = Prisma.TaskCounterModel
+/**
+ * Model TaskProjectLock
+ * Linha travada (`FOR UPDATE`) para serializar invariantes entre tarefas do projeto (BR-001,
+ * BR-006, limites), separada do contador de números.
+ */
+export type TaskProjectLock = Prisma.TaskProjectLockModel

@@ -1,10 +1,10 @@
 # 004 — Tarefas · Requisitos
 
-- **Status**: Rascunho
+- **Status**: Aprovado
 - **Fase do roadmap**: 1 — MVP (ordem 5, depois de `003-projects`)
 - **Bounded contexts**: Tasks (`tasks`, novo); consulta Projects (`projects`) por porta; `projects` avisa `tasks` por porta quando alguém deixa de poder contribuir num projeto (cadeia `organizations → projects → tasks`)
 - **Autor / data**: Claude Code (com decisões do usuário) / 2026-10-13
-- **Aprovado por / data**: —
+- **Aprovado por / data**: usuário / 2026-10-14
 
 ## Objetivo
 
@@ -125,4 +125,4 @@ Projetos existem (spec 003), mas não há onde colocar o trabalho. A proposta de
 | 6   | Exclusão                                                                                          | Usuário     | Definitiva, com subtarefas e dependências                                              |
 | 7   | Owner/admin podem ser responsáveis (D1 da 003)?                                                   | Usuário     | Sim, pelo papel efetivo; FK para `memberships` e portas síncronas desfazem atribuições |
 | 8   | Escala de prioridade                                                                              | Usuário     | Sem, baixa, média, alta, urgente (padrão: sem)                                         |
-| 9   | Limites, esclarecimento da BR-001, BR-006 como precondição, ciclo implícito, exclusão pelo member | Usuário     | Pontos D1–D5 do design, para aprovação                                                 |
+| 9   | Limites, esclarecimento da BR-001, BR-006 como precondição, ciclo implícito, exclusão pelo member | Usuário     | D1–D5 aprovados como recomendados no design                                            |

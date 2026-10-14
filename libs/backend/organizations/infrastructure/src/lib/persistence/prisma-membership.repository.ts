@@ -76,6 +76,22 @@ export class PrismaMembershipRepository implements MembershipRepository {
     };
   }
 
+  async lockRolesForShare(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>> {
+    if (userIds.length === 0) return new Map();
+    const transaction = this.transactions.transactionalClient(
+      'MembershipRepository.lockRolesForShare',
+    );
+    // Só o lock em SQL (como os demais); os dados vêm pela consulta tipada na mesma transação.
+    await transaction.$queryRaw`
+      SELECT id FROM memberships
+      WHERE organization_id = ${organizationId}::uuid AND user_id = ANY(${[...userIds]}::uuid[])
+      FOR SHARE`;
+    return this.rolesOf(organizationId, userIds);
+  }
+
   async rolesOf(
     organizationId: string,
     userIds: ReadonlyArray<string>,

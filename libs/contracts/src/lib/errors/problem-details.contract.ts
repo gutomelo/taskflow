@@ -21,6 +21,11 @@ export const problemDetailsSchema = z.object({
   instance: z.string().optional(),
   requestId: z.string().optional(),
   violations: z.array(fieldViolationSchema).optional(),
+  /**
+   * Membro de extensão (RFC 9457) da spec 004: tarefas que impedem a operação — subtarefas
+   * obrigatórias pendentes (BR-001) ou bloqueadoras pendentes (BR-006). Só ids do mesmo projeto.
+   */
+  taskIds: z.array(z.string()).optional(),
 });
 
 export type ProblemDetails = z.infer<typeof problemDetailsSchema>;

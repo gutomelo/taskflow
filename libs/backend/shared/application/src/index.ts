@@ -16,6 +16,7 @@ export type {
 export { ServiceBusyError } from './lib/errors/service-busy-error';
 export type { Pseudonymizer } from './lib/privacy/pseudonymizer';
 export { RateLimitedError } from './lib/errors/rate-limited-error';
+export { ConcurrentUpdateError } from './lib/errors/concurrent-update-error';
 // Papéis vivem no kernel (o domínio de organizations precisa deles); reexportados aqui.
 export {
   isOrganizationRole,

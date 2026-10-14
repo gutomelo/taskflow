@@ -1,5 +1,28 @@
 import { Prisma } from '../../generated/prisma/client';
 
+const CONFLICT_SQLSTATES: ReadonlySet<string> = new Set(['40P01', '40001']);
+
+function sqlStateOf(meta: unknown): string | null {
+  if (typeof meta !== 'object' || meta === null || !('driverAdapterError' in meta)) return null;
+  const adapterError: unknown = meta.driverAdapterError;
+  if (typeof adapterError !== 'object' || adapterError === null || !('cause' in adapterError))
+    return null;
+  const cause: unknown = adapterError.cause;
+  if (typeof cause !== 'object' || cause === null || !('originalCode' in cause)) return null;
+  return typeof cause.originalCode === 'string' ? cause.originalCode : null;
+}
+
+/**
+ * Deadlock ou conflito de escrita (`P2034`; ou SQLSTATE `40P01`/`40001` vindo de SQL raw): a
+ * transação inteira pode ser repetida (efeitos externos nunca rodam dentro dela).
+ */
+export function isTransactionConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code === 'P2034') return true;
+  const sqlState = sqlStateOf(error.meta);
+  return sqlState !== null && CONFLICT_SQLSTATES.has(sqlState);
+}
+
 /**
  * Violação de UNIQUE (código P2002). Repositórios traduzem para erros de domínio — por
  * exemplo, cadastro concorrente com o mesmo e-mail.

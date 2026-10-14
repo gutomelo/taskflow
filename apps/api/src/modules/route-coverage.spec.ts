@@ -57,6 +57,22 @@ import {
 import { createProjectsTestbed } from '@taskflow/backend/projects/application/testing';
 import { createProjectsRouter } from '@taskflow/backend/projects/http';
 import { createOrganizationsRouters } from '@taskflow/backend/organizations/http';
+import {
+  AddDependencyUseCase,
+  AssignTaskUseCase,
+  CancelTaskUseCase,
+  CreateTaskUseCase,
+  DeleteTaskUseCase,
+  GetTaskUseCase,
+  ListAssignableUsersUseCase as ListAssignableTaskUsersUseCase,
+  ListTasksUseCase,
+  RemoveDependencyUseCase,
+  ReopenTaskUseCase,
+  TransitionTaskUseCase,
+  UpdateTaskUseCase,
+} from '@taskflow/backend/tasks/application';
+import { createTasksTestbed } from '@taskflow/backend/tasks/application/testing';
+import { createTasksRouter } from '@taskflow/backend/tasks/http';
 import { GLOBAL_ROUTES, ISOLATION_CASES } from '../testing/isolation-cases';
 import {
   coverageGaps,
@@ -150,12 +166,30 @@ function composed() {
     },
     rateLimiter: projectsBed.rateLimiter,
   });
+  const tasksBed = createTasksTestbed();
+  const tasksRouter = createTasksRouter({
+    useCases: {
+      createTask: new CreateTaskUseCase(tasksBed),
+      listTasks: new ListTasksUseCase(tasksBed),
+      getTask: new GetTaskUseCase(tasksBed),
+      listAssignableUsers: new ListAssignableTaskUsersUseCase(tasksBed),
+      updateTask: new UpdateTaskUseCase(tasksBed),
+      assignTask: new AssignTaskUseCase(tasksBed),
+      transitionTask: new TransitionTaskUseCase(tasksBed),
+      cancelTask: new CancelTaskUseCase(tasksBed),
+      reopenTask: new ReopenTaskUseCase(tasksBed),
+      deleteTask: new DeleteTaskUseCase(tasksBed),
+      addDependency: new AddDependencyUseCase(tasksBed),
+      removeDependency: new RemoveDependencyUseCase(tasksBed),
+    },
+  });
   return composeApiRouters({
     identityRouter,
     authenticate,
     csrf,
     organizations: { ...routers, resolveTenant: (input) => resolve.execute(input) },
     projects: { tenantRouter: projectsRouter },
+    tasks: { tenantRouter: tasksRouter },
   });
 }
 

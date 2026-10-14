@@ -13,6 +13,15 @@ import {
   removeProjectMemberQuerySchema,
   updateOrganizationRequestSchema,
   updateProjectRequestSchema,
+  addDependencyRequestSchema,
+  assignableUsersQuerySchema,
+  assignTaskRequestSchema,
+  createTaskRequestSchema,
+  deleteTaskQuerySchema,
+  taskListQuerySchema,
+  taskVersionRequestSchema,
+  transitionTaskRequestSchema,
+  updateTaskRequestSchema,
 } from '@taskflow/contracts';
 import type { InputSchema, IsolationExpectation, RouteKey } from './tenant-isolation';
 
@@ -21,6 +30,7 @@ export interface TestClient {
   get(path: string): Promise<Response>;
   post(path: string, body?: object): Promise<Response>;
   patch(path: string, body?: object): Promise<Response>;
+  put(path: string, body?: object): Promise<Response>;
   delete(path: string): Promise<Response>;
 }
 
@@ -36,7 +46,13 @@ export interface IsolationWorld {
   readonly orgA: string;
   readonly orgB: string;
   /** Recursos reais de A, para trocar **uma** referência por vez (as demais continuam válidas). */
-  readonly ofA: Readonly<{ projectId: string; key: string; participantUserId: string }>;
+  readonly ofA: Readonly<{
+    projectId: string;
+    key: string;
+    participantUserId: string;
+    /** Tarefa de A (versão 1, status inicial), para trocar só a outra referência. */
+    taskId: string;
+  }>;
   /** Ids, chaves e cursores reais de B, por nome de referência. */
   readonly ofB: Readonly<Record<string, string>>;
   readonly asOwnerOfA: TestClient;
@@ -72,12 +88,28 @@ const noLeak = (
   actors: IsolationVariant['actors'] = 'both',
 ): IsolationVariant => ({ expect: 'no-leak', actors, call });
 
+const refused = (code: string, call: IsolationVariant['call']): IsolationVariant => ({
+  expect: 'refused',
+  code,
+  actors: 'both',
+  call,
+});
+
 /** POST sem corpo (ações): declara um objeto vazio, nunca omite. */
 const emptyBody = z.strictObject({});
 
 const org = (world: IsolationWorld) => `/organizations/${world.orgA}`;
 const projectOfA = (world: IsolationWorld) => `${org(world)}/projects/${world.ofA.projectId}`;
 const projectOfB = (world: IsolationWorld) => `${org(world)}/projects/${world.ofB['projectId']}`;
+const tasks = (world: IsolationWorld) => `${org(world)}/tasks`;
+const taskOfA = (world: IsolationWorld) => `${tasks(world)}/${world.ofA.taskId}`;
+const taskOfB = (world: IsolationWorld) => `${tasks(world)}/${world.ofB['taskId']}`;
+
+/** Variante "tarefa de B sob o prefixo de A" (404 uniforme, achado M3). */
+const foreignTask = (
+  suffix: string,
+  send: (actor: TestClient, path: string) => Promise<Response> = (actor, path) => actor.get(path),
+) => notFound('TASK_NOT_FOUND', (world, actor) => send(actor, `${taskOfB(world)}${suffix}`));
 
 /** Variante "projeto de B sob o prefixo de A" para rotas `/projects/:projectId/...`. */
 const foreignProject = (
@@ -297,6 +329,169 @@ export const ISOLATION_CASES: Readonly<Record<RouteKey, IsolationCase>> = {
       ),
       userId: notFound('PROJECT_MEMBER_NOT_FOUND', (world, actor) =>
         actor.delete(`${projectOfA(world)}/members/${world.ofB['participantUserId']}?version=1`),
+      ),
+    },
+  },
+
+  // --- tasks (spec 004): caminho, corpo e query; `assigned` (eu/sem responsável) não é referência ---
+  'GET /organizations/:organizationId/tasks': {
+    body: null,
+    query: taskListQuerySchema,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.get(`${tasks(world)}?projectId=${world.ofB['projectId']}`),
+      ),
+      list: noLeak((world, actor) => actor.get(`${tasks(world)}?projectId=${world.ofA.projectId}`)),
+      statusId: noLeak((world, actor) =>
+        actor.get(
+          `${tasks(world)}?projectId=${world.ofA.projectId}&statusId=${world.ofB['statusId']}`,
+        ),
+      ),
+      assigneeUserId: noLeak((world, actor) =>
+        actor.get(
+          `${tasks(world)}?projectId=${world.ofA.projectId}&assigneeUserId=${world.ofB['userId']}`,
+        ),
+      ),
+      parentTaskId: noLeak((world, actor) =>
+        actor.get(
+          `${tasks(world)}?projectId=${world.ofA.projectId}&parentTaskId=${world.ofB['taskId']}`,
+        ),
+      ),
+      cursor: noLeak((world, actor) =>
+        actor.get(
+          `${tasks(world)}?projectId=${world.ofA.projectId}&cursor=${world.ofB['tasksCursor']}`,
+        ),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/tasks': {
+    body: createTaskRequestSchema,
+    query: null,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.post(tasks(world), { projectId: world.ofB['projectId'], title: 'Tomada' }),
+      ),
+      parentTaskId: notFound('TASK_NOT_FOUND', (world, actor) =>
+        actor.post(tasks(world), {
+          projectId: world.ofA.projectId,
+          title: 'Tomada',
+          parentTaskId: world.ofB['taskId'],
+        }),
+      ),
+      assigneeUserId: refused('ASSIGNEE_NOT_PROJECT_MEMBER', (world, actor) =>
+        actor.post(tasks(world), {
+          projectId: world.ofA.projectId,
+          title: 'Tomada',
+          assigneeUserId: world.ofB['userId'],
+        }),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/tasks/assignable-users': {
+    body: null,
+    query: assignableUsersQuerySchema,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.get(`${tasks(world)}/assignable-users?projectId=${world.ofB['projectId']}`),
+      ),
+      list: noLeak((world, actor) =>
+        actor.get(`${tasks(world)}/assignable-users?projectId=${world.ofA.projectId}`),
+      ),
+      cursor: noLeak((world, actor) =>
+        actor.get(
+          `${tasks(world)}/assignable-users?projectId=${world.ofA.projectId}&cursor=${world.ofB['assignableCursor']}`,
+        ),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/tasks/by-key/:key': {
+    body: null,
+    query: null,
+    references: {
+      key: notFound('TASK_NOT_FOUND', (world, actor) =>
+        actor.get(`${tasks(world)}/by-key/${world.ofB['taskKey']}`),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/tasks/:taskId': {
+    body: null,
+    query: null,
+    references: { taskId: foreignTask('') },
+  },
+  'PATCH /organizations/:organizationId/tasks/:taskId': {
+    body: updateTaskRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('', (actor, path) => actor.patch(path, { title: 'Tomada', version: 1 })),
+    },
+  },
+  'DELETE /organizations/:organizationId/tasks/:taskId': {
+    body: null,
+    query: deleteTaskQuerySchema,
+    references: { taskId: foreignTask('', (actor, path) => actor.delete(`${path}?version=1`)) },
+  },
+  'PUT /organizations/:organizationId/tasks/:taskId/assignee': {
+    body: assignTaskRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/assignee', (actor, path) =>
+        actor.put(path, { assigneeUserId: null, version: 1 }),
+      ),
+      assigneeUserId: refused('ASSIGNEE_NOT_PROJECT_MEMBER', (world, actor) =>
+        actor.put(`${taskOfA(world)}/assignee`, {
+          assigneeUserId: world.ofB['userId'],
+          version: 1,
+        }),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/transition': {
+    body: transitionTaskRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/transition', (actor, path) =>
+        actor.post(path, { statusId: '00000000-0000-7000-8000-000000000001', version: 1 }),
+      ),
+      statusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.post(`${taskOfA(world)}/transition`, { statusId: world.ofB['statusId'], version: 1 }),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/cancel': {
+    body: taskVersionRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/cancel', (actor, path) => actor.post(path, { version: 1 })),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/reopen': {
+    body: taskVersionRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/reopen', (actor, path) => actor.post(path, { version: 1 })),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/dependencies': {
+    body: addDependencyRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/dependencies', (actor, path) =>
+        actor.post(path, { blockingTaskId: '00000000-0000-7000-8000-000000000001' }),
+      ),
+      blockingTaskId: notFound('TASK_NOT_FOUND', (world, actor) =>
+        actor.post(`${taskOfA(world)}/dependencies`, { blockingTaskId: world.ofB['taskId'] }),
+      ),
+    },
+  },
+  'DELETE /organizations/:organizationId/tasks/:taskId/dependencies/:blockingTaskId': {
+    body: null,
+    query: null,
+    references: {
+      taskId: notFound('TASK_NOT_FOUND', (world, actor) =>
+        actor.delete(`${taskOfB(world)}/dependencies/${world.ofB['blockingTaskId']}`),
+      ),
+      blockingTaskId: notFound('DEPENDENCY_NOT_FOUND', (world, actor) =>
+        actor.delete(`${taskOfA(world)}/dependencies/${world.ofB['blockingTaskId']}`),
       ),
     },
   },

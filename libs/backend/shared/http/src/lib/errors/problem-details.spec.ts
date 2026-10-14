@@ -1,6 +1,10 @@
 import request from 'supertest';
 import { z } from 'zod';
-import { RateLimitedError, ServiceBusyError } from '@taskflow/backend/shared/application';
+import {
+  ConcurrentUpdateError,
+  RateLimitedError,
+  ServiceBusyError,
+} from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import { problemDetailsSchema } from '@taskflow/contracts';
 import { createTestApp } from '../testing/test-app';
@@ -10,7 +14,7 @@ import { notFoundHandler } from './problem-details';
 
 class TaskHasPendingSubtasksError extends DomainError {
   readonly code = 'TASK_HAS_PENDING_REQUIRED_SUBTASKS';
-  constructor() {
+  constructor(readonly taskIds: ReadonlyArray<string> = []) {
     super('Task has pending required subtasks');
   }
 }
@@ -37,6 +41,9 @@ function buildApp() {
       app.get('/mapped', () => {
         throw new TaskHasPendingSubtasksError();
       });
+      app.get('/blocked', () => {
+        throw new TaskHasPendingSubtasksError(['t-1', 't-2']);
+      });
       app.get('/weak', () => {
         throw new WeakSecretError(['uppercase', 'digit']);
       });
@@ -52,6 +59,9 @@ function buildApp() {
       app.get('/argon2-busy', () => {
         throw new ServiceBusyError('password-hasher', 2);
       });
+      app.post('/concurrent', () => {
+        throw new ConcurrentUpdateError();
+      });
       app.get('/crash', () => {
         throw new Error('SELECT * FROM users -- internal');
       });
@@ -65,6 +75,7 @@ function buildApp() {
         TASK_HAS_PENDING_REQUIRED_SUBTASKS: {
           status: 409,
           title: 'Há subtarefas obrigatórias pendentes',
+          taskIds: (error) => (error instanceof TaskHasPendingSubtasksError ? error.taskIds : []),
         },
         WEAK_SECRET: {
           status: 422,
@@ -80,6 +91,15 @@ function buildApp() {
 }
 
 describe('error handling', () => {
+  it('spec 004: a conflict that survived the retry answers 409 CONCURRENT_UPDATE', async () => {
+    const response = await request(buildApp()).post('/concurrent').expect(409);
+
+    expect(problemDetailsSchema.parse(response.body)).toMatchObject({
+      code: 'CONCURRENT_UPDATE',
+      status: 409,
+    });
+  });
+
   it('maps registered domain errors to their status and pt-BR title', async () => {
     const response = await request(buildApp()).get('/mapped').expect(409);
 
@@ -88,6 +108,14 @@ describe('error handling', () => {
       code: 'TASK_HAS_PENDING_REQUIRED_SUBTASKS',
       title: 'Há subtarefas obrigatórias pendentes',
     });
+  });
+
+  it('spec 004: adds the taskIds extension only when the mapping yields ids', async () => {
+    const blocked = await request(buildApp()).get('/blocked').expect(409);
+    const empty = await request(buildApp()).get('/mapped').expect(409);
+
+    expect(problemDetailsSchema.parse(blocked.body).taskIds).toEqual(['t-1', 't-2']);
+    expect(empty.body).not.toHaveProperty('taskIds');
   });
 
   it('adds structured violations extracted from the domain error', async () => {

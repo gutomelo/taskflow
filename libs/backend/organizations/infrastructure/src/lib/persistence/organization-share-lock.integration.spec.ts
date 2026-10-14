@@ -107,6 +107,49 @@ describe('organization share lock (integration, spec 003 T4)', () => {
     expect(order).toEqual(['second share locked', 'share released']);
   });
 
+  it('spec 004: locked member roles hold a role change until the commit of the tasks transaction', async () => {
+    const [ana, bia] = [randomUUID(), randomUUID()];
+    const organizationId = await organization([
+      [ana, 'owner'],
+      [bia, 'member'],
+    ]);
+    const order: string[] = [];
+    let locked: () => void = () => undefined;
+    const isLocked = new Promise<void>((resolve) => (locked = resolve));
+    const share = transactions.run(async () => {
+      expect(await memberships.lockRolesForShare(organizationId, [bia, randomUUID()])).toEqual(
+        new Map([[bia, 'member']]),
+      );
+      locked();
+      await sleep(400);
+      order.push('share released');
+    });
+    await isLocked;
+
+    const roleChange = transactions.run(async () => {
+      const membership = await memberships.find(organizationId, bia);
+      if (!membership) throw new Error('membership not found');
+      membership.changeRole('viewer', new Date());
+      await memberships.save(membership);
+      order.push('role changed');
+    });
+    const unrelated = transactions.run(async () => {
+      expect(await memberships.lockRolesForShare(organizationId, [ana])).toEqual(
+        new Map([[ana, 'owner']]),
+      );
+      order.push('other member locked');
+    });
+    await Promise.all([share, roleChange, unrelated]);
+
+    expect(order).toEqual(['other member locked', 'share released', 'role changed']);
+    await expect(memberships.lockRolesForShare(organizationId, [bia])).rejects.toBeInstanceOf(
+      TransactionRequiredError,
+    );
+    expect(await transactions.run(() => memberships.lockRolesForShare(organizationId, []))).toEqual(
+      new Map(),
+    );
+  });
+
   it('reads roles of members only and pages members excluding some users', async () => {
     const [ana, bia, caio] = [randomUUID(), randomUUID(), randomUUID()];
     const organizationId = await organization([

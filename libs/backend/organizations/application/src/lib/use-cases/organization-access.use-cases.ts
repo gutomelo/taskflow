@@ -80,3 +80,19 @@ export class ListMembersExcludingUseCase {
     };
   }
 }
+
+/**
+ * Trava as memberships das pessoas indicadas `FOR SHARE` e devolve os papéis (spec 004): escritas
+ * de tarefa não travam a organização inteira (linha quente), só quem a decisão envolve. Contrato:
+ * chamado dentro da transação do chamador (fora dela, lança).
+ */
+export class LockMembersForShareUseCase {
+  constructor(private readonly deps: { readonly memberships: MembershipRepository }) {}
+
+  execute(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>> {
+    return this.deps.memberships.lockRolesForShare(organizationId, userIds);
+  }
+}

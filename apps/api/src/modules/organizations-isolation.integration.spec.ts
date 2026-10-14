@@ -10,6 +10,10 @@ import {
   projectMemberPageSchema,
   projectPageSchema,
   projectSchema,
+  assignableUserPageSchema,
+  taskPageSchema,
+  taskSchema,
+  workflowSchema,
 } from '@taskflow/contracts';
 import { startIntegrationApi, type IntegrationApi } from '../testing/integration-api';
 import { ISOLATION_CASES, type IsolationWorld, type TestClient } from '../testing/isolation-cases';
@@ -107,6 +111,8 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
       .or(projectPageSchema)
       .or(projectMemberPageSchema)
       .or(invitationPageSchema)
+      .or(taskPageSchema)
+      .or(assignableUserPageSchema)
       .parse(body);
     if (!parsed.nextCursor) throw new Error('expected a second page in B');
     return parsed.nextCursor;
@@ -174,10 +180,43 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
     await addParticipant(asBob, orgB, projectB.id, bia);
     await addParticipant(asBob, orgB, projectB.id, dual);
 
+    // Spec 004: tarefa de A (do membro duplo); em B, duas tarefas (cursor), a primeira atribuída a
+    // bia e bloqueada pela segunda.
+    const createTask = async (client: TestClient, organizationId: string, body: object) => {
+      const response = await client.post(`/organizations/${organizationId}/tasks`, body);
+      expect(response.status).toBe(201);
+      return taskSchema.parse(response.body);
+    };
+    const taskA = await createTask(asDual, orgA, { projectId: projectA.id, title: 'Tarefa de A' });
+    const taskB = await createTask(asBob, orgB, {
+      projectId: projectB.id,
+      title: 'Tarefa de B',
+      assigneeUserId: bia,
+    });
+    const blockerB = await createTask(asBob, orgB, {
+      projectId: projectB.id,
+      title: 'Bloqueadora',
+    });
+    expect(
+      (
+        await asBob.post(`/organizations/${orgB}/tasks/${taskB.id}/dependencies`, {
+          blockingTaskId: blockerB.id,
+        })
+      ).status,
+    ).toBe(201);
+    const workflowB = workflowSchema.parse(
+      (await asBob.get(`/organizations/${orgB}/projects/${projectB.id}/workflow`)).body,
+    );
+
     return {
       orgA,
       orgB,
-      ofA: { projectId: projectA.id, key: projectA.key, participantUserId: carol },
+      ofA: {
+        projectId: projectA.id,
+        key: projectA.key,
+        participantUserId: carol,
+        taskId: taskA.id,
+      },
       ofB: {
         userId: bia,
         invitationId: invitations.items[0]?.id ?? '',
@@ -188,6 +227,19 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         projectsCursor: await cursorOf(asBob.get(`/organizations/${orgB}/projects?limit=1`)),
         projectMembersCursor: await cursorOf(
           asBob.get(`/organizations/${orgB}/projects/${projectB.id}/members?limit=1`),
+        ),
+        taskId: taskB.id,
+        taskKey: taskB.key,
+        blockingTaskId: blockerB.id,
+        // Status inicial de B: é onde estão as tarefas de B (um filtro sem tenant as vazaria).
+        statusId: workflowB.statuses[0]?.id ?? '',
+        tasksCursor: await cursorOf(
+          asBob.get(`/organizations/${orgB}/tasks?projectId=${projectB.id}&limit=1`),
+        ),
+        assignableCursor: await cursorOf(
+          asBob.get(
+            `/organizations/${orgB}/tasks/assignable-users?projectId=${projectB.id}&limit=1`,
+          ),
         ),
       },
       asOwnerOfA: asAna,
@@ -232,6 +284,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
     if (method === 'post') return client.post(path, {});
     if (method === 'patch')
       return client.patch(path, { version: 1, name: 'Tomada', role: 'viewer' });
+    if (method === 'put') return client.put(path, { version: 1 });
     if (method === 'delete') return client.delete(`${path}?version=1`);
     throw new Error(`unexpected method ${method}`);
   }
@@ -272,8 +325,8 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
           if (variant.actors === 'owner-of-A' && actor !== setup.asOwnerOfA) continue;
           const response = await variant.call(setup, actor);
           const label = `${route} › ${reference} › ${actorName}`;
-          if (variant.expect === 'not-found') {
-            expect(response.status, label).toBe(404);
+          if (variant.expect === 'not-found' || variant.expect === 'refused') {
+            expect(response.status, label).toBe(variant.expect === 'not-found' ? 404 : 422);
             if (variant.code)
               expect(problemDetailsSchema.parse(response.body).code, label).toBe(variant.code);
           } else {

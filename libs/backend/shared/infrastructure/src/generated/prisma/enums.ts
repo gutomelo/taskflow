@@ -54,3 +54,14 @@ export const StatusCategory = {
 } as const
 
 export type StatusCategory = (typeof StatusCategory)[keyof typeof StatusCategory]
+
+
+export const TaskPriority = {
+  none: 'none',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  urgent: 'urgent'
+} as const
+
+export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority]

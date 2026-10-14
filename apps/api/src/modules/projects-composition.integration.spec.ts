@@ -40,9 +40,11 @@ import { InMemoryProjectsUserDirectory } from '@taskflow/backend/projects/applic
 import { ProjectRoleAboveCeilingError } from '@taskflow/backend/projects/domain';
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
 import { createMembershipRoleChanges } from './adapters/membership-role-changes.adapter';
+import { createContributorChanges } from './adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from './adapters/organization-access.adapter';
 import { createOrganizationsModule } from './organizations.module';
 import { createProjectsFoundation, createProjectsModule } from './projects.module';
+import { createTasksFoundation } from './tasks.module';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -82,7 +84,11 @@ describe('projects composition (integration, spec 003 T7)', () => {
     const rateLimiter = new InMemoryRateLimiter();
     const logger = pino({ level: 'silent' });
     // Mesma ordem de montagem de `main.ts`.
-    foundation = createProjectsFoundation({ transactions, clock });
+    foundation = createProjectsFoundation({
+      transactions,
+      clock,
+      contributorChanges: createContributorChanges(createTasksFoundation({ transactions, clock })),
+    });
     membershipRoleChanges = createMembershipRoleChanges(foundation);
     const noop: RequestHandler = (_request, _response, next) => next();
     const organizations = createOrganizationsModule({

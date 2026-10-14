@@ -1,4 +1,4 @@
-import { VersionConflictError } from '@taskflow/backend/shared/kernel';
+import { VersionConflictError, type ProjectRole } from '@taskflow/backend/shared/kernel';
 import {
   AlreadyAProjectMemberError,
   NotAnOrganizationMemberError,
@@ -13,7 +13,7 @@ import {
   type PrismaTransactionRunner,
 } from '@taskflow/backend/shared/infrastructure';
 import { dateFrom, decodeCursor, encodeCursor } from './keyset-cursor';
-import { toProjectMember } from './projects-mappers';
+import { projectRoleFrom, toProjectMember } from './projects-mappers';
 
 /**
  * Participações sempre localizadas por `(organizationId, projectId, userId)`: nunca só pelo
@@ -48,6 +48,7 @@ export class PrismaProjectMemberRepository implements ProjectMemberRepository {
     organizationId: string,
     projectId: string,
     { limit, cursor }: PageRequest,
+    roles?: ReadonlyArray<ProjectRole>,
   ): Promise<Page<ProjectMember>> {
     const position = decodeCursor(cursor);
     const after = dateFrom(position);
@@ -55,6 +56,7 @@ export class PrismaProjectMemberRepository implements ProjectMemberRepository {
       where: {
         organizationId,
         projectId,
+        ...(roles === undefined ? {} : { role: { in: [...roles] } }),
         ...(position && after
           ? {
               OR: [{ createdAt: { gt: after } }, { createdAt: after, userId: { gt: position.id } }],
@@ -73,6 +75,30 @@ export class PrismaProjectMemberRepository implements ProjectMemberRepository {
           ? encodeCursor({ value: last.createdAt.toISOString(), id: last.userId })
           : null,
     };
+  }
+
+  async rolesOf(
+    organizationId: string,
+    projectId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, ProjectRole>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await this.transactions.client().projectMember.findMany({
+      where: { organizationId, projectId, userId: { in: [...userIds] } },
+      select: { userId: true, role: true },
+    });
+    return new Map(rows.map((row) => [row.userId, projectRoleFrom(row.role)]));
+  }
+
+  async listForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<ReadonlyArray<Readonly<{ projectId: string; role: ProjectRole }>>> {
+    const rows = await this.transactions.client().projectMember.findMany({
+      where: { organizationId, userId },
+      select: { projectId: true, role: true },
+    });
+    return rows.map((row) => ({ projectId: row.projectId, role: projectRoleFrom(row.role) }));
   }
 
   async listUserIds(organizationId: string, projectId: string): Promise<ReadonlyArray<string>> {

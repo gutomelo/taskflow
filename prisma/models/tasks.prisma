@@ -1,0 +1,100 @@
+// Bounded context: Tasks (spec 004). Tabelas pertencem exclusivamente a este contexto.
+// `created_by_user_id`, `completed_by_user_id` e `canceled_by_user_id` referenciam `identity` sem FK.
+// FKs para outros contextos sob os critérios do ADR 0015 (tabela em docs/architecture/bounded-contexts.md):
+// projetos, status do workflow e a membership do responsável. Toda FK interna é composta com
+// `organization_id` e `project_id` (mesma organização e mesmo projeto garantidos pelo banco).
+
+/// Prioridade da tarefa (padrão: sem prioridade).
+enum TaskPriority {
+  none
+  low
+  medium
+  high
+  urgent
+
+  @@map("task_priority")
+}
+
+/// Tarefa ou subtarefa (um nível). Número `CHAVE-N` por projeto, nunca reutilizado (BR-028).
+model Task {
+  id                String       @id @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  projectId         String       @map("project_id") @db.Uuid
+  number            Int
+  title             String       @db.VarChar(200)
+  description       String?      @db.VarChar(10000)
+  statusId          String       @map("status_id") @db.Uuid
+  priority          TaskPriority @default(none)
+  /// BR-003. FK `ON DELETE SET NULL (assignee_user_id)` escrita à mão na migration: o Prisma gera
+  /// `SET NULL` sem lista de colunas (anularia `organization_id`) e não enxerga a lista — protegida
+  /// pelo teste de catálogo `tasks-schema.integration.spec.ts` (design da spec 004).
+  assigneeUserId    String?      @map("assignee_user_id") @db.Uuid
+  dueDate           DateTime?    @map("due_date") @db.Date
+  parentTaskId      String?      @map("parent_task_id") @db.Uuid
+  isRequired        Boolean      @default(false) @map("is_required")
+  completedAt       DateTime?    @map("completed_at") @db.Timestamptz(3)
+  completedByUserId String?      @map("completed_by_user_id") @db.Uuid
+  canceledAt        DateTime?    @map("canceled_at") @db.Timestamptz(3)
+  canceledByUserId  String?      @map("canceled_by_user_id") @db.Uuid
+  createdByUserId   String       @map("created_by_user_id") @db.Uuid
+  /// Optimistic locking (BR-008).
+  version           Int          @default(1)
+  createdAt         DateTime     @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project   Project          @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+  status    WorkflowStatus   @relation(fields: [organizationId, projectId, statusId], references: [organizationId, projectId, id], onDelete: Restrict, onUpdate: Restrict)
+  assignee  Membership?      @relation(fields: [organizationId, assigneeUserId], references: [organizationId, userId], onDelete: SetNull, onUpdate: Restrict)
+  parent    Task?            @relation("Subtasks", fields: [organizationId, projectId, parentTaskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+  subtasks  Task[]           @relation("Subtasks")
+  blockedBy TaskDependency[] @relation("Blocked")
+  blocking  TaskDependency[] @relation("Blocking")
+
+  /// Alvo das FKs compostas internas.
+  @@unique([organizationId, projectId, id])
+  @@unique([organizationId, projectId, number])
+  @@index([organizationId, projectId, parentTaskId, number])
+  @@index([organizationId, assigneeUserId])
+  @@index([organizationId, projectId, statusId])
+  @@map("tasks")
+}
+
+/// "`blocked` bloqueada por `blocking`" (BR-006), sempre no mesmo projeto.
+model TaskDependency {
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  blockedTaskId  String   @map("blocked_task_id") @db.Uuid
+  blockingTaskId String   @map("blocking_task_id") @db.Uuid
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+
+  blocked  Task @relation("Blocked", fields: [organizationId, projectId, blockedTaskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+  blocking Task @relation("Blocking", fields: [organizationId, projectId, blockingTaskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@id([projectId, blockedTaskId, blockingTaskId])
+  @@index([organizationId, projectId, blockingTaskId])
+  @@map("task_dependencies")
+}
+
+/// BR-028: próximo número por projeto (`upsert` atômico).
+model TaskCounter {
+  organizationId String @map("organization_id") @db.Uuid
+  projectId      String @map("project_id") @db.Uuid
+  nextNumber     Int    @map("next_number")
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@id([organizationId, projectId])
+  @@map("task_counters")
+}
+
+/// Linha travada (`FOR UPDATE`) para serializar invariantes entre tarefas do projeto (BR-001,
+/// BR-006, limites), separada do contador de números.
+model TaskProjectLock {
+  organizationId String @map("organization_id") @db.Uuid
+  projectId      String @map("project_id") @db.Uuid
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@id([organizationId, projectId])
+  @@map("task_project_locks")
+}

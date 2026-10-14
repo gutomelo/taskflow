@@ -62,7 +62,11 @@ export const ModelName = {
   ProjectMember: 'ProjectMember',
   WorkflowStatus: 'WorkflowStatus',
   WorkflowTransition: 'WorkflowTransition',
-  OutboxEvent: 'OutboxEvent'
+  OutboxEvent: 'OutboxEvent',
+  Task: 'Task',
+  TaskDependency: 'TaskDependency',
+  TaskCounter: 'TaskCounter',
+  TaskProjectLock: 'TaskProjectLock'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -244,6 +248,60 @@ export const OutboxEventScalarFieldEnum = {
 } as const
 
 export type OutboxEventScalarFieldEnum = (typeof OutboxEventScalarFieldEnum)[keyof typeof OutboxEventScalarFieldEnum]
+
+
+export const TaskScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  number: 'number',
+  title: 'title',
+  description: 'description',
+  statusId: 'statusId',
+  priority: 'priority',
+  assigneeUserId: 'assigneeUserId',
+  dueDate: 'dueDate',
+  parentTaskId: 'parentTaskId',
+  isRequired: 'isRequired',
+  completedAt: 'completedAt',
+  completedByUserId: 'completedByUserId',
+  canceledAt: 'canceledAt',
+  canceledByUserId: 'canceledByUserId',
+  createdByUserId: 'createdByUserId',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
+export const TaskDependencyScalarFieldEnum = {
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  blockedTaskId: 'blockedTaskId',
+  blockingTaskId: 'blockingTaskId',
+  createdAt: 'createdAt'
+} as const
+
+export type TaskDependencyScalarFieldEnum = (typeof TaskDependencyScalarFieldEnum)[keyof typeof TaskDependencyScalarFieldEnum]
+
+
+export const TaskCounterScalarFieldEnum = {
+  organizationId: 'organizationId',
+  projectId: 'projectId',
+  nextNumber: 'nextNumber'
+} as const
+
+export type TaskCounterScalarFieldEnum = (typeof TaskCounterScalarFieldEnum)[keyof typeof TaskCounterScalarFieldEnum]
+
+
+export const TaskProjectLockScalarFieldEnum = {
+  organizationId: 'organizationId',
+  projectId: 'projectId'
+} as const
+
+export type TaskProjectLockScalarFieldEnum = (typeof TaskProjectLockScalarFieldEnum)[keyof typeof TaskProjectLockScalarFieldEnum]
 
 
 export const SortOrder = {

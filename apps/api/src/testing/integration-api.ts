@@ -19,11 +19,14 @@ import { InMemoryUserDirectory } from '@taskflow/backend/organizations/applicati
 import { InMemoryProjectsUserDirectory } from '@taskflow/backend/projects/application/testing';
 import { createApp } from '../app';
 import { createMembershipRoleChanges } from '../modules/adapters/membership-role-changes.adapter';
+import { createContributorChanges } from '../modules/adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from '../modules/adapters/organization-access.adapter';
 import { composeApiRouters } from '../modules/api-routers';
 import { mergeDomainErrors } from '../modules/domain-errors';
 import { createOrganizationsModule } from '../modules/organizations.module';
 import { createProjectsFoundation, createProjectsModule } from '../modules/projects.module';
+import { createProjectAccess } from '../modules/adapters/project-access.adapter';
+import { createTasksFoundation, createTasksModule } from '../modules/tasks.module';
 import type { TestClient } from './isolation-cases';
 import { listTenantRoutes, type RouteKey } from './tenant-isolation';
 
@@ -68,7 +71,12 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
   const projectUsers = new InMemoryProjectsUserDirectory();
   const clock = new SystemClock();
   const logger = pino({ level: 'silent' });
-  const foundation = createProjectsFoundation({ transactions, clock });
+  const tasksFoundation = createTasksFoundation({ transactions, clock });
+  const foundation = createProjectsFoundation({
+    transactions,
+    clock,
+    contributorChanges: createContributorChanges(tasksFoundation),
+  });
   const organizations = createOrganizationsModule({
     logger,
     transactions,
@@ -92,6 +100,22 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     organizationAccess: createOrganizationAccess(organizations),
     users: projectUsers,
   });
+  const tasks = createTasksModule({
+    foundation: tasksFoundation,
+    logger,
+    transactions,
+    rateLimiter: new InMemoryRateLimiter(),
+    idGenerator: new UuidV7Generator(),
+    clock,
+    projectAccess: createProjectAccess(projects),
+    // Mesmas contas de `projects` (só o nome).
+    users: {
+      async getNames(userIds) {
+        const accounts = await projectUsers.getAccounts(userIds);
+        return new Map([...accounts].map(([id, account]) => [id, account.name] as const));
+      },
+    },
+  });
   // No lugar do router de identidade: só a emissão do cookie CSRF ligada à sessão de teste.
   const identityRouter = Router().get('/test/csrf', authenticate, (req, res) => {
     csrf.issue(res, req.actor?.sessionId);
@@ -103,13 +127,18 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     csrf,
     organizations,
     projects,
+    tasks,
   });
   const app = createApp({
     config: { trustProxy: false, jsonBodyLimit: '100kb', healthCheckTimeoutMs: 100 },
     logger,
     probes: [],
     apiRouters: composed.apiRouters,
-    domainErrors: mergeDomainErrors(organizations.domainErrors, projects.domainErrors),
+    domainErrors: mergeDomainErrors(
+      organizations.domainErrors,
+      projects.domainErrors,
+      tasks.domainErrors,
+    ),
   });
 
   function clientFor(userId: string): TestClient {
@@ -125,7 +154,11 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
       token = issued;
       return issued;
     };
-    const mutate = async (method: 'post' | 'patch' | 'delete', path: string, body?: object) => {
+    const mutate = async (
+      method: 'post' | 'patch' | 'put' | 'delete',
+      path: string,
+      body?: object,
+    ) => {
       const value = await csrfToken();
       return request(app)
         [method](`/api/v1${path}`)
@@ -139,6 +172,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
       get: (path) => request(app).get(`/api/v1${path}`).set('x-test-user', userId),
       post: (path, body) => mutate('post', path, body),
       patch: (path, body) => mutate('patch', path, body),
+      put: (path, body) => mutate('put', path, body),
       delete: (path) => mutate('delete', path),
     };
   }

@@ -39,6 +39,7 @@ export { ResolveTenantMembershipUseCase } from './lib/use-cases/resolve-tenant-m
 export {
   GetMemberRolesUseCase,
   ListMembersExcludingUseCase,
+  LockMembersForShareUseCase,
   LockOrganizationForShareUseCase,
   type OrganizationAccessSnapshot,
 } from './lib/use-cases/organization-access.use-cases';

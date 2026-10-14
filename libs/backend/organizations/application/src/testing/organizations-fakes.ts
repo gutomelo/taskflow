@@ -170,6 +170,12 @@ export class InMemoryMembershipRepository implements MembershipRepository, Trans
     const next = start + page.limit;
     return { items, nextCursor: next < all.length ? String(next) : null };
   }
+  /** Travas de memberships pedidas (spec 004). */
+  readonly shareLocks: (readonly string[])[] = [];
+  async lockRolesForShare(organizationId: string, userIds: ReadonlyArray<string>) {
+    this.shareLocks.push([...userIds]);
+    return this.rolesOf(organizationId, userIds);
+  }
   async rolesOf(organizationId: string, userIds: ReadonlyArray<string>) {
     return new Map(
       this.inOrganization(organizationId)

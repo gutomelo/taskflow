@@ -25,6 +25,7 @@ import {
   ListMembersExcludingUseCase,
   ListMembersUseCase,
   ListMyOrganizationsUseCase,
+  LockMembersForShareUseCase,
   LockOrganizationForShareUseCase,
   LookupInvitationUseCase,
   RemoveMemberUseCase,
@@ -73,6 +74,7 @@ export interface OrganizationsModule {
   /** Consultas para a porta `OrganizationAccess` de `projects` (spec 003). */
   readonly access: Readonly<{
     lockForShare: LockOrganizationForShareUseCase;
+    lockMembersForShare: LockMembersForShareUseCase;
     rolesOf: GetMemberRolesUseCase;
     membersExcluding: ListMembersExcludingUseCase;
   }>;
@@ -136,6 +138,7 @@ export function createOrganizationsModule(
     domainErrors: organizationsErrorMappings,
     access: {
       lockForShare: new LockOrganizationForShareUseCase({ organizations, memberships }),
+      lockMembersForShare: new LockMembersForShareUseCase({ memberships }),
       rolesOf: new GetMemberRolesUseCase({ memberships }),
       membersExcluding: new ListMembersExcludingUseCase({ memberships }),
     },

@@ -201,6 +201,8 @@ export default [
  */
 export const organizationsMustNotReachProjects = {
   files: ['**/*.ts'],
+  // Testes de integração semeiam tabelas de outros contextos de propósito.
+  ignores: ['**/*.integration.spec.ts'],
   rules: {
     // Repete as restrições do tenant: este bloco substitui o `no-restricted-syntax` anterior.
     'no-restricted-syntax': [
@@ -208,9 +210,55 @@ export const organizationsMustNotReachProjects = {
       ...TENANT_PARAM_RESTRICTIONS,
       {
         selector:
-          'MemberExpression[property.name=/^(projects|projectParticipations|project|projectMember|workflowStatus|workflowTransition)$/], Property[key.name=/^(projects|projectParticipations)$/]',
+          'MemberExpression[property.name=/^(projects|projectParticipations|assignedTasks|project|projectMember|workflowStatus|workflowTransition|task|taskDependency|taskCounter|taskProjectLock)$/], Property[key.name=/^(projects|projectParticipations|assignedTasks)$/]',
         message:
-          'ADR 0015: organizations não usa a back-relation nem os modelos de projects; integre por porta.',
+          'ADR 0015: organizations não usa as back-relations nem os modelos de projects/tasks; integre por porta.',
+      },
+    ],
+  },
+};
+
+/**
+ * ADR 0015 (spec 004): as back-relations `tasks`, `taskCounter` e `taskProjectLock` de `Project` e
+ * `WorkflowStatus` existem só para as FKs de `tasks`; o código de `projects` não as usa nem toca os
+ * modelos de `tasks`. Incluída pelos configs das bibliotecas de `projects`.
+ */
+export const projectsMustNotReachTasks = {
+  files: ['**/*.ts'],
+  // Testes de integração semeiam tabelas de outros contextos de propósito.
+  ignores: ['**/*.integration.spec.ts'],
+  rules: {
+    'no-restricted-syntax': [
+      'error',
+      ...TENANT_PARAM_RESTRICTIONS,
+      {
+        selector:
+          'MemberExpression[property.name=/^(task|taskDependency|taskCounter|taskProjectLock|assignedTasks)$/], Property[key.name=/^(tasks|taskCounter|taskProjectLock|assignedTasks)$/]',
+        message:
+          'ADR 0015: projects não usa as back-relations nem os modelos de tasks; integre por porta.',
+      },
+    ],
+  },
+};
+
+/**
+ * ADR 0015 (spec 004): as relações `project`, `status` e `assignee` de `Task` existem só para as FKs;
+ * `tasks` não lê tabelas de outros contextos (status, nomes e papéis chegam por `ProjectAccess` e
+ * `UserDirectory`). Incluída pelos configs das bibliotecas de `tasks`.
+ */
+export const tasksMustNotReachOtherContexts = {
+  files: ['**/*.ts'],
+  // Testes de integração semeiam tabelas de outros contextos de propósito.
+  ignores: ['**/*.integration.spec.ts'],
+  rules: {
+    'no-restricted-syntax': [
+      'error',
+      ...TENANT_PARAM_RESTRICTIONS,
+      {
+        selector:
+          'MemberExpression[property.name=/^(project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(project|status|assignee)$/]',
+        message:
+          'ADR 0015: tasks não lê tabelas de outros contextos; use ProjectAccess ou UserDirectory.',
       },
     ],
   },

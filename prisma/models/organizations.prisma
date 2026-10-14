@@ -47,6 +47,8 @@ model Membership {
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   /// ADR 0015: exigida pelo Prisma para a FK de `projects`; nunca usada pelo código de `organizations`.
   projectParticipations ProjectMember[]
+  /// ADR 0015: exigida pelo Prisma para a FK do responsável em `tasks`; nunca usada por `organizations`.
+  assignedTasks         Task[]
 
   /// Usado pelo middleware de tenant (uma consulta por requisição).
   @@unique([organizationId, userId])

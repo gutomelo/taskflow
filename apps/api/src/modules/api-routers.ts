@@ -2,6 +2,7 @@ import type { RequestHandler, Router } from 'express';
 import { createTenantScope, type CsrfProtection } from '@taskflow/backend/shared/http';
 import type { OrganizationsModule } from './organizations.module';
 import type { ProjectsModule } from './projects.module';
+import type { TasksModule } from './tasks.module';
 
 /**
  * Tudo o que compõe `/api/v1`. Cada contexto novo (projects, tasks…) entra aqui como campo
@@ -13,6 +14,7 @@ export interface ApiModules {
   readonly csrf: CsrfProtection;
   readonly organizations: Pick<OrganizationsModule, 'router' | 'tenantRouter' | 'resolveTenant'>;
   readonly projects: Pick<ProjectsModule, 'tenantRouter'>;
+  readonly tasks: Pick<TasksModule, 'tenantRouter'>;
 }
 
 export interface ComposedApi {
@@ -31,7 +33,11 @@ export function composeApiRouters(modules: ApiModules): ComposedApi {
     authenticate: modules.authenticate,
     csrf: modules.csrf,
     resolve: modules.organizations.resolveTenant,
-    routers: [modules.organizations.tenantRouter, modules.projects.tenantRouter],
+    routers: [
+      modules.organizations.tenantRouter,
+      modules.projects.tenantRouter,
+      modules.tasks.tenantRouter,
+    ],
   });
   return { globalRouters, tenantScope, apiRouters: [...globalRouters, tenantScope] };
 }

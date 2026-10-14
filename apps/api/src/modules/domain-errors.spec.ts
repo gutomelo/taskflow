@@ -1,6 +1,7 @@
 import { identityErrorMappings } from '@taskflow/backend/identity/http';
 import { organizationsErrorMappings } from '@taskflow/backend/organizations/http';
 import { projectsErrorMappings } from '@taskflow/backend/projects/http';
+import { tasksErrorMappings } from '@taskflow/backend/tasks/http';
 import { mergeDomainErrors } from './domain-errors';
 
 describe('mergeDomainErrors (spec 003, S-7)', () => {
@@ -9,10 +10,12 @@ describe('mergeDomainErrors (spec 003, S-7)', () => {
       identityErrorMappings,
       organizationsErrorMappings,
       projectsErrorMappings,
+      tasksErrorMappings,
     );
 
     expect(merged['MEMBER_NOT_FOUND']).toEqual(organizationsErrorMappings['MEMBER_NOT_FOUND']);
     expect(merged['PROJECT_NOT_FOUND']).toEqual({ status: 404, title: 'Projeto não encontrado' });
+    expect(merged['TASK_HAS_PENDING_REQUIRED_SUBTASKS']?.status).toBe(422);
   });
 
   it('refuses a shared code mapped differently by two contexts', () => {

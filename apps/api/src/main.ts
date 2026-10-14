@@ -17,6 +17,7 @@ import {
 import { createApp } from './app';
 import { loadConfig } from './config/env';
 import { createMembershipRoleChanges } from './modules/adapters/membership-role-changes.adapter';
+import { createContributorChanges } from './modules/adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from './modules/adapters/organization-access.adapter';
 import { createProjectUserDirectory } from './modules/adapters/project-user-directory.adapter';
 import { createUserDirectory } from './modules/adapters/user-directory.adapter';
@@ -25,6 +26,9 @@ import { composeApiRouters } from './modules/api-routers';
 import { createIdentityModule } from './modules/identity.module';
 import { createOrganizationsModule } from './modules/organizations.module';
 import { createProjectsFoundation, createProjectsModule } from './modules/projects.module';
+import { createTasksFoundation, createTasksModule } from './modules/tasks.module';
+import { createProjectAccess } from './modules/adapters/project-access.adapter';
+import { createTaskUserDirectory } from './modules/adapters/task-user-directory.adapter';
 import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
@@ -75,8 +79,12 @@ async function bootstrap(): Promise<void> {
     clock: new SystemClock(),
   };
   const identity = await createIdentityModule({ ...shared, config, redis });
-  // Ordem de montagem (spec 003): `projects` reage a mudanças de papel em `organizations`.
-  const projectsFoundation = createProjectsFoundation(shared);
+  // Ordem de montagem (specs 003 e 004): organizations → projects → tasks, montados ao contrário.
+  const tasksFoundation = createTasksFoundation(shared);
+  const projectsFoundation = createProjectsFoundation({
+    ...shared,
+    contributorChanges: createContributorChanges(tasksFoundation),
+  });
   const organizations = createOrganizationsModule({
     ...shared,
     membershipRoleChanges: createMembershipRoleChanges(projectsFoundation),
@@ -90,6 +98,12 @@ async function bootstrap(): Promise<void> {
     organizationAccess: createOrganizationAccess(organizations),
     users: createProjectUserDirectory(identity),
   });
+  const tasks = createTasksModule({
+    ...shared,
+    foundation: tasksFoundation,
+    projectAccess: createProjectAccess(projects),
+    users: createTaskUserDirectory(identity),
+  });
   // ADR 0012: `authenticate → csrf → tenantContext` uma vez sobre /organizations/:organizationId.
   const { apiRouters } = composeApiRouters({
     identityRouter: identity.router,
@@ -97,6 +111,7 @@ async function bootstrap(): Promise<void> {
     csrf: identity.csrf,
     organizations,
     projects,
+    tasks,
   });
 
   const app = createApp({
@@ -108,6 +123,7 @@ async function bootstrap(): Promise<void> {
       identity.domainErrors,
       organizations.domainErrors,
       projects.domainErrors,
+      tasks.domainErrors,
     ),
     // RF-14: documentação interativa apenas fora de produção.
     ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),

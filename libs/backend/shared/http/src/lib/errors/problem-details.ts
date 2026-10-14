@@ -1,5 +1,9 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
-import { RateLimitedError, ServiceBusyError } from '@taskflow/backend/shared/application';
+import {
+  ConcurrentUpdateError,
+  RateLimitedError,
+  ServiceBusyError,
+} from '@taskflow/backend/shared/application';
 import { DomainError } from '@taskflow/backend/shared/kernel';
 import {
   PROBLEM_CONTENT_TYPE,
@@ -36,6 +40,8 @@ export type DomainErrorMapping = Readonly<{
   title: string;
   /** Detalhes estruturados seguros para o cliente (ex.: regras de senha violadas). */
   violations?: (error: DomainError) => ReadonlyArray<FieldViolation>;
+  /** Extensão `taskIds` (spec 004): tarefas que impedem a operação, com ids já visíveis ao ator. */
+  taskIds?: (error: DomainError) => ReadonlyArray<string>;
 }>;
 
 export interface ErrorHandlerOptions {
@@ -98,14 +104,25 @@ export function createErrorHandler({
       return;
     }
 
+    if (error instanceof ConcurrentUpdateError) {
+      sendProblem(response, {
+        status: 409,
+        code: error.code,
+        title: 'Outra operação alterou estes dados ao mesmo tempo. Tente novamente.',
+      });
+      return;
+    }
+
     if (error instanceof DomainError) {
       const mapping = domainErrors[error.code];
       const violations = mapping?.violations?.(error);
+      const taskIds = mapping?.taskIds?.(error);
       sendProblem(response, {
         status: mapping?.status ?? DEFAULT_DOMAIN_ERROR_STATUS,
         code: error.code,
         title: mapping?.title ?? 'Operação não permitida',
         ...(violations && violations.length > 0 ? { violations: [...violations] } : {}),
+        ...(taskIds && taskIds.length > 0 ? { taskIds: [...taskIds] } : {}),
       });
       return;
     }

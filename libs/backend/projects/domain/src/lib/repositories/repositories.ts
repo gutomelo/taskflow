@@ -33,6 +33,15 @@ export interface ProjectRepository {
   ): Promise<Page<VisibleProject>>;
   countInOrganization(organizationId: string): Promise<number>;
   /**
+   * Trava o projeto para compartilhamento (`FOR SHARE`) até o commit e o devolve (spec 004):
+   * escritas de tarefa correm em paralelo entre si, mas esperam arquivamento e mudanças de
+   * participação (`FOR NO KEY UPDATE`). `null` se não existir. Só em transação.
+   */
+  lockForShare(
+    organizationId: string,
+    by: Readonly<{ projectId: string } | { key: string }>,
+  ): Promise<Project | null>;
+  /**
    * Trava o projeto até o fim da transação (`FOR NO KEY UPDATE`) e o devolve; `null` se não
    * existir na organização. Só dentro de transação.
    */
@@ -49,11 +58,24 @@ export interface ProjectMemberRepository {
    */
   add(member: ProjectMember): Promise<void>;
   find(organizationId: string, projectId: string, userId: string): Promise<ProjectMember | null>;
+  /** `roles`: só participações com esses papéis gravados (ex.: elegíveis a responsável). */
   listPage(
     organizationId: string,
     projectId: string,
     page: PageRequest,
+    roles?: ReadonlyArray<ProjectRole>,
   ): Promise<Page<ProjectMember>>;
+  /** Participações das pessoas indicadas no projeto (ausente = não participa). */
+  rolesOf(
+    organizationId: string,
+    projectId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, ProjectRole>>;
+  /** Todas as participações de uma pessoa na organização (reação a mudança de papel). */
+  listForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<ReadonlyArray<Readonly<{ projectId: string; role: ProjectRole }>>>;
   /** Todos os participantes (limitados a `MAX_MEMBERS_PER_PROJECT`), para excluir dos candidatos. */
   listUserIds(organizationId: string, projectId: string): Promise<ReadonlyArray<string>>;
   count(organizationId: string, projectId: string): Promise<number>;

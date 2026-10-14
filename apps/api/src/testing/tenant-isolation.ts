@@ -117,7 +117,11 @@ export const methodOf = (route: RouteKey) => (route.split(' ')[0] ?? '').toLower
  * Variante de isolamento de uma referência da rota: `not-found` = id real de B sob o prefixo de A
  * deve dar 404; `no-leak` = a resposta (lista) não pode conter ids de B.
  */
-export type IsolationExpectation = 'not-found' | 'no-leak';
+/**
+ * `not-found`: 404 com o código esperado; `no-leak`: sucesso sem dados de B; `refused`: 422 com o
+ * código esperado — referência a uma pessoa de B que a regra recusa (ex.: responsável, BR-003).
+ */
+export type IsolationExpectation = 'not-found' | 'no-leak' | 'refused';
 
 /** Schema de entrada declarado num caso (Zod `object`): só as chaves importam aqui. */
 export type InputSchema = Readonly<{ shape: Readonly<Record<string, unknown>> }>;

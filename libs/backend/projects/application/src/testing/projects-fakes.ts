@@ -23,8 +23,9 @@ import {
   type VisibleProject,
   type Workflow,
 } from '@taskflow/backend/projects/domain';
-import type { OrganizationRole } from '@taskflow/backend/shared/kernel';
+import type { OrganizationRole, ProjectRole } from '@taskflow/backend/shared/kernel';
 import type { OrganizationAccess } from '../lib/ports/organization-access';
+import type { ProjectContributorChanges } from '../lib/ports/project-contributor-changes';
 import type { ProjectUserAccount, UserDirectory } from '../lib/ports/user-directory';
 import type {
   ProjectsSecurityEvent,
@@ -82,12 +83,37 @@ export class InMemoryProjectMemberRepository
     const row = this.rows[this.index(organizationId, projectId, userId)];
     return row ? ProjectMember.restore(row) : null;
   }
-  async listPage(organizationId: string, projectId: string, page: PageRequest) {
+  async listPage(
+    organizationId: string,
+    projectId: string,
+    page: PageRequest,
+    roles?: ReadonlyArray<ProjectRole>,
+  ) {
     const all = this.rows.filter(
-      (row) => row.organizationId === organizationId && row.projectId === projectId,
+      (row) =>
+        row.organizationId === organizationId &&
+        row.projectId === projectId &&
+        (roles === undefined || roles.includes(row.role)),
     );
     const result = pageOf(all, page);
     return { ...result, items: result.items.map((row) => ProjectMember.restore(row)) };
+  }
+  async rolesOf(organizationId: string, projectId: string, userIds: ReadonlyArray<string>) {
+    return new Map(
+      this.rows
+        .filter(
+          (row) =>
+            row.organizationId === organizationId &&
+            row.projectId === projectId &&
+            userIds.includes(row.userId),
+        )
+        .map((row) => [row.userId, row.role] as const),
+    );
+  }
+  async listForUser(organizationId: string, userId: string) {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && row.userId === userId)
+      .map((row) => ({ projectId: row.projectId, role: row.role }));
   }
   async listUserIds(organizationId: string, projectId: string) {
     return this.rows
@@ -210,6 +236,21 @@ export class InMemoryProjectRepository implements ProjectRepository, Transaction
   async countInOrganization(organizationId: string) {
     return this.rows.filter((row) => row.organizationId === organizationId).length;
   }
+  /** Travas para compartilhamento pedidas (spec 004). */
+  readonly shareLocks: string[] = [];
+  async lockForShare(
+    organizationId: string,
+    by: Readonly<{ projectId: string } | { key: string }>,
+  ) {
+    requireTransaction(this.transactions, 'ProjectRepository.lockForShare');
+    const row = this.rows.find(
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        ('projectId' in by ? candidate.id === by.projectId : candidate.key.value === by.key),
+    );
+    if (row) this.shareLocks.push(row.id);
+    return row ? Project.restore(row) : null;
+  }
   async lockForUpdate(organizationId: string, projectId: string) {
     requireTransaction(this.transactions, 'ProjectRepository.lockForUpdate');
     this.locks.push(projectId);
@@ -271,6 +312,13 @@ export class InMemoryOrganizationAccess implements OrganizationAccess {
       roles: await this.rolesOf(organizationId, userIds),
     };
   }
+  /** Memberships travadas para compartilhamento (spec 004). */
+  readonly memberShareLocks: (readonly string[])[] = [];
+  async lockMembersForShare(organizationId: string, userIds: ReadonlyArray<string>) {
+    requireTransaction(this.transactions, 'OrganizationAccess.lockMembersForShare');
+    this.memberShareLocks.push([...userIds]);
+    return this.rolesOf(organizationId, userIds);
+  }
   async rolesOf(organizationId: string, userIds: ReadonlyArray<string>) {
     const roles =
       this.organizations.get(organizationId)?.roles ?? new Map<string, OrganizationRole>();
@@ -309,6 +357,16 @@ export class InMemoryProjectsUserDirectory implements UserDirectory {
   }
 }
 
+/** Registra os avisos de "deixou de contribuir" (porta da spec 004). */
+export class RecordingContributorChanges implements ProjectContributorChanges {
+  readonly changes: Parameters<ProjectContributorChanges['contributorAccessReduced']>[0][] = [];
+  async contributorAccessReduced(
+    change: Parameters<ProjectContributorChanges['contributorAccessReduced']>[0],
+  ) {
+    this.changes.push(change);
+  }
+}
+
 export class RecordingProjectsSecurityEvents implements ProjectsSecurityEventRecorder {
   events: ProjectsSecurityEvent[] = [];
   record(event: ProjectsSecurityEvent) {
@@ -329,6 +387,7 @@ export function createProjectsTestbed() {
     organizationAccess: new InMemoryOrganizationAccess(transactions, projectMembers),
     users: new InMemoryProjectsUserDirectory(),
     securityEvents: new RecordingProjectsSecurityEvents(),
+    contributorChanges: new RecordingContributorChanges(),
     rateLimiter: new InMemoryRateLimiter(),
     clock: new FixedClock(),
     idGenerator: new SequentialIds(),

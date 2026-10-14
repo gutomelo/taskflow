@@ -122,6 +122,31 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.transactions.client().project.count({ where: { organizationId } });
   }
 
+  async lockForShare(
+    organizationId: string,
+    by: Readonly<{ projectId: string } | { key: string }>,
+  ): Promise<Project | null> {
+    const transaction = this.transactions.transactionalClient('ProjectRepository.lockForShare');
+    // FOR SHARE: escritas de tarefa em paralelo, serializadas com arquivamento e mudanças de
+    // participação (FOR NO KEY UPDATE). Só o lock em SQL; os dados pela consulta tipada.
+    const locked =
+      'projectId' in by
+        ? await transaction.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM projects
+            WHERE organization_id = ${organizationId}::uuid AND id = ${by.projectId}::uuid
+            FOR SHARE`
+        : await transaction.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM projects
+            WHERE organization_id = ${organizationId}::uuid AND key = ${by.key}
+            FOR SHARE`;
+    const [first] = locked;
+    if (!first) return null;
+    const row = await transaction.project.findUnique({
+      where: { organizationId_id: { organizationId, id: first.id } },
+    });
+    return row ? toProject(row) : null;
+  }
+
   async lockForUpdate(organizationId: string, projectId: string): Promise<Project | null> {
     const transaction = this.transactions.transactionalClient('ProjectRepository.lockForUpdate');
     // FOR NO KEY UPDATE: serializa mutações do projeto sem bloquear o FOR KEY SHARE das FKs.

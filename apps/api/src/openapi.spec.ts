@@ -67,7 +67,8 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
     }
     expect(
       Object.keys(paths).filter(
-        (path) => path.includes('organizations') && !path.includes('/projects'),
+        (path) =>
+          path.includes('organizations') && !path.includes('/projects') && !path.includes('/tasks'),
       ),
     ).toHaveLength(8);
   });
@@ -97,6 +98,33 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
       expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
     }
     expect(Object.keys(paths).filter((path) => path.includes('/projects'))).toHaveLength(9);
+  });
+
+  it('spec 004: describes every tasks endpoint, with 404 and literal routes', () => {
+    const base = '/api/v1/organizations/{organizationId}/tasks';
+    const expected: Array<[string, string]> = [
+      ['get', base],
+      ['post', base],
+      ['get', `${base}/assignable-users`],
+      ['get', `${base}/by-key/{key}`],
+      ['get', `${base}/{taskId}`],
+      ['patch', `${base}/{taskId}`],
+      ['delete', `${base}/{taskId}`],
+      ['put', `${base}/{taskId}/assignee`],
+      ['post', `${base}/{taskId}/transition`],
+      ['post', `${base}/{taskId}/cancel`],
+      ['post', `${base}/{taskId}/reopen`],
+      ['post', `${base}/{taskId}/dependencies`],
+      ['delete', `${base}/{taskId}/dependencies/{blockingTaskId}`],
+    ];
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of expected) {
+      const operation = paths[path]?.[method as 'get'];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
+    }
+    expect(Object.keys(paths).filter((path) => path.includes('/tasks'))).toHaveLength(10);
   });
 
   it('documents errors as Problem Details and cookie/CSRF security schemes', () => {

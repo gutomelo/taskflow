@@ -21,6 +21,14 @@ export interface OrganizationAccess {
     organizationId: string,
     userIds: ReadonlyArray<string>,
   ): Promise<OrganizationAccessSnapshot | null>;
+  /**
+   * Trava as memberships das pessoas indicadas `FOR SHARE` e devolve os papéis (spec 004): sem
+   * travar a linha da organização. Contrato: dentro da transação do chamador.
+   */
+  lockMembersForShare(
+    organizationId: string,
+    userIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, OrganizationRole>>;
   /** Papéis atuais, sem lock (leituras). */
   rolesOf(
     organizationId: string,

@@ -37,9 +37,13 @@ model Project {
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   /// ADR 0015: toda tabela tenant-scoped tem FK para a organização (.claude/rules/database.md).
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  members      ProjectMember[]
-  statuses     WorkflowStatus[]
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  members         ProjectMember[]
+  statuses        WorkflowStatus[]
+  /// ADR 0015: exigidas pelo Prisma para as FKs de `tasks`; nunca usadas pelo código de `projects`.
+  tasks           Task[]
+  taskCounter     TaskCounter?
+  taskProjectLock TaskProjectLock?
 
   /// Alvo das FKs compostas (ADR 0014).
   @@unique([organizationId, id])
@@ -85,6 +89,8 @@ model WorkflowStatus {
   project         Project              @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
   transitionsFrom WorkflowTransition[] @relation("TransitionFrom")
   transitionsTo   WorkflowTransition[] @relation("TransitionTo")
+  /// ADR 0015: exigida pelo Prisma para a FK de `tasks`; nunca usada pelo código de `projects`.
+  tasks           Task[]
 
   /// Alvo das FKs das transições (e de `tasks.status_id` na spec 004): mesmo projeto garantido.
   @@unique([organizationId, projectId, id])

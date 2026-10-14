@@ -40,6 +40,8 @@ export type {
   OutboxEvent as OutboxEventRow,
   Project as ProjectRow,
   ProjectMember as ProjectMemberRow,
+  Task as TaskRow,
+  TaskDependency as TaskDependencyRow,
   WorkflowStatus as WorkflowStatusRow,
   WorkflowTransition as WorkflowTransitionRow,
   RefreshToken as RefreshTokenRow,

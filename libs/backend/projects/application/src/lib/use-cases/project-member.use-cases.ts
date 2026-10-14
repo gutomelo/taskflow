@@ -21,7 +21,9 @@ import {
   type ProjectRepository,
 } from '@taskflow/backend/projects/domain';
 import type { OrganizationAccess } from '../ports/organization-access';
+import type { ProjectContributorChanges } from '../ports/project-contributor-changes';
 import type { UserDirectory } from '../ports/user-directory';
+import { isContributor } from '../shared/contribution';
 import {
   toMemberCandidateView,
   toProjectMemberView,
@@ -45,6 +47,8 @@ export interface ProjectMembersDependencies {
   readonly users: UserDirectory;
   readonly transactions: TransactionRunner;
   readonly securityEvents: ProjectsSecurityEventRecorder;
+  /** Spec 004: quem deixou de contribuir tem as atribuições desfeitas (BR-003), na mesma transação. */
+  readonly contributorChanges: ProjectContributorChanges;
   readonly idGenerator: IdGenerator;
   readonly clock: Clock;
 }
@@ -262,6 +266,15 @@ export class ChangeProjectMemberRoleUseCase {
       }
       member.changeRole(command.role, targetOrganizationRole, this.deps.clock.now());
       await this.deps.projectMembers.save(member);
+      // BR-003: com o papel novo, deixou de contribuir neste projeto? Decide aqui, `tasks` executa.
+      if (!isContributor(effectiveProjectRole(targetOrganizationRole, command.role))) {
+        await this.deps.contributorChanges.contributorAccessReduced({
+          organizationId,
+          userId: command.userId,
+          scope: { projectId: command.projectId },
+          stillContributorIn: [],
+        });
+      }
       return { member, fromRole, targetOrganizationRole, locked, changed: true };
     });
 
@@ -313,10 +326,11 @@ export class RemoveProjectMemberUseCase {
     const actorUserId = context.actor.userId;
     const self = command.userId === actorUserId;
     await this.deps.transactions.run(async () => {
-      await lockProjectAndRereadActor(this.deps, context, {
+      const locked = await lockProjectAndRereadActor(this.deps, context, {
         projectId: command.projectId,
         // Sair só exige ver o projeto: quem não participa (owner/admin) recebe 404 do participante.
         permission: self ? 'project:read' : 'project-member:manage',
+        alsoRead: [command.userId],
       });
       const member = await this.deps.projectMembers.find(
         organizationId,
@@ -331,6 +345,20 @@ export class RemoveProjectMemberUseCase {
         command.userId,
         command.version,
       );
+      // BR-003: sem a participação, ainda contribui? Owner/admin seguem como manager (decisão 7 da
+      // spec 004); member e viewer da organização deixam de contribuir neste projeto.
+      const targetOrganizationRole = locked.access.roles.get(command.userId);
+      if (
+        !targetOrganizationRole ||
+        !isContributor(effectiveProjectRole(targetOrganizationRole, null))
+      ) {
+        await this.deps.contributorChanges.contributorAccessReduced({
+          organizationId,
+          userId: command.userId,
+          scope: { projectId: command.projectId },
+          stillContributorIn: [],
+        });
+      }
     });
 
     this.deps.securityEvents.record({
