@@ -5,3 +5,4 @@ export * from './lib/organizations/organizations.contract';
 export * from './lib/projects/projects.contract';
 export * from './lib/tasks/tasks.contract';
 export * from './lib/tasks/board.contract';
+export * from './lib/collaboration/comments.contract';

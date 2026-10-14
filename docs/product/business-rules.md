@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001, BR-003 e BR-006 **implementadas e testadas** (spec 004); BR-004, BR-009 e BR-030 **implementadas e testadas** (specs 004 e 005: mudança de status, movimento de cards e workflow configurável); BR-008 aplicada a organizações, memberships, projetos e tarefas; BR-002, BR-005, BR-007 e BR-010 **documentadas** (dependem das specs 005+, salvo o que já está indicado); BR-028 e BR-029 **implementadas e testadas** (spec 004); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); A spec que implementa cada regra está indicada.
+Status: BR-001, BR-003 e BR-006 **implementadas e testadas** (spec 004); BR-004, BR-009 e BR-030 **implementadas e testadas** (specs 004 e 005: mudança de status, movimento de cards e workflow configurável); BR-008 aplicada a organizações, memberships, projetos e tarefas; BR-002, BR-005, BR-007 e BR-010 **documentadas** (dependem das specs 005+, salvo o que já está indicado); BR-028 e BR-029 **implementadas e testadas** (spec 004); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); BR-031 e BR-032 **implementadas e testadas** (spec 010); A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -189,3 +189,13 @@ Cancelar e reabrir são ações próprias, independentes do status, que registra
 ### BR-030 — Workflow configurável
 
 O gerente do projeto (`board:configure`) cria, renomeia, reordena e remove status e define as transições, sempre com a versão do workflow (BR-008). Nomes de 1 a 40 caracteres de texto exibível, únicos no projeto sem diferenciar maiúsculas (`STATUS_NAME_TAKEN`, 409); sempre ao menos um status `todo` — o primeiro pela ordem é o inicial das tarefas novas (`WORKFLOW_NEEDS_TODO_STATUS`, 422); no máximo 20 status (`STATUS_LIMIT_REACHED`, 422). A **categoria só muda em status sem nenhuma tarefa** — canceladas e subtarefas contam (`STATUS_IN_USE`, 409): a conclusão das tarefas nunca muda por configuração. Remover um status com tarefas exige outro status **da mesma categoria** para recebê-las (`INVALID_STATUS_TARGET`, 422); a reatribuição e a remoção acontecem juntas, e as transições do status removido caem. Transições ligam status distintos do workflow, sem repetição (`INVALID_TRANSITION`, 422). Referências fora do workflow ⇒ `STATUS_NOT_FOUND` (404), antes das regras.
+
+## Comentários e menções (spec 010)
+
+### BR-031 — Comentário
+
+Texto simples de 1 a 5 000 caracteres (code points) depois de normalizar (NFC, fins de linha `\n`, bordas aparadas), Unicode bem formado, sem caracteres de controle além de quebra de linha e tabulação, sem formatação bidi e sem pilhas de marcas combinantes (`INVALID_COMMENT_BODY`, 400). Autor fixo; editar só o autor, com versão (BR-008; `VERSION_CONFLICT`, 409), mostrando "editado". Excluir — o autor ou o gerente do projeto (moderação) — troca o texto por "comentário removido" de forma irreversível e idempotente, apagando as menções; removido não se edita (`COMMENT_DELETED`, 409). Projeto arquivado (BR-026) e tarefa cancelada (BR-029) impedem comentar e editar, **mas não excluir** (decisão 9 da spec 010). Ordem `(criado em, id)`; teto suave de 2 000 comentários não removidos por tarefa (`COMMENT_LIMIT_REACHED`, 422). Quem saiu da organização aparece como "Ex-membro".
+
+### BR-032 — Menção
+
+Menção é o token `<@id>` no texto, gravado também como linha estruturada. Só vale para quem lê o projeto no momento da escrita, conferido sob lock; na edição, só as menções **novas** são conferidas (as mantidas continuam válidas). Qualquer outro caso — inexistente, de outra organização ou sem acesso — responde o mesmo `INVALID_MENTION` (422). Sem repetição; o autor não se menciona; no máximo 20 pessoas por comentário (`TOO_MANY_MENTIONS`, 422). Mencionar não concede acesso. Só as menções novas geram evento (`collaboration.comment_created`/`comment_edited`); a entrega de notificações é da spec 008, que confere o acesso na entrega.

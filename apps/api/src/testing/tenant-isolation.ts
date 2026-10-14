@@ -1,5 +1,7 @@
 import type { Router } from 'express';
 import { noStore, TENANT_PATH_PREFIX } from '@taskflow/backend/shared/http';
+import { embeddedReferences } from '@taskflow/contracts';
+import { z } from 'zod';
 
 // Harness de isolamento (spec 006, RF-08). Toda leitura dos internos do router do Express 5
 // (`router.stack`, `layer.slash`, `layer.match`) fica neste arquivo e falha fechada: uma estrutura
@@ -153,6 +155,9 @@ function referencesOf(shape: Readonly<Record<string, unknown>>, prefix: string):
   return Object.entries(shape).flatMap(([key, raw]) => {
     if (key.endsWith('Id') || key.endsWith('Ids') || key === 'cursor') return [`${prefix}${key}`];
     const field = unwrapped(raw);
+    // Referências dentro de texto (spec 010: menções `<@id>`), declaradas no próprio schema.
+    const embedded = field instanceof z.ZodType ? embeddedReferences.get(field) : undefined;
+    if (embedded) return [`${prefix}${key}.${embedded.kind}`];
     if (!isNode(field) || field.element === undefined) return [];
     const element = unwrapped(field.element);
     if (!isNode(element) || !isShape(element.shape)) return [];
@@ -163,8 +168,9 @@ function referencesOf(shape: Readonly<Record<string, unknown>>, prefix: string):
 
 /**
  * Referências de entrada que precisam de variante (spec 003, obrigação 6 da spec 006): campos que
- * apontam para outro recurso (`…Id`, listas `…Ids`, e `…Id` dentro de listas de objetos) e o
- * cursor de paginação (`no-leak`).
+ * apontam para outro recurso (`…Id`, listas `…Ids`, e `…Id` dentro de listas de objetos), o
+ * cursor de paginação (`no-leak`) e texto com referências embutidas (`body.mentions`, spec 010 —
+ * registro `embeddedReferences` dos contratos: falha fechado pelo schema).
  */
 export function inputReferences(schema: InputSchema | null): string[] {
   return schema ? referencesOf(schema.shape, '') : [];

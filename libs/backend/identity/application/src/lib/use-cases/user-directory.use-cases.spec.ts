@@ -112,6 +112,11 @@ describe('SearchUsersAmongUseCase (spec 010, mention candidates)', () => {
     expect(
       (await search.execute(ids, 'a', { limit: 2, cursor: 'lixo' })).items.map((item) => item.name),
     ).toEqual(['Ana Souza', 'Bia Lima']);
+    // JSON válido com id fora do formato UUID também recomeça (nunca chega à coluna UUID).
+    const forged = Buffer.from(JSON.stringify({ n: 'zzz', i: 'nao-uuid' })).toString('base64url');
+    expect(
+      (await search.execute(ids, 'a', { limit: 2, cursor: forged })).items.map((item) => item.name),
+    ).toEqual(['Ana Souza', 'Bia Lima']);
   });
 
   it('rejects more ids than the cap (programming error)', async () => {

@@ -135,6 +135,19 @@ Para servir `tasks`, `projects/application` expõe `LockProjectForContribution`,
 
 Na spec 004 entraram em `shared/*`: `ConcurrentUpdateError` e a opção `TransactionOptions.lockTimeoutMs` da porta `TransactionRunner` (`shared/application`, 409 `CONCURRENT_UPDATE`), `isTransactionConflict`, `isLockTimeout` e o `PrismaTransactionRunner` com READ COMMITTED explícito, uma nova tentativa em `P2034` e `lock_timeout` por transação (`shared/infrastructure`), e o membro de extensão `taskIds` do Problem Details (`DomainErrorMapping.taskIds` em `shared/http`, `problemDetailsSchema` em `libs/contracts`).
 
+## Bibliotecas do contexto Collaboration (implementadas, spec 010)
+
+Todas com `scope:backend` e `domain:collaboration`. Não importam outros contextos: tarefa, papéis, leitores, membros e nomes chegam pelas portas `TaskDiscussionAccess` e `CollaborationUserDirectory`, ligadas em `apps/api/src/modules/adapters` (`task-discussion-access.adapter.ts`, `collaboration-user-directory.adapter.ts`). O módulo é montado por último em `main.ts`.
+
+| Projeto                                     | Tipo             | Alias                                            | Conteúdo                                                                                                                                                  |
+| ------------------------------------------- | ---------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/backend/collaboration/domain`         | `domain`         | `@taskflow/backend/collaboration/domain`         | `Comment` (edição com menções novas, exclusão lógica idempotente), `parseCommentBody` (BR-031/BR-032, `MENTION_TOKEN`), erros, contrato do repositório    |
+| `libs/backend/collaboration/application`    | `application`    | `@taskflow/backend/collaboration/application`    | Casos de uso (conversa, comentário por id, candidatos, criar, editar, excluir), portas, cursores amarrados à tarefa, limites, eventos `collaboration.*`   |
+| `libs/backend/collaboration/infrastructure` | `infrastructure` | `@taskflow/backend/collaboration/infrastructure` | `PrismaCommentRepository` (sempre `organizationId`; keyset `(created_at DESC, id DESC)`; `FOR NO KEY UPDATE` da linha; menções trocadas com a versão)     |
+| `libs/backend/collaboration/http`           | `presentation`   | `@taskflow/backend/collaboration/http`           | `createCollaborationRouter` (404 por tipo de rota), mapeamento de erros, OpenAPI (tag Comments), teste de paridade da gramática do token com os contratos |
+
+Subcaminho de teste: `@taskflow/backend/collaboration/application/testing`. Para servir `collaboration`: `tasks` expõe `createTasksModule().discussion` (e o repositório ganhou `lockForShare`), `projects` expõe `contribution.readerIds`, `identity` expõe `searchUsersAmong` (o `contains` do Prisma não escapa `%`/`_`: escapados no repositório) e `organizations` reaproveita `access.rolesOf`. Lints: `collaborationMustNotReachOtherContexts` (modelos de `tasks`, `projects`, `organizations` e `identity`) e `tasksMustNotReachOtherContexts` ampliado (back-relation inerte `Task.comments`); ambos ignoram `*.integration.spec.ts`.
+
 ## Restrições por tipo (frontend)
 
 | Origem             | Pode depender de                                                                            |

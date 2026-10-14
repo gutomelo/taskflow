@@ -1,3 +1,14 @@
+import {
+  CreateCommentUseCase,
+  DeleteCommentUseCase,
+  EditCommentUseCase,
+  GetCommentUseCase,
+  ListCommentsUseCase,
+  ListMentionCandidatesUseCase,
+} from '@taskflow/backend/collaboration/application';
+import { createCollaborationTestbed } from '@taskflow/backend/collaboration/application/testing';
+import { createCollaborationRouter } from '@taskflow/backend/collaboration/http';
+import { commentBodySchema } from '@taskflow/contracts';
 import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import {
@@ -199,6 +210,17 @@ function composed() {
       moveCard: new MoveCardUseCase(tasksBed),
     },
   });
+  const collaborationBed = createCollaborationTestbed();
+  const collaborationRouter = createCollaborationRouter({
+    useCases: {
+      listComments: new ListCommentsUseCase(collaborationBed),
+      getComment: new GetCommentUseCase(collaborationBed),
+      listMentionCandidates: new ListMentionCandidatesUseCase(collaborationBed),
+      createComment: new CreateCommentUseCase(collaborationBed),
+      editComment: new EditCommentUseCase(collaborationBed),
+      deleteComment: new DeleteCommentUseCase(collaborationBed),
+    },
+  });
   return composeApiRouters({
     identityRouter,
     authenticate,
@@ -206,6 +228,7 @@ function composed() {
     organizations: { ...routers, resolveTenant: (input) => resolve.execute(input) },
     projects: { tenantRouter: projectsRouter },
     tasks: { tenantRouter: tasksRouter },
+    collaboration: { tenantRouter: collaborationRouter },
   });
 }
 
@@ -302,6 +325,32 @@ describe('isolation harness fails closed', () => {
       'PUT /organizations/:organizationId/things: no variant for body.links[].fromThingId',
       'PUT /organizations/:organizationId/things: no variant for query.moveToThingId',
     ]);
+  });
+
+  it('spec 010 (B1): text carrying references (mentions) needs a variant, derived from the schema', () => {
+    const routes = listTenantRoutes(scopeWith((router) => router.post('/notes', noop)));
+    const gaps = (references: Readonly<Record<string, never>>) =>
+      coverageGaps(routes, {
+        [routes[0] ?? '']: {
+          body: z.strictObject({ text: commentBodySchema, title: z.string().optional() }),
+          query: null,
+          references,
+        },
+      });
+
+    expect(gaps({})).toEqual([
+      'POST /organizations/:organizationId/notes: no variant for body.text.mentions',
+    ]);
+    // Um texto qualquer (sem o registro) não exige variante.
+    expect(
+      coverageGaps(routes, {
+        [routes[0] ?? '']: {
+          body: z.strictObject({ text: z.string() }),
+          query: null,
+          references: {},
+        },
+      }),
+    ).toEqual([]);
   });
 
   it('spec 003: a route that takes a body must declare its schema', () => {

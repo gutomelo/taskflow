@@ -49,6 +49,8 @@ export class FindUserIdByEmailUseCase {
 export const MAX_SEARCH_IDS = 1000;
 export const MAX_SEARCH_PAGE = 50;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function encodePosition(name: string, id: string): string {
   return Buffer.from(JSON.stringify({ n: name, i: id }), 'utf8').toString('base64url');
 }
@@ -61,7 +63,8 @@ function decodePosition(cursor: string | null): Readonly<{ name: string; id: str
     if (typeof value !== 'object' || value === null || !('n' in value) || !('i' in value))
       return null;
     const { n, i } = value;
-    return typeof n === 'string' && typeof i === 'string' && n.length <= 200 && i.length <= 64
+    // `id` vai para uma comparação em coluna UUID: fora do formato seria 500 (B1 da auditoria).
+    return typeof n === 'string' && typeof i === 'string' && n.length <= 200 && UUID.test(i)
       ? { name: n, id: i }
       : null;
   } catch {

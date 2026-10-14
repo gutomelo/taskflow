@@ -31,6 +31,7 @@
       "@taskflow/backend/collaboration/domain": [
         "./libs/backend/collaboration/domain/src/index.ts"
       ],
+      "@taskflow/backend/collaboration/http": ["./libs/backend/collaboration/http/src/index.ts"],
       "@taskflow/backend/collaboration/infrastructure": [
         "./libs/backend/collaboration/infrastructure/src/index.ts"
       ],

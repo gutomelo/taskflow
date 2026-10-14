@@ -19,6 +19,7 @@ import { ActiveOrganizationStore } from '../../core/organizations';
 import { focusAfterRender } from '../../shared/forms/form-focus';
 import { ActiveProjectStore } from '../projects/active-project.store';
 import { TaskApi } from './task-api';
+import { TaskComments } from './comments/task-comments';
 import { TaskAssignee } from './task-assignee';
 import { TASK_DELETED_STATE, TaskDetailStore } from './task-detail.store';
 import { TaskRelations } from './task-relations';
@@ -37,6 +38,7 @@ import { PRIORITY_LABELS, taskDetailMessages } from './tasks.messages';
     ReactiveFormsModule,
     RouterLink,
     TaskAssignee,
+    TaskComments,
     TaskRelations,
   ],
   providers: [TaskDetailStore],
@@ -178,6 +180,7 @@ import { PRIORITY_LABELS, taskDetailMessages } from './tasks.messages';
 
             <tf-task-assignee />
             <tf-task-relations />
+            <tf-task-comments />
 
             <section class="mt-8 flex flex-wrap gap-2 border-t border-border pt-4">
               @if (task.actions.cancel) {

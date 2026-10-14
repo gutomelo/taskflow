@@ -28,6 +28,9 @@ import { createOrganizationsModule } from '../modules/organizations.module';
 import { createProjectsFoundation, createProjectsModule } from '../modules/projects.module';
 import { createProjectAccess } from '../modules/adapters/project-access.adapter';
 import { createTasksFoundation, createTasksModule } from '../modules/tasks.module';
+import { createCollaborationModule } from '../modules/collaboration.module';
+import { createCollaborationUserDirectory } from '../modules/adapters/collaboration-user-directory.adapter';
+import { createTaskDiscussionAccess } from '../modules/adapters/task-discussion-access.adapter';
 import type { TestClient } from './isolation-cases';
 import { listTenantRoutes, type RouteKey } from './tenant-isolation';
 
@@ -118,6 +121,48 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
       },
     },
   });
+  // Spec 010: `identity` só com as contas de teste (nomes e busca entre ids).
+  const identity = {
+    userAccounts: {
+      execute: async (userIds: readonly string[]) => {
+        const accounts = await projectUsers.getAccounts(userIds);
+        return [...accounts].map(([id, account]) => ({
+          id,
+          name: account.name ?? '',
+          email: account.email ?? '',
+          emailVerified: true,
+        }));
+      },
+    },
+    searchUsersAmong: {
+      execute: async (
+        userIds: readonly string[],
+        query: string,
+        page: Readonly<{ limit: number; cursor: string | null }>,
+      ) => {
+        const accounts = await projectUsers.getAccounts(userIds);
+        const items = [...accounts]
+          .map(([id, account]) => ({
+            id,
+            name: account.name ?? '',
+            email: account.email ?? '',
+            emailVerified: true,
+          }))
+          .filter((account) => `${account.name} ${account.email}`.includes(query))
+          .sort((a, b) => (a.name < b.name ? -1 : 1));
+        return { items: items.slice(0, page.limit), nextCursor: null };
+      },
+    },
+  };
+  const collaboration = createCollaborationModule({
+    logger,
+    transactions,
+    rateLimiter: new InMemoryRateLimiter(),
+    idGenerator: new UuidV7Generator(),
+    clock,
+    discussion: createTaskDiscussionAccess({ tasks, projects, identity }),
+    users: createCollaborationUserDirectory({ organizations, identity }),
+  });
   // No lugar do router de identidade: só a emissão do cookie CSRF ligada à sessão de teste.
   const identityRouter = Router().get('/test/csrf', authenticate, (req, res) => {
     csrf.issue(res, req.actor?.sessionId);
@@ -130,6 +175,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     organizations,
     projects,
     tasks,
+    collaboration,
   });
   const app = createApp({
     config: { trustProxy: false, jsonBodyLimit: '100kb', healthCheckTimeoutMs: 100 },
@@ -140,6 +186,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
       organizations.domainErrors,
       projects.domainErrors,
       tasks.domainErrors,
+      collaboration.domainErrors,
     ),
   });
 

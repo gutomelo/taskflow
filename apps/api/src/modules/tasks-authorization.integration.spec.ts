@@ -237,7 +237,13 @@ describe('tasks authorization within the organization (integration, spec 004 T10
   }
 
   const taskRoutes = () =>
-    api.tenantRoutes.filter((route) => route.includes('/tasks') || route.includes('/board'));
+    api.tenantRoutes.filter(
+      (route) =>
+        (route.includes('/tasks') || route.includes('/board')) &&
+        // Comentários (spec 010) têm a própria bateria.
+        !route.includes('/comments') &&
+        !route.includes('/mentionable-users'),
+    );
 
   it('covers every task route (a new one without a request makes this fail)', () => {
     expect([...taskRoutes()].sort()).toEqual(Object.keys(REQUESTS).sort());

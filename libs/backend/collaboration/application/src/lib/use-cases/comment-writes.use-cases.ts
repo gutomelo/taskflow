@@ -145,8 +145,8 @@ async function lockCommentAndTask(
   ]);
   const role = lock?.effectiveRoles.get(actorUserId);
   const comment = lock && role ? await deps.comments.lockById(organizationId, commentId) : null;
-  if (!lock || !role || !comment || comment.taskId !== lock.taskId)
-    throw new CommentNotFoundError();
+  // O `taskId` de um comentário nunca muda: o travado é o mesmo da leitura.
+  if (!lock || !role || !comment) throw new CommentNotFoundError();
   return { lock, role, comment, locked: new Set([actorUserId, ...extra]) };
 }
 

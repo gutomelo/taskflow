@@ -30,6 +30,9 @@ import { createProjectsFoundation, createProjectsModule } from './modules/projec
 import { createTasksFoundation, createTasksModule } from './modules/tasks.module';
 import { createProjectAccess } from './modules/adapters/project-access.adapter';
 import { createTaskUserDirectory } from './modules/adapters/task-user-directory.adapter';
+import { createTaskDiscussionAccess } from './modules/adapters/task-discussion-access.adapter';
+import { createCollaborationUserDirectory } from './modules/adapters/collaboration-user-directory.adapter';
+import { createCollaborationModule } from './modules/collaboration.module';
 import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
@@ -106,6 +109,12 @@ async function bootstrap(): Promise<void> {
     projectAccess: createProjectAccess(projects),
     users: createTaskUserDirectory(identity),
   });
+  // Spec 010: `collaboration` por último — nenhum módulo anterior depende dele.
+  const collaboration = createCollaborationModule({
+    ...shared,
+    discussion: createTaskDiscussionAccess({ tasks, projects, identity }),
+    users: createCollaborationUserDirectory({ organizations, identity }),
+  });
   // ADR 0012: `authenticate → csrf → tenantContext` uma vez sobre /organizations/:organizationId.
   const { apiRouters } = composeApiRouters({
     identityRouter: identity.router,
@@ -114,6 +123,7 @@ async function bootstrap(): Promise<void> {
     organizations,
     projects,
     tasks,
+    collaboration,
   });
 
   const app = createApp({
@@ -126,6 +136,7 @@ async function bootstrap(): Promise<void> {
       organizations.domainErrors,
       projects.domainErrors,
       tasks.domainErrors,
+      collaboration.domainErrors,
     ),
     // RF-14: documentação interativa apenas fora de produção.
     ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),

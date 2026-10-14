@@ -15,8 +15,10 @@ import {
   ListColumnCardsUseCase,
   ListAssignableUsersUseCase,
   ListTasksUseCase,
+  LockTaskForDiscussionUseCase,
   MoveCardUseCase,
   RemoveDependencyUseCase,
+  ResolveTaskForDiscussionUseCase,
   ReassignTasksStatusUseCase,
   ReopenTaskUseCase,
   RevokeAssignmentsOnAccessLossUseCase,
@@ -110,6 +112,11 @@ export function createTasksModule(deps: TasksModuleDependencies) {
   };
   return {
     useCases,
+    /** Spec 010: porta `TaskDiscussionAccess` de `collaboration` (dados, sem decidir permissão). */
+    discussion: {
+      lockForComment: new LockTaskForDiscussionUseCase(shared),
+      resolveForRead: new ResolveTaskForDiscussionUseCase(shared),
+    },
     /** Rotas tenant-scoped, montadas pelo composition root no `createTenantScope`. */
     tenantRouter: createTasksRouter({ useCases }),
     domainErrors: tasksErrorMappings,

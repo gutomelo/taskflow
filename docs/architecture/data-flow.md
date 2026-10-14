@@ -104,6 +104,27 @@ sequenceDiagram
 
 **Planejado (Fase 2)**: publicar `card.moved` por Socket.IO (room `project:{id}`) depois do commit, para os outros usuários reconciliarem pela versão.
 
+## 3a. Comentário com menção (BR-031, BR-032, BR-010) — implementado (spec 010)
+
+```mermaid
+sequenceDiagram
+    participant UI as Detalhe da tarefa
+    participant API as collaboration/http
+    participant UC as CreateComment
+    participant TDA as TaskDiscussionAccess
+    participant DB as PostgreSQL
+    UI->>API: POST /tasks/{taskId}/comments { body com <@id> }
+    API->>UC: execute (limite contado; texto e menções validados antes do lock)
+    UC->>TDA: lockForComment(tarefa, [ator, mencionados])
+    TDA->>DB: projeto e memberships FOR SHARE; tarefa FOR SHARE
+    UC->>UC: 404 → 403 → arquivado → cancelada → INVALID_MENTION → teto
+    UC->>DB: INSERT comment + comment_mentions (mesma transação)
+    UC-->>API: comentário; evento collaboration.comment_created após o commit
+    API-->>UI: 201 Comment (Location)
+```
+
+Sem tempo real: a conversa recarrega ao abrir e depois de conflitos. A entrega das menções (notificações) é **planejada** para a spec 008, pela Outbox.
+
 ## 4. Comunicação assíncrona
 
 **Implementado (spec 001, ADR [0011](adr/0011-early-worker-and-outbox-for-email.md))**: Transactional Outbox para e-mails transacionais, do caso de uso na API até o SMTP.

@@ -15,6 +15,8 @@ import {
   taskSchema,
   workflowSchema,
   boardSchema,
+  commentPageSchema,
+  commentSchema,
 } from '@taskflow/contracts';
 import { startIntegrationApi, type IntegrationApi } from '../testing/integration-api';
 import { ISOLATION_CASES, type IsolationWorld, type TestClient } from '../testing/isolation-cases';
@@ -213,6 +215,27 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
     );
     const boardCursor = boardB.columns[0]?.nextCursor;
     if (!boardCursor) throw new Error('expected a second page in the first column of B');
+    // Spec 010: comentário de A (do membro duplo) e dois de B (cursor da conversa).
+    const commentOn = async (
+      client: TestClient,
+      organizationId: string,
+      taskId: string,
+      body: string,
+    ) => {
+      const response = await client.post(
+        `/organizations/${organizationId}/tasks/${taskId}/comments`,
+        { body },
+      );
+      expect(response.status).toBe(201);
+      return commentSchema.parse(response.body);
+    };
+    const commentA = await commentOn(asDual, orgA, taskA.id, 'Comentário de A');
+    const commentB = await commentOn(asBob, orgB, taskB.id, `Comentário de B <@${bia}>`);
+    await commentOn(asBob, orgB, taskB.id, 'Outro de B');
+    const commentsB = commentPageSchema.parse(
+      (await asBob.get(`/organizations/${orgB}/tasks/${taskB.id}/comments?limit=1`)).body,
+    );
+    if (!commentsB.nextCursor) throw new Error('expected a second page of comments in B');
     const workflowB = workflowSchema.parse(
       (await asBob.get(`/organizations/${orgB}/projects/${projectB.id}/workflow`)).body,
     );
@@ -226,6 +249,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         participantUserId: carol,
         taskId: taskA.id,
         statusIds: workflowA.statuses.map((status) => status.id),
+        commentId: commentA.id,
       },
       ofB: {
         userId: bia,
@@ -240,6 +264,8 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         ),
         taskId: taskB.id,
         boardCursor,
+        commentId: commentB.id,
+        commentsCursor: commentsB.nextCursor,
         taskKey: taskB.key,
         blockingTaskId: blockerB.id,
         // Status inicial de B: é onde estão as tarefas de B (um filtro sem tenant as vazaria).
@@ -334,6 +360,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
       for (const [reference, variant] of Object.entries(ISOLATION_CASES[route]?.references ?? {})) {
         for (const [actorName, actor] of actors) {
           if (variant.actors === 'owner-of-A' && actor !== setup.asOwnerOfA) continue;
+          if (variant.actors === 'dual-member' && actor !== setup.asDualMember) continue;
           const response = await variant.call(setup, actor);
           const label = `${route} › ${reference} › ${actorName}`;
           if (variant.expect === 'not-found' || variant.expect === 'refused') {

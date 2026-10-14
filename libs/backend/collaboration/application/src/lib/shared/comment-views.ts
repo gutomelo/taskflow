@@ -50,6 +50,13 @@ function actionsOf(comment: Comment, viewer: ViewerOnTask) {
   };
 }
 
+/** Menções na ordem da primeira aparição no texto (o banco não guarda ordem). */
+function inTextOrder(body: string | null, userIds: ReadonlyArray<string>): ReadonlyArray<string> {
+  if (body === null) return userIds;
+  const position = (userId: string) => body.indexOf(`<@${userId}>`);
+  return [...userIds].sort((a, b) => position(a) - position(b));
+}
+
 /** Monta as visões com os nomes em lote (uma chamada por resposta, RNF-04). */
 export async function toCommentViews(
   deps: Pick<CollaborationDependencies, 'users'>,
@@ -82,7 +89,7 @@ export async function toCommentViews(
       taskId,
       author: person(authorUserId),
       body,
-      mentions: mentionedUserIds.map(person),
+      mentions: inTextOrder(body, mentionedUserIds).map(person),
       createdAt,
       editedAt,
       deletedAt,

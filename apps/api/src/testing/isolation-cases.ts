@@ -30,6 +30,10 @@ import {
   reorderStatusesRequestSchema,
   replaceTransitionsRequestSchema,
   updateStatusRequestSchema,
+  commentListQuerySchema,
+  createCommentRequestSchema,
+  editCommentRequestSchema,
+  mentionCandidatesQuerySchema,
 } from '@taskflow/contracts';
 import type { InputSchema, IsolationExpectation, RouteKey } from './tenant-isolation';
 
@@ -62,6 +66,8 @@ export interface IsolationWorld {
     taskId: string;
     /** Status do workflow de A, na ordem (versão do workflow 1). */
     statusIds: ReadonlyArray<string>;
+    /** Comentário de A (do membro duplo, versão 1), na tarefa de A (spec 010). */
+    commentId: string;
   }>;
   /** Ids, chaves e cursores reais de B, por nome de referência. */
   readonly ofB: Readonly<Record<string, string>>;
@@ -77,8 +83,11 @@ export type IsolationVariant = Readonly<{
   code?: string;
   /** Status de `refused` (padrão 422). */
   status?: number;
-  /** Quem executa: só o owner de A (rotas que exigem papel de organização) ou os dois atores. */
-  actors: 'owner-of-A' | 'both';
+  /**
+   * Quem executa: só o owner de A (rotas que exigem papel de organização), só o membro de A e B
+   * (autor de recurso de A, spec 010) ou os dois atores.
+   */
+  actors: 'owner-of-A' | 'dual-member' | 'both';
   call: (world: IsolationWorld, actor: TestClient) => Promise<Response>;
 }>;
 
@@ -659,6 +668,84 @@ export const ISOLATION_CASES: Readonly<Record<RouteKey, IsolationCase>> = {
           beforeTaskId: world.ofB['taskId'],
           version: 1,
         }),
+      ),
+    },
+  },
+
+  // --- collaboration (spec 010): menções no texto são referências (`body.mentions`) ---
+  'GET /organizations/:organizationId/tasks/:taskId/comments': {
+    body: null,
+    query: commentListQuerySchema,
+    references: {
+      taskId: foreignTask('/comments'),
+      // Cursor real de B, amarrado à tarefa de B: recusado sem chegar ao banco.
+      cursor: refused(
+        'INVALID_CURSOR',
+        (world, actor) =>
+          actor.get(`${taskOfA(world)}/comments?cursor=${world.ofB['commentsCursor']}`),
+        400,
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/comments': {
+    body: createCommentRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/comments', (actor, path) => actor.post(path, { body: 'oi' })),
+      'body.mentions': refused('INVALID_MENTION', (world, actor) =>
+        actor.post(`${taskOfA(world)}/comments`, { body: `oi <@${world.ofB['userId']}>` }),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/tasks/:taskId/mentionable-users': {
+    body: null,
+    query: mentionCandidatesQuerySchema,
+    references: {
+      taskId: foreignTask('/mentionable-users?query=a'),
+      cursor: refused(
+        'INVALID_CURSOR',
+        (world, actor) =>
+          actor.get(
+            `${taskOfA(world)}/mentionable-users?query=a&cursor=${world.ofB['commentsCursor']}`,
+          ),
+        400,
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/comments/:commentId': {
+    body: null,
+    query: null,
+    references: {
+      commentId: notFound('COMMENT_NOT_FOUND', (world, actor) =>
+        actor.get(`${org(world)}/comments/${world.ofB['commentId']}`),
+      ),
+    },
+  },
+  'PATCH /organizations/:organizationId/comments/:commentId': {
+    body: editCommentRequestSchema,
+    query: null,
+    references: {
+      commentId: notFound('COMMENT_NOT_FOUND', (world, actor) =>
+        actor.patch(`${org(world)}/comments/${world.ofB['commentId']}`, { body: 'x', version: 1 }),
+      ),
+      // Só o membro duplo é autor do comentário de A: o owner recebe 403 antes da menção.
+      'body.mentions': {
+        ...refused('INVALID_MENTION', (world, actor) =>
+          actor.patch(`${org(world)}/comments/${world.ofA.commentId}`, {
+            body: `oi <@${world.ofB['userId']}>`,
+            version: 1,
+          }),
+        ),
+        actors: 'dual-member',
+      },
+    },
+  },
+  'DELETE /organizations/:organizationId/comments/:commentId': {
+    body: null,
+    query: null,
+    references: {
+      commentId: notFound('COMMENT_NOT_FOUND', (world, actor) =>
+        actor.delete(`${org(world)}/comments/${world.ofB['commentId']}?version=1`),
       ),
     },
   },

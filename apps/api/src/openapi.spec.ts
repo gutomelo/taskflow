@@ -71,7 +71,8 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
           path.includes('organizations') &&
           !path.includes('/projects') &&
           !path.includes('/tasks') &&
-          !path.includes('/board'),
+          !path.includes('/board') &&
+          !path.includes('/comments'),
       ),
     ).toHaveLength(8);
   });
@@ -127,7 +128,42 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
       expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
       expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
     }
-    expect(Object.keys(paths).filter((path) => path.includes('/tasks'))).toHaveLength(11);
+    expect(
+      Object.keys(paths).filter(
+        (path) =>
+          path.includes('/tasks') &&
+          !path.endsWith('/comments') &&
+          !path.endsWith('/mentionable-users'),
+      ),
+    ).toHaveLength(11);
+  });
+
+  it('spec 010: describes the comments and mention candidates, with 404, under the Comments tag', () => {
+    const organization = '/api/v1/organizations/{organizationId}';
+    const expected: Array<[string, string]> = [
+      ['get', `${organization}/tasks/{taskId}/comments`],
+      ['post', `${organization}/tasks/{taskId}/comments`],
+      ['get', `${organization}/tasks/{taskId}/mentionable-users`],
+      ['get', `${organization}/comments/{commentId}`],
+      ['patch', `${organization}/comments/{commentId}`],
+      ['delete', `${organization}/comments/{commentId}`],
+    ];
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of expected) {
+      const operation = paths[path]?.[method as 'get'];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
+      expect(operation?.tags).toEqual(['Comments']);
+    }
+    expect(
+      Object.keys(paths).filter(
+        (path) =>
+          path.endsWith('/comments') ||
+          path.includes('/comments/') ||
+          path.endsWith('/mentionable-users'),
+      ),
+    ).toHaveLength(3);
   });
 
   it('spec 005: describes the board, the card move and the workflow edits, with 404', () => {

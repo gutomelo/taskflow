@@ -25,6 +25,7 @@ import {
   FindUserIdByEmailUseCase,
   GetCurrentUserUseCase,
   GetUserAccountsUseCase,
+  SearchUsersAmongUseCase,
   GetUserVerificationStatusUseCase,
   ListSessionsUseCase,
   LoginUseCase,
@@ -81,6 +82,8 @@ export interface IdentityModule {
   readonly userVerificationStatus: GetUserVerificationStatusUseCase;
   readonly userAccounts: GetUserAccountsUseCase;
   readonly userIdByEmail: FindUserIdByEmailUseCase;
+  /** Spec 010: busca de candidatos a menção entre ids dados. */
+  readonly searchUsersAmong: SearchUsersAmongUseCase;
 }
 
 /** Composition root do contexto Identity & Access (spec 001). */
@@ -212,5 +215,6 @@ export async function createIdentityModule(
     userVerificationStatus: new GetUserVerificationStatusUseCase({ users }),
     userAccounts: new GetUserAccountsUseCase({ users }),
     userIdByEmail: new FindUserIdByEmailUseCase({ users }),
+    searchUsersAmong: new SearchUsersAmongUseCase({ users }),
   };
 }

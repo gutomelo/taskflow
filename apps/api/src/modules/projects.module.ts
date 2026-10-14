@@ -13,6 +13,7 @@ import {
   GetProjectUseCase,
   GetWorkflowUseCase,
   ListAssignableUsersUseCase,
+  ListProjectReaderIdsUseCase,
   ListMemberCandidatesUseCase,
   ListProjectMembersUseCase,
   ListProjectsUseCase,
@@ -128,6 +129,8 @@ export function createProjectsModule(deps: ProjectsModuleDependencies) {
       lockForContribution: new LockProjectForContributionUseCase(shared),
       resolveForRead: new ResolveProjectForReadUseCase(shared),
       assignableUsers: new ListAssignableUsersUseCase(shared),
+      /** Spec 010: quem lê o projeto (candidatos a menção de `collaboration`). */
+      readerIds: new ListProjectReaderIdsUseCase(shared),
     },
     /** Rotas tenant-scoped, montadas pelo composition root no `createTenantScope`. */
     tenantRouter: createProjectsRouter({ useCases, rateLimiter: deps.rateLimiter }),

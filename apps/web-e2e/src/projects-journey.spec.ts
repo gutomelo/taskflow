@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { inviteAndJoin, password, signUpAndCreateOrganization } from './support/accounts';
 
-// CA-10 (spec 003, T13) e CA-10 (spec 004, T13): jornada real — web, API, worker e Mailpit, sem
-// simulações. Grava dados: rode contra um banco descartável (docs/development/testing.md). As
+// CA-10 das specs 003, 004, 005 e 010: jornada real — web, API, worker e Mailpit, sem simulações.
+// Grava dados: rode contra um banco descartável (docs/development/testing.md). As
 // tarefas continuam a jornada de projetos com as mesmas contas: a suíte já faz os 5 cadastros que o
 // limite por IP permite.
 
@@ -208,5 +208,70 @@ test('CA-10: create a project, add a participant, archive and restore; then its 
     await ownerPage.goto(`${projectUrl}/board`);
     await cardAction('PDC-3', 'Para Concluído');
     await expect(ownerPage.getByRole('region', { name: /^Concluído,/ })).toContainText('PDC-3');
+  });
+
+  await test.step('spec 010: comment with a mention, edit, moderation and a canceled task', async () => {
+    const projectUrl = `/o/${organization.slug}/projects/PDC`;
+    const conversation = (page: Page) => page.getByRole('region', { name: /^Comentários/ });
+    const composer = (page: Page) => page.getByRole('combobox', { name: 'Novo comentário' });
+
+    // Owner cria a tarefa e comenta mencionando o membro pelo teclado (RF-03, RF-08)
+    await ownerPage.goto(`${projectUrl}/tasks`);
+    await ownerPage.getByRole('button', { name: 'Nova tarefa' }).click();
+    await ownerPage.getByLabel('Título').fill('Revisar textos');
+    await ownerPage.getByRole('button', { name: 'Criar tarefa' }).click();
+    await expect(ownerPage.getByText('Tarefa PDC-5 criada.')).toBeAttached();
+    await ownerPage.goto(`${projectUrl}/tasks/5`);
+    await expect(conversation(ownerPage)).toContainText('Nenhum comentário ainda.');
+    await composer(ownerPage).pressSequentially('Pode revisar, @Membro');
+    await expect(
+      ownerPage
+        .getByRole('listbox', { name: 'Pessoas para mencionar' })
+        .getByRole('option', { name: /Membro Projetos/ }),
+    ).toBeVisible();
+    await composer(ownerPage).press('Enter');
+    await expect(composer(ownerPage)).toHaveValue('Pode revisar, @Membro Projetos ');
+    await conversation(ownerPage).getByRole('button', { name: 'Comentar' }).click();
+    await expect(ownerPage.getByText('Comentário enviado.')).toBeAttached();
+    await expect(conversation(ownerPage)).toContainText('Pode revisar, @Membro Projetos');
+
+    // Owner edita o próprio comentário mantendo a menção (RF-04)
+    await conversation(ownerPage).getByRole('button', { name: 'Editar' }).click();
+    const editor = ownerPage.getByRole('combobox', { name: 'Editar comentário' });
+    await expect(editor).toHaveValue('Pode revisar, @Membro Projetos');
+    await editor.press('End');
+    await editor.pressSequentially(' até amanhã?');
+    await conversation(ownerPage).getByRole('button', { name: 'Salvar' }).click();
+    await expect(ownerPage.getByText('Comentário atualizado.')).toBeAttached();
+    await expect(conversation(ownerPage)).toContainText('@Membro Projetos até amanhã?');
+    await expect(conversation(ownerPage)).toContainText('(editado)');
+
+    // O membro responde; não pode editar nem excluir o comentário do owner
+    await guestPage.goto(`${projectUrl}/tasks/5`);
+    await expect(conversation(guestPage)).toContainText('@Membro Projetos até amanhã?');
+    await composer(guestPage).fill('Vou ver hoje.');
+    await conversation(guestPage).getByRole('button', { name: 'Comentar' }).click();
+    await expect(guestPage.getByText('Comentário enviado.')).toBeAttached();
+    const guestItems = conversation(guestPage).getByRole('listitem');
+    await expect(guestItems.first().getByRole('button')).toHaveCount(0);
+    await expect(guestItems.last().getByRole('button', { name: 'Excluir' })).toBeVisible();
+
+    // Owner (gerente efetivo) modera o comentário do membro (RF-05)
+    await ownerPage.reload();
+    const ownerItems = conversation(ownerPage).getByRole('listitem');
+    await ownerItems.last().getByRole('button', { name: 'Excluir' }).click();
+    await ownerPage.getByRole('button', { name: 'Excluir comentário' }).click();
+    await expect(ownerPage.getByText('Comentário removido.')).toBeAttached();
+    await expect(ownerItems.last()).toContainText('Comentário removido');
+
+    // Tarefa cancelada: sem composer nem editar; excluir continua (decisão 9)
+    await ownerPage.getByRole('button', { name: 'Cancelar tarefa' }).click();
+    await expect(ownerPage.getByText('Tarefa cancelada.')).toBeAttached();
+    await expect(conversation(ownerPage)).toContainText(
+      'A tarefa está cancelada: reabra-a para comentar.',
+    );
+    await expect(composer(ownerPage)).toHaveCount(0);
+    await expect(conversation(ownerPage).getByRole('button', { name: 'Editar' })).toHaveCount(0);
+    await expect(ownerItems.first().getByRole('button', { name: 'Excluir' })).toBeVisible();
   });
 });

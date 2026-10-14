@@ -260,6 +260,22 @@ describe('ListComments / GetComment (RF-01, RF-07, RF-13, RF-14, RF-15)', () => 
     expect(next.nextCursor).toBeNull();
     expect(next).not.toHaveProperty('count');
     expect(bed.users.calls).toBe(2);
+    // Página exata: sem próxima página.
+    expect((await list(bed, 'vivi', { limit: 3 })).nextCursor).toBeNull();
+  });
+
+  it('mentions come in the order they appear in the text, whatever the storage order', async () => {
+    const { bed } = world();
+    const view = await create(bed, 'bia', `${token('mia')} e ${token('vivi')}`);
+    const [stored] = bed.comments.rows;
+    if (!stored) throw new Error('comment not stored');
+    bed.comments.rows[0] = { ...stored, mentionedUserIds: [id('vivi'), id('mia')] };
+
+    const page = await list(bed, 'bia');
+
+    expect(
+      page.items.find((item) => item.id === view.id)?.mentions.map((mention) => mention.userId),
+    ).toEqual([id('mia'), id('vivi')]);
   });
 
   it('actions per comment follow the role, ownership and state', async () => {
@@ -280,6 +296,8 @@ describe('ListComments / GetComment (RF-01, RF-07, RF-13, RF-14, RF-15)', () => 
     expect(actions(asMia, others.id)).toEqual({ edit: false, delete: true });
     expect(canceled.actions).toEqual({ comment: false });
     expect(actions(canceled, own.id)).toEqual({ edit: false, delete: true });
+    await remove(bed, 'bia', own.id);
+    expect(actions(await list(bed, 'mia'), own.id)).toEqual({ edit: false, delete: false });
   });
 
   it('a cursor of another task, tampered or malformed is 400; no access is 404', async () => {
@@ -298,6 +316,10 @@ describe('ListComments / GetComment (RF-01, RF-07, RF-13, RF-14, RF-15)', () => 
         }),
       ),
     ).toBe('INVALID_CURSOR');
+    const badDate = Buffer.from(JSON.stringify({ t: TASK, c: 'ontem', i: uuid('1') })).toString(
+      'base64url',
+    );
+    expect(await code(list(bed, 'bia', { cursor: badDate }))).toBe('INVALID_CURSOR');
     expect(await code(list(bed, 'otto'))).toBe('TASK_NOT_FOUND');
     expect(await code(list(bed, 'bia', { taskId: FOREIGN_TASK }))).toBe('TASK_NOT_FOUND');
   });
@@ -305,10 +327,14 @@ describe('ListComments / GetComment (RF-01, RF-07, RF-13, RF-14, RF-15)', () => 
   it('GetComment: the same COMMENT_NOT_FOUND for missing, another organization and no access', async () => {
     const { bed } = world();
     const view = await create(bed, 'bia', 'oi');
-    bed.comments.rows.push({
     const [stored] = bed.comments.rows;
     if (!stored) throw new Error('comment not stored');
-    bed.comments.rows.push({ ...stored, id: uuid('e1'), organizationId: OTHER_ORG, taskId: FOREIGN_TASK });
+    bed.comments.rows.push({
+      ...stored,
+      id: uuid('e1'),
+      organizationId: OTHER_ORG,
+      taskId: FOREIGN_TASK,
+    });
 
     expect((await new GetCommentUseCase(bed).execute(as('vivi'), view.id)).id).toBe(view.id);
     for (const [person, commentId] of [

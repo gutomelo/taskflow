@@ -28,9 +28,11 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 
 > A spec `006-permissions` é implementada logo após organizações porque todas as features seguintes dependem dela, embora mantenha a numeração original.
 
-## Fase 2 — Colaboração · Não iniciado
+## Fase 2 — Colaboração · Em andamento
 
-Comentários e menções (Collaboration), notificações in-app (`008-notifications`), Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
+**`010-comments` concluída**: comentários em tarefas e menções estruturadas (BR-031, BR-032), sem entrega de notificações. Próximas: notificações in-app (`008-notifications`), Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
+
+Escopo da fase: comentários e menções (Collaboration), notificações in-app (`008-notifications`), Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
 
 ## Fase 3 — Gestão avançada · Não iniciado
 
