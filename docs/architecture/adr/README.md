@@ -19,3 +19,4 @@ Processo: [0001](0001-record-architecture-decisions.md). Template: [0000](0000-t
 | [0013](0013-authorization-shared-kernel.md)         | Vocabulário de autorização como Shared Kernel e papel efetivo | Aceito                     |
 | [0014](0014-rls-deferred.md)                        | Row Level Security adiado para a Fase 4                       | Aceito                     |
 | [0015](0015-cross-context-referential-integrity.md) | Integridade referencial entre bounded contexts no banco       | Aceito                     |
+| [0016](0016-kanban-board-as-tasks-view.md)          | Quadro Kanban como visão de Tasks; contexto Boards adiado     | Proposto                   |
