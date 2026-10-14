@@ -9,6 +9,7 @@ import type {
   RateLimitDecision,
   RateLimitPolicy,
   RateLimiter,
+  TransactionOptions,
   TransactionRunner,
 } from '../index';
 
@@ -32,8 +33,12 @@ export class FakeTransactionRunner implements TransactionRunner {
     return this.depth > 0;
   }
 
-  async run<T>(work: () => Promise<T>): Promise<T> {
+  /** Opções de cada transação externa (ex.: `lockTimeoutMs`), na ordem. */
+  readonly options: Array<TransactionOptions | undefined> = [];
+
+  async run<T>(work: () => Promise<T>, options?: TransactionOptions): Promise<T> {
     if (this.depth > 0) return work();
+    this.options.push(options);
     const saved = this.stores.map((store) => store.snapshot());
     this.depth += 1;
     try {

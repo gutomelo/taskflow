@@ -5,6 +5,7 @@ import {
 } from '@taskflow/backend/shared/application';
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
 import { TaskCanceledError, TaskNotFoundError, type Task } from '@taskflow/backend/tasks/domain';
+import { TASK_LOCK_TIMEOUT_MS } from './task-limits';
 import { loadTaskView, type TaskProjectContext, type TaskView } from './task-views';
 import type { TasksDependencies } from './tasks-dependencies';
 import type { TasksEvent } from './tasks-events';
@@ -28,7 +29,9 @@ export async function runTaskMutation<T>(
 ): Promise<T> {
   const decision = await deps.rateLimiter.consume(policy, context.actor.userId);
   if (!decision.allowed) throw new RateLimitedError(decision.retryAfterSeconds);
-  const { result, events } = await deps.transactions.run(work);
+  const { result, events } = await deps.transactions.run(work, {
+    lockTimeoutMs: TASK_LOCK_TIMEOUT_MS,
+  });
   events.forEach((event) => deps.events.record(event));
   return result;
 }

@@ -54,7 +54,7 @@ import { projectAreaMessages } from './projects.messages';
                     <a
                       [routerLink]="link.path"
                       routerLinkActive="border-primary text-default"
-                      [routerLinkActiveOptions]="{ exact: true }"
+                      [routerLinkActiveOptions]="{ exact: link.exact }"
                       ariaCurrentWhenActive="page"
                       class="inline-block border-b-2 border-transparent px-3 py-2 text-sm text-muted hover:text-default focus-visible:outline-2 focus-visible:outline-focus"
                     >
@@ -74,10 +74,12 @@ import { projectAreaMessages } from './projects.messages';
 export class ProjectLayout {
   protected readonly store = inject(ActiveProjectStore);
   protected readonly m = projectAreaMessages;
-  protected readonly links: ReadonlyArray<{ path: string; label: string }> = [
-    { path: '.', label: projectAreaMessages.overview },
-    { path: 'members', label: projectAreaMessages.members },
-    { path: 'settings', label: projectAreaMessages.settings },
+  /** "Tarefas" fica ativa também no detalhe (`tasks/:number`). */
+  protected readonly links: ReadonlyArray<{ path: string; label: string; exact: boolean }> = [
+    { path: '.', label: projectAreaMessages.overview, exact: true },
+    { path: 'tasks', label: projectAreaMessages.tasks, exact: false },
+    { path: 'members', label: projectAreaMessages.members, exact: true },
+    { path: 'settings', label: projectAreaMessages.settings, exact: true },
   ];
 
   constructor() {

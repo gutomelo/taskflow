@@ -1,6 +1,6 @@
 # Autorização
 
-Status: vocabulário e matrizes **implementados** na spec 006 como Shared Kernel (`libs/backend/shared/kernel`, [ADR 0013](../architecture/adr/0013-authorization-shared-kernel.md)), com testes tabela-driven que transcrevem as tabelas abaixo. Permissões **de organização** com comportamento: **implementadas e testadas** (specs 002 e 006). Permissões **de projeto**: matriz e papel efetivo (BR-023) **implementados e aplicados** pelos casos de uso de `projects` (spec 003: `project:read`, `project:update`, `project:archive`, `project-member:manage`); as permissões de tarefas, comentários, sprints e quadro serão aplicadas nas specs 004–007. Itens marcados como planejados não estão no catálogo e, portanto, são negados.
+Status: vocabulário e matrizes **implementados** na spec 006 como Shared Kernel (`libs/backend/shared/kernel`, [ADR 0013](../architecture/adr/0013-authorization-shared-kernel.md)), com testes tabela-driven que transcrevem as tabelas abaixo. Permissões **de organização** com comportamento: **implementadas e testadas** (specs 002 e 006). Permissões **de projeto**: matriz e papel efetivo (BR-023) **implementados e aplicados** pelos casos de uso de `projects` (spec 003: `project:read`, `project:update`, `project:archive`, `project-member:manage`); as permissões de tarefas (`task:create`, `task:update`, `task:assign`, `task:delete`) **implementadas e aplicadas** pelos casos de uso de `tasks` (spec 004); as de comentários, sprints e quadro serão aplicadas nas specs 005–007. Itens marcados como planejados não estão no catálogo e, portanto, são negados.
 
 ## Modelo
 
@@ -47,22 +47,24 @@ Legenda: ✅ permitido · ⚪ apenas sobre o próprio recurso (`own`) · ⚙️ 
 
 ### Projeto (papel efetivo no projeto)
 
-| Permissão                                         |     Manager     |      Member       | Viewer |
-| ------------------------------------------------- | :-------------: | :---------------: | :----: |
-| `project:read`                                    |       ✅        |        ✅         |   ✅   |
-| `project:update` / configurar workflow            |       ✅        |        ❌         |   ❌   |
-| `project:archive`                                 |       ✅        |        ❌         |   ❌   |
-| `project-member:manage`                           |       ✅        |        ❌         |   ❌   |
-| `task:create`                                     |       ✅        |        ✅         |   ❌   |
-| `task:update` (campos, status, mover card)        |       ✅        |        ✅         |   ❌   |
-| `task:assign`                                     |       ✅        |       ✅ ³        |   ❌   |
-| `task:delete`                                     |       ✅        | ⚪ criadas por si |   ❌   |
-| `comment:create`                                  |       ✅        |        ✅         |   ❌   |
-| `comment:update` / `comment:delete`               | ⚪ / ✅ moderar |      ⚪ / ⚪      |   ❌   |
-| `sprint:manage` (criar, iniciar, fechar, reabrir) |       ✅        |        ❌         |   ❌   |
-| `board:configure` (colunas)                       |       ✅        |        ❌         |   ❌   |
+| Permissão                                         |     Manager     |       Member        | Viewer |
+| ------------------------------------------------- | :-------------: | :-----------------: | :----: |
+| `project:read`                                    |       ✅        |         ✅          |   ✅   |
+| `project:update` / configurar workflow            |       ✅        |         ❌          |   ❌   |
+| `project:archive`                                 |       ✅        |         ❌          |   ❌   |
+| `project-member:manage`                           |       ✅        |         ❌          |   ❌   |
+| `task:create`                                     |       ✅        |         ✅          |   ❌   |
+| `task:update` (campos, status, mover card)        |       ✅        |         ✅          |   ❌   |
+| `task:assign`                                     |       ✅        |        ✅ ³         |   ❌   |
+| `task:delete`                                     |       ✅        | ⚪ criadas por si ⁴ |   ❌   |
+| `comment:create`                                  |       ✅        |         ✅          |   ❌   |
+| `comment:update` / `comment:delete`               | ⚪ / ✅ moderar |       ⚪ / ⚪       |   ❌   |
+| `sprint:manage` (criar, iniciar, fechar, reabrir) |       ✅        |         ❌          |   ❌   |
+| `board:configure` (colunas)                       |       ✅        |         ❌          |   ❌   |
 
-³ Apenas para membros do projeto (BR-003) — regra de estado verificada em `tasks` (spec 004), não na matriz.
+³ O **responsável** precisa ter papel efetivo manager/member (BR-003) — regra de estado verificada em `tasks` (spec 004), não na matriz.
+
+⁴ D5 da spec 004: o member só exclui quando a tarefa **e todas as subtarefas** foram criadas por ele (a exclusão é em cascata e não apaga trabalho alheio), decidido sob o lock do projeto em `tasks`.
 
 ## Capacidades na API
 
@@ -74,6 +76,8 @@ O frontend **não tem matriz própria**. A API devolve:
 Capacidades são **dica de interface**: a interface só esconde ou desabilita ações; o caso de uso sempre decide de novo, com o estado relido.
 
 Nos projetos (spec 003), o mesmo padrão: `GET …/projects/{id}` e `…/by-key/{key}` devolvem `myRole` (papel efetivo) e `capabilities` (permissões `allow`, descontado o arquivamento: arquivado ⇒ só ler e restaurar); cada participante traz `actions` (`changeRoleTo`, `remove`, `leave`) e cada candidato `allowedRoles` (teto). Quem não participa recebe 404 com o mesmo corpo de um projeto inexistente; participante sem permissão recebe 403 antes de qualquer erro de estado.
+
+Nas tarefas (spec 004), o detalhe traz `actions` (`update`, `assign`, `cancel`, `reopen`, `delete` — com a regra de D5 — e `transitionTo`, os destinos permitidos pelo workflow), descontados o arquivamento e o cancelamento. Rotas endereçadas por tarefa respondem o **mesmo** 404 `TASK_NOT_FOUND` para tarefa inexistente, de projeto inexistente ou sem acesso (achado M3); rotas com `projectId` na query ou no corpo respondem `PROJECT_NOT_FOUND`. Ordem de decisão: 404 → 403 → projeto arquivado → tarefa cancelada → versão → referências → regras → limites.
 
 ## Onde a autorização acontece
 

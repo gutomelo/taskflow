@@ -136,8 +136,13 @@ export class PrismaTaskRepository implements TaskRepository {
         ...(filter.includeCanceled ? {} : { canceledAt: null }),
         ...(filter.statusId === undefined ? {} : { statusId: filter.statusId }),
         ...(filter.priority === undefined ? {} : { priority: filter.priority }),
-        ...(filter.unassigned ? { assigneeUserId: null } : {}),
-        ...(filter.assigneeUserId === undefined ? {} : { assigneeUserId: filter.assigneeUserId }),
+        // E lógico entre "sem responsável" e "de uma pessoa" (um spread sobrescreveria o outro).
+        AND: [
+          ...(filter.unassigned ? [{ assigneeUserId: null }] : []),
+          ...(filter.assigneeUserId === undefined
+            ? []
+            : [{ assigneeUserId: filter.assigneeUserId }]),
+        ],
         ...(before === null ? {} : { number: { lt: before } }),
       },
       orderBy: { number: 'desc' },

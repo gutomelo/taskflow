@@ -16,10 +16,9 @@ export class PrismaTaskDependencyRepository implements TaskDependencyRepository 
   ): Promise<boolean> {
     const client = this.transactions.client();
     // Checagem antes de inserir (sob o lock do projeto em `tasks`): um P2002 abortaria a transação.
-    const existing = await client.taskDependency.findUnique({
-      where: {
-        projectId_blockedTaskId_blockingTaskId: { projectId, blockedTaskId, blockingTaskId },
-      },
+    const existing = await client.taskDependency.findFirst({
+      where: { organizationId, projectId, blockedTaskId, blockingTaskId },
+      select: { blockedTaskId: true },
     });
     if (existing) return false;
     try {

@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001…BR-010 **documentadas / não implementadas** (dependem das specs 003+; BR-008 já aplicada a organizações e memberships na spec 002); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); BR-004 implementada só na parte do workflow padrão (spec 003; transições na 005). A spec que implementa cada regra está indicada.
+Status: BR-001, BR-003 e BR-006 **implementadas e testadas** (spec 004); BR-004 implementada para mudanças de status de tarefa (spec 004; o quadro reutiliza na 005); BR-008 aplicada a organizações, memberships, projetos e tarefas; BR-002, BR-005, BR-007, BR-009 e BR-010 **documentadas** (dependem das specs 005+, salvo o que já está indicado); BR-028 e BR-029 **implementadas e testadas** (spec 004); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -13,10 +13,11 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Spec**: 004-tasks · **Contexto**: Tasks
 - **Invariante**: uma tarefa em status de categoria `done` não possui subtarefa obrigatória (`isRequired = true`) pendente.
 - **Pré-condições**: usuário autorizado a alterar a tarefa (BR-002); tarefa não arquivada.
-- **Pós-condições**: tarefa concluída, `completedAt` registrado, `version` incrementada, evento `TaskCompleted` emitido após commit, auditoria registrada (BR-007).
-- **Erros**: `TASK_HAS_PENDING_REQUIRED_SUBTASKS` (422) com a lista de IDs pendentes.
-- **Concorrência**: a verificação das subtarefas e a mudança de status ocorrem na mesma transação; criar subtarefa obrigatória em tarefa concluída é rejeitado (`TASK_ALREADY_COMPLETED`, 422) para não violar a invariante a posteriori.
-- **Casos limite**: subtarefa opcional pendente não bloqueia; subtarefa cancelada não bloqueia; reabrir a tarefa é permitido.
+- **Pós-condições**: tarefa concluída, `completedAt`/`completedByUserId` registrados, `version` incrementada, evento `tasks.status_changed` no log após o commit (**implementado**). O evento de integração `TaskCompleted` e a auditoria (BR-007) são **planejados** (specs 008 e de auditoria).
+- **Erros**: `TASK_HAS_PENDING_REQUIRED_SUBTASKS` (422) com os ids pendentes na extensão `taskIds` do Problem Details.
+- **A invariante vale sempre** (D1 da spec 004): criar ou tornar obrigatória uma subtarefa pendente, reabrir ou tirar de `done` uma subtarefa obrigatória de pai concluído ⇒ `PARENT_TASK_COMPLETED` (422; substitui o `TASK_ALREADY_COMPLETED` do texto original); reabrir (cancelamento) um pai em `done` com obrigatória pendente ⇒ `TASK_HAS_PENDING_REQUIRED_SUBTASKS`. "Pai concluído" = status de categoria `done`, mesmo cancelado.
+- **Concorrência**: concluir ou reabrir o pai e criar, reabrir ou tornar obrigatória uma subtarefa passam pelo lock do projeto em `tasks` (`task_project_locks`); testado com intercalações reais (spec 004, T8).
+- **Casos limite**: subtarefa opcional pendente não bloqueia; subtarefa cancelada não bloqueia; subtarefas têm um nível só (`SUBTASK_DEPTH`) e "obrigatória" só existe em subtarefa (`REQUIRED_WITHOUT_PARENT`).
 - **Validação**: sempre no backend (domínio). O frontend apenas antecipa o aviso.
 
 ## BR-002 — Somente usuários autorizados alteram tarefas
@@ -29,10 +30,11 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 ## BR-003 — Responsável precisa ter acesso ao projeto
 
 - **Spec**: 004-tasks · **Contextos**: Tasks (consulta Projects via porta)
-- **Invariante**: todo responsável (`assignee`) de uma tarefa é membro ativo do projeto, com papel que permite receber tarefas (não viewer).
-- **Erros**: `ASSIGNEE_NOT_PROJECT_MEMBER` (422).
-- **Pós-condição**: evento `TaskAssigned` após commit.
-- **Casos limite**: ao remover um membro do projeto, suas atribuições abertas são desfeitas — remover alguém da organização ou sair **nunca** pode ser bloqueado por tarefas (spec 003, transição para a 004: FK `ON DELETE SET NULL (assignee_user_id)`, ADR 0015); atribuir a si mesmo segue a mesma regra.
+- **Invariante**: todo responsável (`assignee`) tem **papel efetivo** `manager` ou `member` no projeto (BR-023) — inclusive owner/admin da organização, que não são participantes gravados.
+- **Erros**: `ASSIGNEE_NOT_PROJECT_MEMBER` (422), igual para viewer, não participante, inexistente ou de outra organização.
+- **Pós-condição**: evento `tasks.assigned` (de/para) no log após o commit (**implementado**); `TaskAssigned` como evento de integração é **planejado** (spec 008).
+- **Perda de acesso** (RF-11 da spec 004): deixar de ter papel efetivo manager/member num projeto — por qualquer caminho — desfaz as atribuições daquele projeto **na mesma transação**. A decisão é de `projects` (porta `ProjectContributorChanges`); `tasks` só executa. Quem continua contribuindo (ex.: admin com participação antiga saindo dela) mantém as atribuições. Remover alguém da organização ou sair **nunca** é bloqueado por tarefas: a FK `ON DELETE SET NULL ("assignee_user_id")` desatribui (ADR 0015).
+- **Concorrência**: atribuir relê o papel do alvo com a membership e o projeto `FOR SHARE`; rebaixar trava a membership — nunca sobra um leitor como responsável (testado na spec 004, T8).
 
 ## BR-004 — Movimentação respeita transições configuradas
 
@@ -41,7 +43,7 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Erros**: `TRANSITION_NOT_ALLOWED` (422).
 - **Interação**: mover para coluna de categoria `done` dispara as validações de BR-001 e BR-006.
 - **Casos limite**: mover dentro da mesma coluna é só reordenação (BR-009); workflow padrão é criado com o projeto (`todo → in_progress → done`, com volta permitida).
-- **Estado**: o workflow padrão ("A fazer", "Em andamento", "Concluído", com transições de ida e volta entre vizinhos) é **implementado** na spec 003 e criado com o projeto; validar transições ao mover é da spec 005.
+- **Estado**: o workflow padrão ("A fazer", "Em andamento", "Concluído", com transições de ida e volta entre vizinhos) é **implementado** na spec 003 e criado com o projeto. A validação de transições é **implementada** na mudança de status de tarefa (spec 004, `assertTransitionAllowed` em `tasks/domain`, inclusive "mesmo status não é transição"); mover cards no quadro a reutilizará (spec 005).
 
 ## BR-005 — Sprint concluída não recebe tarefas
 
@@ -56,8 +58,9 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 - **Spec**: 004-tasks · **Contexto**: Tasks
 - **Invariante**: tarefa com dependência do tipo "bloqueada por" em tarefa pendente não pode ir para `done`.
 - **Erros**: `TASK_BLOCKED_BY_DEPENDENCIES` (422) com IDs bloqueantes.
-- **Integridade**: dependências não podem formar ciclo (`DEPENDENCY_CYCLE`, 422) e só existem entre tarefas da mesma organização.
-- **Concorrência**: verificação na mesma transação da conclusão.
+- **Integridade**: dependências só existem entre tarefas do **mesmo projeto** (garantido também pelas FKs compostas) e não formam ciclo (`DEPENDENCY_CYCLE`, 422), inclusive o implícito "pai bloqueado pelas subtarefas obrigatórias" (D4: subtarefa obrigatória não pode ser bloqueada, direta ou indiretamente, pelo próprio pai). Busca em largura limitada a 64 níveis e 500 tarefas; tetos de 50 bloqueadoras por tarefa e 5 000 dependências por projeto (`DEPENDENCY_LIMIT_REACHED`, 422).
+- **Precondição** (D2): só vale ao concluir; tarefa concluída pode ganhar bloqueadora, e reabrir a bloqueadora não "desconclui". Bloqueadora concluída ou cancelada não bloqueia.
+- **Concorrência**: dependências e conclusões passam pelo lock do projeto em `tasks`; duas dependências opostas em paralelo ⇒ uma recusada como ciclo (testado na spec 004, T8).
 
 ## BR-007 — Alterações relevantes são auditadas
 
@@ -164,8 +167,18 @@ Owner e admin sempre criam projetos. Members criam se a organização permitir (
 
 ### BR-026 — Projeto arquivado é somente leitura
 
-Arquivado não aceita edição, novas participações nem mudanças de papel (`PROJECT_ARCHIVED`, 409); continua legível por quem tem acesso e sai da lista padrão. Remover participante e sair continuam permitidos. Arquivar e restaurar exigem `project:archive`, são idempotentes (já no estado pedido ⇒ 200 com a versão atual) e, fora disso, exigem a versão (BR-008). As specs 004/005 estendem a regra a tarefas e quadros.
+Arquivado não aceita edição, novas participações nem mudanças de papel (`PROJECT_ARCHIVED`, 409); continua legível por quem tem acesso e sai da lista padrão. Remover participante e sair continuam permitidos. Arquivar e restaurar exigem `project:archive`, são idempotentes (já no estado pedido ⇒ 200 com a versão atual) e, fora disso, exigem a versão (BR-008). A spec 004 estende a regra a tarefas (**implementado**: toda escrita de tarefa ⇒ `PROJECT_ARCHIVED`, depois do 403; arquivar espera a criação em andamento); a 005 a estende a quadros.
 
 ### BR-027 — Participação no projeto
 
 Só membros da organização participam (`MEMBER_NOT_FOUND`, 404, igual para inexistente e de outra organização). O papel gravado nunca passa do teto: viewer na organização ⇒ só `viewer` (`PROJECT_ROLE_ABOVE_CEILING`, 422). Owner e admin da organização não são gravados como participantes (`ALREADY_MANAGES_ALL_PROJECTS`, 422 — já gerenciam todos os projetos). Sair ou ser removido da organização apaga as participações (FK em cascata, ADR 0015); ser rebaixado a viewer na organização rebaixa as participações a `viewer` na mesma transação, com versão incrementada, e promover de volta não as restaura. Participar duas vezes ⇒ `ALREADY_A_PROJECT_MEMBER` (409). Sair do projeto é sempre permitido a quem participa.
+
+## Tarefas (spec 004)
+
+### BR-028 — Número da tarefa
+
+Cada projeto numera as tarefas em sequência (`CHAVE-N`, ex.: `WEB-42`), a partir de 1, por um contador próprio (`task_counters`, `upsert` atômico); um número **nunca é reutilizado**, nem depois de excluir a tarefa. Criações simultâneas recebem números distintos (também garantido por índice único). Teto de 10 000 números por projeto e 100 000 tarefas por organização (`TASK_LIMIT_REACHED`, 422).
+
+### BR-029 — Tarefa cancelada
+
+Cancelar e reabrir são ações próprias, independentes do status, que registram quando e quem (idempotentes). Cancelada sai das listas padrão (filtro `canceled=true` a inclui), não conta como pendente em BR-001 nem em BR-006 e é só leitura até ser reaberta (`TASK_CANCELED`, 409); pode ser excluída.

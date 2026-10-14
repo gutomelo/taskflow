@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { inviteAndJoin, password, signUpAndCreateOrganization } from './support/accounts';
 
-// CA-10 (spec 003, T13): jornada real — web, API, worker e Mailpit, sem simulações. Grava dados:
-// rode contra um banco descartável (docs/development/testing.md).
+// CA-10 (spec 003, T13) e CA-10 (spec 004, T13): jornada real — web, API, worker e Mailpit, sem
+// simulações. Grava dados: rode contra um banco descartável (docs/development/testing.md). As
+// tarefas continuam a jornada de projetos com as mesmas contas: a suíte já faz os 5 cadastros que o
+// limite por IP permite.
 
 const projectList = (page: Page) => page.getByRole('list', { name: 'Projetos' });
 const participants = (page: Page) => page.getByRole('list', { name: 'Participantes do projeto' });
@@ -11,7 +13,11 @@ const participants = (page: Page) => page.getByRole('list', { name: 'Participant
 const projectSection = (page: Page, name: string) =>
   page.getByRole('navigation', { name: 'Seções do projeto' }).getByRole('link', { name });
 
-test('CA-10: create a project, add a participant, archive and restore', async ({ browser }) => {
+test('CA-10: create a project, add a participant, archive and restore; then its tasks (spec 004)', async ({
+  browser,
+}) => {
+  // Jornada longa (projetos e tarefas com as mesmas contas): mais que os 30 s padrão.
+  test.setTimeout(120_000);
   const id = randomUUID().slice(0, 8);
   const organization = { name: `Acme ${id}`, slug: `e2e-p-${id}` };
   const owner = {
@@ -77,4 +83,71 @@ test('CA-10: create a project, add a participant, archive and restore', async ({
   await expect(ownerPage.getByText('Projeto restaurado.')).toBeAttached();
   await ownerPage.goto(`/o/${organization.slug}/projects`);
   await expect(projectList(ownerPage)).toContainText('Portal do Cliente');
+
+  await test.step('spec 004: task, assignee, required subtask and BR-001', async () => {
+    const tasksUrl = `/o/${organization.slug}/projects/PDC/tasks`;
+    const moveTo = (page: Page, status: string) =>
+      page.getByRole('button', { name: `Mover para ${status}` }).click();
+
+    // Owner (gerente efetivo) cria a tarefa na aba "Tarefas" (RF-01, BR-028)
+    await ownerPage.goto(`/o/${organization.slug}/projects/PDC`);
+    await projectSection(ownerPage, 'Tarefas').click();
+    await ownerPage.getByRole('button', { name: 'Nova tarefa' }).click();
+    await ownerPage.getByLabel('Título').fill('Login com SSO');
+    await ownerPage.getByRole('button', { name: 'Criar tarefa' }).click();
+    await expect(ownerPage.getByText('Tarefa PDC-1 criada.')).toBeAttached();
+    await ownerPage
+      .getByRole('list', { name: 'Tarefas do projeto' })
+      .getByRole('link', { name: /PDC-1/ })
+      .click();
+    await expect(ownerPage).toHaveURL(new RegExp(`${tasksUrl}/1$`));
+
+    // Atribui ao membro, entre os elegíveis da API (RF-06, BR-003)
+    await ownerPage
+      .getByRole('region', { name: 'Responsável' })
+      .getByRole('combobox')
+      .selectOption({ label: guest.name });
+    await ownerPage.getByRole('button', { name: 'Salvar responsável' }).click();
+    await expect(ownerPage.getByText('Responsável atualizado.')).toBeAttached();
+
+    // Subtarefa obrigatória (RF-02)
+    await ownerPage.getByRole('button', { name: 'Nova subtarefa' }).click();
+    const subtaskForm = ownerPage.getByRole('form', { name: 'Nova subtarefa' });
+    await subtaskForm.getByLabel('Título').fill('Revisar segurança');
+    await subtaskForm.getByLabel('Obrigatória para concluir a tarefa').check();
+    await subtaskForm.getByRole('button', { name: 'Criar subtarefa' }).click();
+    await expect(ownerPage.getByRole('list', { name: 'Subtarefas' })).toContainText('PDC-2');
+
+    // BR-001: o pai não conclui com a obrigatória pendente; a mensagem cita a subtarefa
+    await moveTo(ownerPage, 'Em andamento');
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Em andamento' })).toBeVisible();
+    await moveTo(ownerPage, 'Concluído');
+    await expect(ownerPage.getByRole('alert')).toContainText(
+      'Conclua ou cancele as subtarefas obrigatórias pendentes: PDC-2.',
+    );
+
+    // Conclui a subtarefa e depois o pai
+    await ownerPage
+      .getByRole('list', { name: 'Subtarefas' })
+      .getByRole('link', { name: /PDC-2/ })
+      .click();
+    await expect(ownerPage).toHaveURL(new RegExp(`${tasksUrl}/2$`));
+    await moveTo(ownerPage, 'Em andamento');
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Em andamento' })).toBeVisible();
+    await moveTo(ownerPage, 'Concluído');
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Concluído' })).toBeVisible();
+    await ownerPage.goto(`${tasksUrl}/1`);
+    await moveTo(ownerPage, 'Concluído');
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Concluído' })).toBeVisible();
+
+    // O membro vê a tarefa atribuída a ele; ações só com capacidade da API (D5: não exclui a alheia)
+    await guestPage.goto(tasksUrl);
+    await guestPage.getByLabel('Responsável').selectOption('me');
+    const mine = guestPage.getByRole('list', { name: 'Tarefas do projeto' });
+    await expect(mine).toContainText('Login com SSO');
+    await mine.getByRole('link', { name: /PDC-1/ }).click();
+    await expect(guestPage.getByRole('heading', { name: 'Status: Concluído' })).toBeVisible();
+    await expect(guestPage.getByRole('button', { name: 'Mover para Em andamento' })).toBeVisible();
+    await expect(guestPage.getByRole('button', { name: 'Excluir tarefa' })).toHaveCount(0);
+  });
 });

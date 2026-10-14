@@ -20,7 +20,22 @@ describe('toApiProblem', () => {
       code: 'PASSWORD_POLICY_VIOLATION',
       violations: [{ field: 'password', message: 'symbol' }],
       retryAfterSeconds: 30,
+      taskIds: [],
     });
+  });
+
+  it('spec 004: reads the taskIds extension (BR-001/BR-006) and ignores a malformed one', () => {
+    const body = {
+      type: 'about:blank',
+      title: 'x',
+      status: 422,
+      code: 'TASK_BLOCKED_BY_DEPENDENCIES',
+    };
+    const ok = new HttpErrorResponse({ status: 422, error: { ...body, taskIds: ['t-1'] } });
+    const malformed = new HttpErrorResponse({ status: 422, error: { ...body, taskIds: [1] } });
+
+    expect(toApiProblem(ok).taskIds).toEqual(['t-1']);
+    expect(toApiProblem(malformed)).toMatchObject({ code: null, taskIds: [] });
   });
 
   it('does not trust bodies that are not Problem Details', () => {
@@ -31,6 +46,7 @@ describe('toApiProblem', () => {
       code: null,
       violations: [],
       retryAfterSeconds: null,
+      taskIds: [],
     });
   });
 

@@ -58,6 +58,7 @@ export const createProjectMessages = {
 export const projectAreaMessages = {
   sectionNav: 'Seções do projeto',
   overview: 'Visão geral',
+  tasks: 'Tarefas',
   members: 'Participantes',
   settings: 'Configurações',
   loading: 'Carregando projeto…',

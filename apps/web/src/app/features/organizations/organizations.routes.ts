@@ -80,6 +80,20 @@ export const organizationsRoutes: Route[] = [
               ),
           },
           {
+            path: 'tasks',
+            title: 'Tarefas · TaskFlow',
+            loadComponent: () =>
+              import('../tasks/project-tasks.page').then((module) => module.ProjectTasksPage),
+          },
+          {
+            // Recriada quando o número muda (ex.: link para a subtarefa): o store da tarefa é do componente.
+            path: 'tasks/:number',
+            data: { [RECREATE_ON_PARAM_CHANGE]: true },
+            title: 'Tarefa · TaskFlow',
+            loadComponent: () =>
+              import('../tasks/task-detail.page').then((module) => module.TaskDetailPage),
+          },
+          {
             path: 'members',
             title: 'Participantes · TaskFlow',
             loadComponent: () =>

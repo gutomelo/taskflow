@@ -94,6 +94,43 @@ describe('PrismaTransactionRunner conflicts (integration, spec 004 T4)', () => {
     expect(attempts).toBe(2);
   });
 
+  it('spec 004 (design, Abuso): lockTimeoutMs turns a long lock wait into ConcurrentUpdateError, without retrying', async () => {
+    const organizationId = await organization();
+    let locked: () => void = () => undefined;
+    const isLocked = new Promise<void>((resolve) => (locked = resolve));
+    const holder = transactions.run(async () => {
+      await transactions.transactionalClient('test')
+        .$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR UPDATE`;
+      locked();
+      await sleep(2_000);
+    });
+    await isLocked;
+    let attempts = 0;
+    const started = Date.now();
+
+    const waiting = transactions.run(
+      async () => {
+        attempts += 1;
+        await transactions.transactionalClient('test')
+          .$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR UPDATE`;
+      },
+      { lockTimeoutMs: 200 },
+    );
+
+    await expect(waiting).rejects.toBeInstanceOf(ConcurrentUpdateError);
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(attempts).toBe(1);
+    await holder;
+    // Só naquela transação (SET LOCAL): a seguinte volta ao padrão do banco.
+    const [setting] = await transactions.run(
+      () =>
+        transactions.transactionalClient('test').$queryRaw<
+          Array<{ lock_timeout: string }>
+        >`SHOW lock_timeout`,
+    );
+    expect(setting?.lock_timeout).toBe('0');
+  });
+
   it('other errors are not retried, and nested runs do not retry on their own', async () => {
     let attempts = 0;
     await expect(

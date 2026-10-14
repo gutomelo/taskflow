@@ -75,6 +75,7 @@ describe('ListTasksUseCase (RF-03, CA-07)', () => {
     expect(await list({ assigned: 'me' })).toEqual(await list({ assigneeUserId: 'bia' }));
     expect(await list({ assigned: 'none' })).toEqual([30, 27, 24, 21, 18, 15, 12, 9, 6, 3]);
     expect(await list({ assigned: 'me', assigneeUserId: 'mia' })).toEqual([]);
+    expect(await list({ assigned: 'none', assigneeUserId: 'mia' })).toEqual([]);
     expect(await list({ priority: 'urgent' })).toEqual([29, 24, 19, 14, 9, 4]);
     expect(await list({ canceled: true })).toHaveLength(30);
     expect(await list({ statusId: 'app-todo' })).toEqual([]);

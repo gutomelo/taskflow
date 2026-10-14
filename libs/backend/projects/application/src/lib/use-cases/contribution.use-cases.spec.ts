@@ -176,7 +176,13 @@ describe('contribution use cases for tasks (spec 004, port ProjectAccess)', () =
       vivi: 'viewer',
       stranger: null,
     });
-    expect([...(contribution?.organizationMembers ?? [])].sort()).toEqual(['adm', 'ana', 'bia', 'mia', 'vivi']);
+    expect([...(contribution?.organizationMembers ?? [])].sort()).toEqual([
+      'adm',
+      'ana',
+      'bia',
+      'mia',
+      'vivi',
+    ]);
     expect(contribution?.workflow.statuses.map((status) => status.category)).toEqual([
       'todo',
       'in_progress',

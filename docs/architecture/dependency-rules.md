@@ -116,6 +116,23 @@ Subcaminho de teste: `@taskflow/backend/projects/application/testing` (fakes em 
 
 Na spec 003 entraram em `shared/*`, por terem dois contextos usuários: `toPageRequest` e os tetos de paginação (`shared/application`), `noStore` (`shared/http`, reconhecido por identidade pelo harness) e `isForeignKeyViolation` (`shared/infrastructure`). `apps/api` junta os mapas de erro com `mergeDomainErrors`, que falha na montagem se dois contextos mapearem o mesmo código de formas diferentes.
 
+## Bibliotecas do contexto Tasks (implementadas, spec 004)
+
+Todas com `scope:backend` e `domain:tasks`. Não importam `projects`, `organizations` nem `identity`: papéis efetivos, workflow e nomes chegam pelas portas `ProjectAccess` e `TaskUserDirectory`, ligadas em `apps/api/src/modules/adapters` (`project-access.adapter.ts`, `task-user-directory.adapter.ts`).
+
+| Projeto                             | Tipo             | Alias                                    | Conteúdo                                                                                                                                                                                                                         |
+| ----------------------------------- | ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/backend/tasks/domain`         | `domain`         | `@taskflow/backend/tasks/domain`         | `Task`, `TaskTitle`, descrição, `Priority`, prazo, chave `CHAVE-N` (BR-028), BR-029, workflow (`assertTransitionAllowed`, BR-004), grafo com aresta implícita e tetos (BR-006, D4), `taskActions` (D5), contratos de repositório |
+| `libs/backend/tasks/application`    | `application`    | `@taskflow/backend/tasks/application`    | Casos de uso com núcleo `…WithinTransaction` e casca (eventos depois do commit), `lockTaskForWrite` (ordem de decisão e de locks), `RevokeAssignmentsOnAccessLoss`, portas, limites, eventos `tasks.*`                           |
+| `libs/backend/tasks/infrastructure` | `infrastructure` | `@taskflow/backend/tasks/infrastructure` | Repositórios Prisma (sempre `organizationId` e `projectId`; contador por `upsert`; `task_project_locks`; keyset por número; `P2002`/`P2003` traduzidos)                                                                          |
+| `libs/backend/tasks/http`           | `presentation`   | `@taskflow/backend/tasks/http`           | `createTasksRouter` (rotas literais antes de `/:taskId`), mapeamento de erros (com a extensão `taskIds`), OpenAPI                                                                                                                |
+
+Subcaminho de teste: `@taskflow/backend/tasks/application/testing` (fakes, `FakeProjectAccess` e o cenário `createTasksWorld`).
+
+Para servir `tasks`, `projects/application` expõe `LockProjectForContribution`, `ResolveProjectForRead` e `ListAssignableUsers` (em `createProjectsModule().contribution`) e chama a porta `ProjectContributorChanges`; `organizations/application` expõe `LockMembersForShare`. Lints: `projectsMustNotReachTasks` (back-relations inertes `tasks`, `taskCounter`, `taskProjectLock`), `organizationsMustNotReachProjects` ampliado (`assignedTasks`) e `tasksMustNotReachOtherContexts`, que também vale na aplicação (por isso o resultado do núcleo usa `projectContext`). Os três ignoram `*.integration.spec.ts`, que semeiam tabelas de outros contextos de propósito.
+
+Na spec 004 entraram em `shared/*`: `ConcurrentUpdateError` e a opção `TransactionOptions.lockTimeoutMs` da porta `TransactionRunner` (`shared/application`, 409 `CONCURRENT_UPDATE`), `isTransactionConflict`, `isLockTimeout` e o `PrismaTransactionRunner` com READ COMMITTED explícito, uma nova tentativa em `P2034` e `lock_timeout` por transação (`shared/infrastructure`), e o membro de extensão `taskIds` do Problem Details (`DomainErrorMapping.taskIds` em `shared/http`, `problemDetailsSchema` em `libs/contracts`).
+
 ## Restrições por tipo (frontend)
 
 | Origem             | Pode depender de                                                                            |

@@ -39,7 +39,10 @@ export function isProblemDetails(value: unknown): value is ProblemDetails {
     typeof value['status'] === 'number' &&
     typeof value['title'] === 'string' &&
     (value['violations'] === undefined ||
-      (Array.isArray(value['violations']) && value['violations'].every(isFieldViolation)))
+      (Array.isArray(value['violations']) && value['violations'].every(isFieldViolation))) &&
+    (value['taskIds'] === undefined ||
+      (Array.isArray(value['taskIds']) &&
+        value['taskIds'].every((id: unknown) => typeof id === 'string')))
   );
 }
 

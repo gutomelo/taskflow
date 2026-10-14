@@ -40,6 +40,14 @@ describe('CreateTaskUseCase (RF-01, RF-02)', () => {
     ]);
   });
 
+  it('every write runs with the 2 s lock timeout of the design (Abuso)', async () => {
+    const { bed } = createTasksWorld();
+
+    await new CreateTaskUseCase(bed).execute(as('mia'), { projectId: WEB, title: 'X' });
+
+    expect(bed.transactions.options).toEqual([{ lockTimeoutMs: 2_000 }]);
+  });
+
   it('BR-028: numbers are never reused after a deletion', async () => {
     const { bed } = createTasksWorld();
     const create = new CreateTaskUseCase(bed);

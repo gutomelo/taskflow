@@ -47,8 +47,9 @@ export class ListTasksUseCase {
     );
     if (!project) throw new ProjectNotFoundError();
     const mine = query.assigned === 'me' ? actorUserId : undefined;
-    // "Eu" e outra pessoa ao mesmo tempo não casam com nada.
-    if (mine && query.assigneeUserId !== undefined && query.assigneeUserId !== mine) {
+    // "Eu" com outra pessoa, ou "sem responsável" com uma pessoa, não casam com nada.
+    const nobody = query.assigned === 'none';
+    if (query.assigneeUserId !== undefined && ((mine && query.assigneeUserId !== mine) || nobody)) {
       return { items: [], nextCursor: null };
     }
     const page = await this.deps.tasks.listPage(

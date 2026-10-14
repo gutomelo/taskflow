@@ -11,6 +11,12 @@ export const MAX_DEPENDENCIES_PER_PROJECT = 5_000;
 /** "Bloqueia" no detalhe: até 50, com `blockingTruncated`. */
 export const MAX_BLOCKING_IN_DETAIL = 50;
 
+/**
+ * Espera máxima por lock nas escritas de tarefa (design, Abuso): contenção vira 409
+ * `CONCURRENT_UPDATE` em 2 s em vez de segurar conexões do pool até o timeout da transação.
+ */
+export const TASK_LOCK_TIMEOUT_MS = 2_000;
+
 /** Criação por usuário, contando tentativas recusadas. */
 export const TASK_CREATION_POLICY = {
   name: 'tasks.create.user.hour',

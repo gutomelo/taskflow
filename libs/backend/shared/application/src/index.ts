@@ -1,5 +1,5 @@
 export type { Actor, RequestContext } from './lib/context/request-context';
-export type { TransactionRunner } from './lib/persistence/transaction-runner';
+export type { TransactionOptions, TransactionRunner } from './lib/persistence/transaction-runner';
 export {
   createIntegrationEvent,
   type IntegrationEvent,

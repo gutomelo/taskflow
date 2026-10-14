@@ -117,21 +117,31 @@ E as ações aparecem só com capacidade da API
 
 ## Testes obrigatórios
 
-- [ ] Domínio: BR-001, BR-004, BR-006 (com D4), BR-028, BR-029, ações
-- [ ] Casos de uso com fakes: sucesso, 403/404, regras, ordem de decisão
-- [ ] Integração: restrições do banco (incluindo o catálogo do `SET NULL`), portas na mesma transação, concorrência, caminhos de RF-11, harness e bateria de tarefas
-- [ ] HTTP: contratos, 400/403/404/409/422/429, OpenAPI
-- [ ] Frontend: lista, criação, detalhe
-- [ ] E2E: jornada real de tarefas; jornadas existentes verdes
+- [x] Domínio: BR-001, BR-004, BR-006 (com D4), BR-028, BR-029, ações
+- [x] Casos de uso com fakes: sucesso, 403/404, regras, ordem de decisão
+- [x] Integração: restrições do banco (incluindo o catálogo do `SET NULL`), portas na mesma transação, concorrência, caminhos de RF-11, harness e bateria de tarefas
+- [x] HTTP: contratos, 400/403/404/409/422/429, OpenAPI
+- [x] Frontend: lista, criação, detalhe
+- [x] E2E: jornada real de tarefas; jornadas existentes verdes
 
 ## Evidências de validação
 
-| Critério | Evidência (comando + resultado) | Data |
-| -------- | ------------------------------- | ---- |
+| Critério | Evidência (comando + resultado)                                                                                                                                                                                                        | Data       |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| CA-01    | `create-task.use-case.spec.ts` (numeração, 403, nunca reutiliza); `tasks-composition.integration.spec.ts` (20 criações simultâneas ⇒ 1–20; depois de excluir, WEB-21) — `nx test` e `pnpm test:integration` ✔                          | 2026-10-14 |
+| CA-02    | `task-lifecycle.use-cases.spec.ts` (BR-001, opcional/cancelada não bloqueiam, D1), `create-task` (segundo nível, outro projeto), integração "concluir pai × criar obrigatória" (5 rodadas) ✔                                           | 2026-10-14 |
+| CA-03    | `task-lifecycle.use-cases.spec.ts` (BR-004, `completedAt`, limpeza), `task-queries` (`transitionTo`), router 422 ✔                                                                                                                     | 2026-10-14 |
+| CA-04    | `task-lifecycle.use-cases.spec.ts` (BR-006, D2, D4 direto/indireto), `edit-task` (D4 pela aresta implícita), integração A↔B em paralelo, bateria IDOR (bloqueadora de outro projeto ⇒ 404) ✔                                           | 2026-10-14 |
+| CA-05    | `create-task`/`edit-task` (aceitos e recusados), `contribution.use-cases.spec.ts` (gatilhos), integração de todos os caminhos de RF-11 e outra organização intacta, atribuir × rebaixar, verificador do invariante BR-003 ✔            | 2026-10-14 |
+| CA-06    | `task-lifecycle.use-cases.spec.ts` (cancelar/reabrir idempotentes, `TASK_CANCELED`, excluir com cascata, D5) e bateria (D5 403 antes da versão) ✔                                                                                      | 2026-10-14 |
+| CA-07    | `task-queries.use-cases.spec.ts` (30 tarefas, páginas de 25, filtros, uma consulta de nomes por página; detalhe por id e chave, bloqueadas até 50) ✔                                                                                   | 2026-10-14 |
+| CA-08    | `task-lifecycle.use-cases.spec.ts` (9 escritas ⇒ 409 depois do 403, leitura segue), integração "arquivar espera a criação" ✔                                                                                                           | 2026-10-14 |
+| CA-09    | `organizations-isolation.integration.spec.ts` (13 rotas de tarefa, referências de caminho/corpo/query, B intacto, sem canários), `tasks-authorization.integration.spec.ts` (404 idêntico, 403 antes de estados, IDOR entre projetos) ✔ | 2026-10-14 |
+| CA-10    | `project-tasks.page.spec.ts` e `task-detail.page.spec.ts` (ações só com capacidade, mensagem com a chave da subtarefa) e E2E `projects-journey.spec.ts` passo "spec 004" — Playwright 19/19 ✔                                          | 2026-10-14 |
 
 ## Definição de concluído
 
-- [ ] CA-01 a CA-10 comprovados por testes executados
-- [ ] `pnpm verify`, `pnpm test:integration` e E2E passando
-- [ ] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
-- [ ] Documentação, regras de negócio, design da 003 e roadmap atualizados
+- [x] CA-01 a CA-10 comprovados por testes executados
+- [x] `pnpm verify`, `pnpm test:integration` e E2E passando
+- [x] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
+- [x] Documentação, regras de negócio, design da 003 e roadmap atualizados

@@ -24,6 +24,16 @@ export function isTransactionConflict(error: unknown): boolean {
 }
 
 /**
+ * Espera por lock excedida (`lock_timeout`, SQLSTATE `55P03`): não é repetida — repetir esperaria
+ * de novo pela mesma contenção.
+ */
+export function isLockTimeout(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && sqlStateOf(error.meta) === '55P03'
+  );
+}
+
+/**
  * Violação de UNIQUE (código P2002). Repositórios traduzem para erros de domínio — por
  * exemplo, cadastro concorrente com o mesmo e-mail.
  */

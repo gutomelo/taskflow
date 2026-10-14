@@ -31,16 +31,16 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 
 | ID  | Tarefa                                                                                                                                                                                                 | Depende de | Verificação                     | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------- | ------ |
-| T11 | `features/tasks`: data-access, guards; aba "Tarefas" (lista com filtros, estados, paginação) e "Nova tarefa"                                                                                           | T9         | testes de componente            | [ ]    |
-| T12 | Detalhe `/o/:slug/projects/:key/tasks/:number`: edição, status pelas transições da API, responsável entre elegíveis, subtarefas, dependências, cancelar/reabrir, excluir; mensagens dos 422 com os ids | T11        | testes de componente (CA-10)    | [ ]    |
-| T13 | E2E real: criar tarefa, atribuir, subtarefa obrigatória, conclusão do pai recusada, concluir subtarefa e pai                                                                                           | T12        | Playwright no banco descartável | [ ]    |
+| T11 | `features/tasks`: data-access, guards; aba "Tarefas" (lista com filtros, estados, paginação) e "Nova tarefa"                                                                                           | T9         | testes de componente            | [x]    |
+| T12 | Detalhe `/o/:slug/projects/:key/tasks/:number`: edição, status pelas transições da API, responsável entre elegíveis, subtarefas, dependências, cancelar/reabrir, excluir; mensagens dos 422 com os ids | T11        | testes de componente (CA-10)    | [x]    |
+| T13 | E2E real: criar tarefa, atribuir, subtarefa obrigatória, conclusão do pai recusada, concluir subtarefa e pai                                                                                           | T12        | Playwright no banco descartável | [x]    |
 
 ## Bloco E — Documentação e validação
 
 | ID  | Tarefa                                                                                                                                                                                                                                                                                                                                         | Depende de | Verificação                                                           | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------ |
-| T14 | `bounded-contexts.md` (tasks implementado, seta `TSK → ORG`, exceções, invariante de locks), `dependency-rules.md`, `business-rules.md` (BR-001/003/006 atualizadas, BR-028, BR-029), `authorization.md`, `multi-tenancy.md`, `testing.md`; design da 003 (revisão registrando a substituição das obrigações 2 e 3); índice de specs e roadmap | T1–T13     | verificação de links                                                  | [ ]    |
-| T15 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                                                                                                                                      | T14        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [ ]    |
+| T14 | `bounded-contexts.md` (tasks implementado, seta `TSK → ORG`, exceções, invariante de locks), `dependency-rules.md`, `business-rules.md` (BR-001/003/006 atualizadas, BR-028, BR-029), `authorization.md`, `multi-tenancy.md`, `testing.md`; design da 003 (revisão registrando a substituição das obrigações 2 e 3); índice de specs e roadmap | T1–T13     | verificação de links                                                  | [x]    |
+| T15 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                                                                                                                                      | T14        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [x]    |
 
 ## Evidências
 
@@ -293,3 +293,120 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 - **Mutation testing**, 6 mutantes, 5 detectados: router não montado; lista sem filtro de projeto; lista sem filtro de tenant; leitura por id sem checar acesso ao projeto; "sem acesso" como 403. O sobrevivente "`findByIds` sem filtro de projeto" é barrado pelas **FKs compostas** do banco (pai e dependências do mesmo projeto, RNF-03): `P2003` ⇒ `TASK_NOT_FOUND`. É equivalente na HTTP e prova a defesa em profundidade.
 - **Regressão**: `pnpm test:integration --skip-nx-cache` ✔ em 7 projetos (identity 50, shared 32, organizations 33, projects 21, tasks 14, worker 9, api 37).
 - **Comandos**: `nx affected -t lint typecheck test` ✔ (25 projetos).
+
+### T11 — 2026-10-14
+
+- **Entregue** em `apps/web/src/app/features/tasks`:
+  - `TaskApi` (todas as rotas da T9, com a organização explícita) e guards de forma (`isTask`, `isTaskPage`, `isAssignableUserPage`);
+  - `core/http`: `ApiProblem.taskIds` e o guard de `ProblemDetails` aceitando a extensão (ids malformados ⇒ corpo descartado);
+  - aba **"Tarefas"** em `/o/:slug/projects/:key/tasks` (`ProjectTasksPage`):
+    - filtros de status (do workflow), responsável (`assigned=me|none`, nunca como UUID — M6.1), prioridade e "incluir canceladas";
+    - skeleton, erro com "Tentar de novo", vazio com e sem filtros, "Carregar mais" uma página por vez;
+    - respostas de filtros anteriores descartadas; 404 de projeto volta à lista de projetos;
+  - `CreateTaskForm` ("Nova tarefa" só com a capacidade `task:create` da API): foco no título, validação, alerta focável para recusas da API, anúncio em `aria-live`. O formulário já aceita `parentTaskId` e a marca "obrigatória" para as subtarefas da T12.
+  - Mensagens em `tasks.messages.ts`; link "Tarefas" nas seções do projeto.
+- **Testes**: 9 de componente (aba) e 1 de `toApiProblem`, total 269 no `web`. Cobrem lista, links por número, filtros na query, resposta velha descartada, paginação, erro e retry, vazio, capacidade, criação (foco, validação, corpo sem dados de tenant, anúncio, recarga), recusa 422 e 404 de projeto.
+- **Mutation testing**: 8/8 detectados.
+- **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T12 — 2026-10-14
+
+- **Entregue**: detalhe em `/o/:slug/projects/:key/tasks/:number`, carregado por `CHAVE-N` (BR-028). Componentes:
+  - `TaskDetailStore`:
+    - estado da tarefa e do workflow (nomes dos destinos);
+    - `run()` para mutações: a resposta substitui a tarefa;
+    - mensagens por código; os 422 de BR-001/BR-006 trazem os `taskIds` traduzidos para chaves das subtarefas/bloqueadoras;
+    - `VERSION_CONFLICT`/`TASK_CANCELED` recarregam;
+    - 404 da tarefa ⇒ "não encontrada"; 404 do projeto ⇒ lista de projetos.
+  - `TaskDetailPage`:
+    - status pelas transições devolvidas pela API (`actions.transitionTo`);
+    - edição (título, descrição, prioridade, prazo) só com `actions.update`; sem ela, os dados ficam só para leitura;
+    - formulário sincronizado com a versão do servidor;
+    - alerta focado em erro;
+    - cancelar/reabrir; excluir com confirmação, voltando à lista com anúncio.
+  - `TaskAssignee`: elegíveis da API (`assignable-users`, "ver mais") ou "Sem responsável".
+  - `TaskRelations`:
+    - subtarefas com a marca "obrigatória"; "Nova subtarefa" só em tarefa de primeiro nível;
+    - "bloqueada por" com remover e adicionar pela chave, validada antes;
+    - "bloqueia" com o aviso de truncamento.
+- **Limitação registrada**: o detalhe não traz chave nem número do pai (`parentTaskId` só), então a subtarefa não mostra um link para o pai. Um campo `parent` no contrato fica como melhoria candidata para a T15/spec futura. Nada fictício foi deixado no código.
+- **Testes**: 13 de componente (282 no `web`):
+  - leitura completa e apenas as transições da API;
+  - somente leitura sem capacidades (CA-10);
+  - mover com a versão;
+  - conclusão do pai recusada com a chave da subtarefa no alerta focado (CA-10);
+  - salvar e conflito com recarga;
+  - atribuir;
+  - criar subtarefa obrigatória; um nível só;
+  - bloqueadora por chave (validação, adicionar, remover); ciclo explicado;
+  - cancelar/reabrir; excluir com confirmação e anúncio;
+  - 404.
+- **Mutation testing**, 9/9 detectados. Dois mutantes refeitos (um não compilava, outro não casava depois do prettier) e um teste reforçado (versão 4 no lugar da 1).
+- **Comandos**: `nx run-many -t lint typecheck test -p web` ✔.
+
+### T13 — 2026-10-14
+
+- **Entregue**: `projects-journey.spec.ts` ganha o passo "spec 004" (CA-10), real com web, API, worker e Mailpit, sobre as mesmas contas da jornada de projetos. Uma jornada à parte exigiria mais 2 cadastros, e a suíte já faz os 5 que `auth.register.ip` permite por hora. O passo:
+  - o owner cria PDC-1 na aba "Tarefas", atribui ao member entre os elegíveis e cria a subtarefa obrigatória PDC-2;
+  - concluir o pai é recusado com "Conclua ou cancele as subtarefas obrigatórias pendentes: PDC-2.";
+  - o owner conclui PDC-2 e depois o pai;
+  - o member filtra "Atribuídas a mim", abre a tarefa, vê as transições e **não** vê "Excluir tarefa" (D5: ações só com capacidade da API).
+  - A jornada ganhou `test.setTimeout(120_000)`, com comentário: projetos e tarefas no mesmo teste passam dos 30 s padrão.
+- **Bug encontrado pela E2E e corrigido**: ao seguir o link de uma subtarefa (`tasks/1` → `tasks/2`), o Angular reaproveitava o componente e o detalhe continuava mostrando a tarefa anterior. A rota `tasks/:number` agora usa `RECREATE_ON_PARAM_CHANGE`, como a do projeto. O teste de componente novo ("following a subtask link opens that task") falha sem a correção (mutante detectado).
+- **Execução**:
+  - primeira rodada: 18/19, a jornada nova falhou pelo bug acima;
+  - depois da correção: `pnpm exec playwright test -c apps/web-e2e/playwright.config.mts` ✔ **19/19** (39,7 s), com `DATABASE_URL=…/taskflow_e2e`, `REDIS_URL=…/2` e as chaves `rate-limit:auth.*` do índice 2 limpas antes;
+  - as jornadas existentes continuam verdes.
+- **Comandos**: `nx run-many -t lint typecheck test -p web web-e2e` ✔ (283 testes no `web`).
+
+### T14 — 2026-10-14
+
+- **Atualizados**:
+  - `docs/architecture/bounded-contexts.md`:
+    - Tasks implementado; setas `TSK → ORG` (FK do responsável) e `PRJ ⇢ TSK` (reação síncrona);
+    - fronteira `tasks × projects` (portas, decisão só em `projects`, revogação sem evento próprio);
+    - ordem única de locks e a invariante de papel efetivo; `SET NULL` ao sair da organização;
+    - quatro linhas novas na tabela de exceções do ADR 0015.
+  - `docs/architecture/dependency-rules.md`: seção das bibliotecas de `tasks`, o que `projects`/`organizations` expõem a `tasks`, os lints novos e o que entrou em `shared/*`.
+  - `docs/product/business-rules.md`:
+    - status das regras;
+    - BR-001 (D1, `PARENT_TASK_COMPLETED` substitui `TASK_ALREADY_COMPLETED`, extensão `taskIds`);
+    - BR-003 (papel efetivo, perda de acesso por qualquer caminho);
+    - BR-004 (transições validadas na 004);
+    - BR-006 (mesmo projeto, D2, D4, tetos);
+    - BR-026 estendida a tarefas;
+    - **BR-028** e **BR-029** novas.
+    - Os eventos de integração e a auditoria continuam marcados como planejados.
+  - `docs/security/authorization.md`: permissões de tarefa aplicadas, nota da D5, `actions` do detalhe e ordem de decisão.
+  - `docs/security/multi-tenancy.md`: harness com as 13 rotas, expectativa `refused` e bateria de tarefas.
+  - `docs/development/testing.md`: parágrafo da spec 004 e jornada E2E.
+  - `specs/003-projects/design.md`, **revisão 4**: como a 004 cumpriu as obrigações 1 e 4 e **substituiu** as 2 e 3.
+  - `specs/004-tasks/design.md`, **revisão 3**: ajustes da implementação, inclusive a remoção do evento `tasks.assignments_revoked`.
+  - `specs/README.md` e `docs/product/roadmap.md`: "implementada — validação final".
+- **Verificação**: script de links relativos sobre todos os `.md` alterados ou novos ⇒ "links ok"; prettier aplicado.
+
+### T15 — 2026-10-14
+
+- **`/review-code`**: nenhum Bloqueante; 3 Importantes e 4 Sugestões. **`/security-audit`**: nenhum Crítico/Alto; 1 Médio e 1 Baixo. Os revisores observaram que o backend já estava no commit `78322c8` (feito pelo usuário) e revisaram commit e working tree.
+- **Correções**, todas com teste e mutante detectado:
+  1. **Importante / Médio — `lock_timeout` de 2 s do design não implementado** (as duas revisões).
+     - Implementado: opção `lockTimeoutMs` da porta `TransactionRunner`; `set_config('lock_timeout', …, true)` no runner; `55P03` ⇒ `ConcurrentUpdateError` (409) sem repetir; `TASK_LOCK_TIMEOUT_MS = 2000` em toda escrita de tarefa.
+     - Testes: integração (lock segurado por outra transação ⇒ 409 em < 1,5 s, uma tentativa, `SET LOCAL` sem vazar) e unitário (escritas pedem 2 s).
+  2. **Importante — chave de bloqueadora inexistente ou de outro projeto** derrubava o detalhe para "não encontrada".
+     - Correção: a chave é resolvida fora do `run()` e vira erro do campo; um 404 numa ação só marca "não encontrada" se a recarga confirmar que a tarefa aberta sumiu.
+     - 2 testes.
+  3. **Importante — edição não salva descartada** por outra ação.
+     - Correção: o formulário só acompanha o servidor quando está intocado, depois de salvar ou num conflito.
+     - 1 teste.
+  4. **Sugestão — `assigned=none` com `assigneeUserId`** devolvia as tarefas da pessoa.
+     - Correção: E lógico no repositório Prisma (o spread sobrescrevia) e guarda no caso de uso.
+     - Teste de integração do repositório.
+  5. **Baixo — `findUnique` sem `organizationId`** em `PrismaTaskDependencyRepository.add` virou `findFirst` com a organização.
+  6. **Sugestão — aba "Tarefas" ativa no detalhe**: `exact: false` só nesse link (teste de `aria-current`).
+  7. **Sugestão — cabeçalho do design** acertado.
+  - A contagem por organização ficou registrada como limite "suave", e o esgotamento do contador por projeto (sem caminho de recuperação) como risco aceito, na revisão 4 do design.
+- **Mutation testing das correções**: 8 mutantes, 8 detectados. O da guarda `none` no caso de uso é equivalente no fake (que já aplicava o E lógico); o defeito real estava no repositório, e o mutante dele foi detectado pela integração.
+- **Gate final**:
+  - `NX_LOAD_DOT_ENV_FILES=false pnpm verify` ✔: 78 tarefas, 78 com sucesso (lint, typecheck, test, build);
+  - `pnpm test:integration --skip-nx-cache` ✔: 7 projetos, **197 testes** (identity 50, shared 33, organizations 33, projects 21, tasks 14, worker 9, api 37);
+  - `pnpm exec playwright test -c apps/web-e2e/playwright.config.mts` ✔ **19/19** (38,2 s), com `taskflow_e2e`, Redis índice 2 e as chaves `rate-limit:auth.*` limpas antes.

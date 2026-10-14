@@ -45,17 +45,17 @@ Proporcionalidade: correções triviais não exigem spec; melhorias pequenas vir
 
 ## Índice
 
-| Spec                                                     | Fase | Status                                |
-| -------------------------------------------------------- | ---- | ------------------------------------- |
-| [000-foundation](000-foundation/requirements.md)         | 0    | Concluído                             |
-| [001-authentication](001-authentication/requirements.md) | 1    | Concluído                             |
-| [002-organizations](002-organizations/requirements.md)   | 1    | Concluída                             |
-| [003-projects](003-projects/requirements.md)             | 1    | Concluída                             |
-| [004-tasks](004-tasks/requirements.md)                   | 1    | Aprovado — implementação em andamento |
-| 005-kanban                                               | 1    | Não iniciada                          |
-| [006-permissions](006-permissions/requirements.md)       | 1    | Concluída                             |
-| 007-sprints                                              | 3    | Não iniciada                          |
-| 008-notifications                                        | 2    | Não iniciada                          |
-| 009-analytics                                            | 3    | Não iniciada                          |
+| Spec                                                     | Fase | Status       |
+| -------------------------------------------------------- | ---- | ------------ |
+| [000-foundation](000-foundation/requirements.md)         | 0    | Concluído    |
+| [001-authentication](001-authentication/requirements.md) | 1    | Concluído    |
+| [002-organizations](002-organizations/requirements.md)   | 1    | Concluída    |
+| [003-projects](003-projects/requirements.md)             | 1    | Concluída    |
+| [004-tasks](004-tasks/requirements.md)                   | 1    | Concluída    |
+| 005-kanban                                               | 1    | Não iniciada |
+| [006-permissions](006-permissions/requirements.md)       | 1    | Concluída    |
+| 007-sprints                                              | 3    | Não iniciada |
+| 008-notifications                                        | 2    | Não iniciada |
+| 009-analytics                                            | 3    | Não iniciada |
 
 Diretórios de specs são criados quando a especificação começa — sem pastas vazias.

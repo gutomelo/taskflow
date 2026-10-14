@@ -208,6 +208,8 @@ describe('tasks persistence (integration, T3)', () => {
     expect((await list({ includeCanceled: true })).items[0]?.id).toBe(t3.id);
     expect((await list({ assigneeUserId: assignee })).items[0]?.id).toBe(t1.id);
     expect((await list({ unassigned: true })).items[0]?.id).toBe(t2.id);
+    // As duas condições valem juntas (E lógico): sem responsável e de uma pessoa ⇒ nada.
+    expect((await list({ unassigned: true, assigneeUserId: assignee })).items).toEqual([]);
     expect((await list({ priority: 'high' })).items[0]?.id).toBe(t1.id);
     expect((await list({ parentTaskId: t1.id })).items[0]?.id).toBe(sub.id);
     expect((await list({}, 'not-a-cursor')).items[0]?.id).toBe(t2.id);
