@@ -20,19 +20,28 @@ import {
 } from './projects.testing';
 
 const workflow = {
+  version: 1,
   statuses: [
-    { id: '0192a000-0000-7000-8000-0000000000a1', name: 'A fazer', category: 'todo', position: 0 },
+    {
+      id: '0192a000-0000-7000-8000-0000000000a1',
+      name: 'A fazer',
+      category: 'todo',
+      position: 0,
+      inUse: false,
+    },
     {
       id: '0192a000-0000-7000-8000-0000000000a2',
       name: 'Em andamento',
       category: 'in_progress',
       position: 1,
+      inUse: false,
     },
     {
       id: '0192a000-0000-7000-8000-0000000000a3',
       name: 'Concluído',
       category: 'done',
       position: 2,
+      inUse: false,
     },
   ],
   transitions: [

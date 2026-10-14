@@ -8,10 +8,11 @@ export const STATUS = { todo: uuid('5101'), doing: uuid('5102'), done: uuid('510
 export const BIA = uuid('b1b1');
 
 export const WORKFLOW: WorkflowDto = {
+  version: 1,
   statuses: [
-    { id: STATUS.todo, name: 'A fazer', category: 'todo', position: 0 },
-    { id: STATUS.doing, name: 'Em andamento', category: 'in_progress', position: 1 },
-    { id: STATUS.done, name: 'Concluído', category: 'done', position: 2 },
+    { id: STATUS.todo, name: 'A fazer', category: 'todo', position: 0, inUse: false },
+    { id: STATUS.doing, name: 'Em andamento', category: 'in_progress', position: 1, inUse: false },
+    { id: STATUS.done, name: 'Concluído', category: 'done', position: 2, inUse: false },
   ],
   transitions: [
     { fromStatusId: STATUS.todo, toStatusId: STATUS.doing },

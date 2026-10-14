@@ -3,6 +3,7 @@ import { TASK_REBALANCE_POLICY } from '../shared/task-limits';
 import type { TasksTestbed } from '../../testing/tasks-fakes';
 import { as, createTasksWorld, forceCancel, forceStatus, WEB } from '../../testing/tasks-world';
 import {
+  BOARD_COLUMN_CONCURRENCY,
   CountTasksByStatusUseCase,
   GetBoardUseCase,
   ListColumnCardsUseCase,
@@ -52,6 +53,34 @@ function move(
 }
 
 describe('GetBoard / ListColumnCards (RF-01, RF-04)', () => {
+  it('queries at most a few columns at a time (connection pool)', async () => {
+    const { bed, web } = createTasksWorld();
+    web.workflow = {
+      statuses: Array.from({ length: 12 }, (_, position) => ({
+        id: `web-s${position}`,
+        name: `S${position}`,
+        category: position === 0 ? 'todo' : 'in_progress',
+        position,
+      })),
+      transitions: [],
+    };
+    const columnPage = bed.tasks.columnPage.bind(bed.tasks);
+    let inFlight = 0;
+    let peak = 0;
+    bed.tasks.columnPage = async (...args) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      return columnPage(...args);
+    };
+
+    const board = await new GetBoardUseCase(bed).execute(as('bia'), { projectId: WEB });
+
+    expect(board.columns).toHaveLength(12);
+    expect(peak).toBe(BOARD_COLUMN_CONCURRENCY);
+  });
+
   it('one column per status in workflow order, only top-level not canceled cards, in rank order', async () => {
     const { bed } = createTasksWorld();
     const first = await create(bed);
@@ -242,6 +271,22 @@ describe('MoveCard (RF-02, RF-03, BR-009)', () => {
       await new GetBoardUseCase(bed).execute(as('mia'), { projectId: WEB })
     ).columns[0]?.cards.map((card) => card.id);
     expect(order).toEqual([first, c.id, second]);
+  });
+
+  it('M1: a refused move neither rebalances nor spends the project quota', async () => {
+    const { bed, a, b, c } = await three();
+    for (const task of [a, b]) {
+      await move(bed, task.id, { toStatusId: 'web-doing' });
+      await move(bed, task.id, { toStatusId: 'web-done' });
+    }
+    bed.tasks.ranks.set(a.id, 'a5');
+    bed.tasks.ranks.set(b.id, 'a5');
+
+    expect(await code(move(bed, c.id, { toStatusId: 'web-done', afterTaskId: a.id }))).toBe(
+      'TRANSITION_NOT_ALLOWED',
+    );
+    expect(bed.tasks.rebalances).toEqual([]);
+    expect(bed.rateLimiter.consumed.get(`${TASK_REBALANCE_POLICY.name}|${WEB}`) ?? 0).toBe(0);
   });
 
   it('long keys trigger a rebalance, limited per project (M1)', async () => {

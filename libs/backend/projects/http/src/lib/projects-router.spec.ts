@@ -20,7 +20,12 @@ import {
   ListMemberCandidatesUseCase,
   ListProjectMembersUseCase,
   ListProjectsUseCase,
+  CreateStatusUseCase,
   RemoveProjectMemberUseCase,
+  RemoveStatusUseCase,
+  ReorderStatusesUseCase,
+  ReplaceTransitionsUseCase,
+  UpdateStatusUseCase,
   RestoreProjectUseCase,
   UpdateProjectUseCase,
 } from '@taskflow/backend/projects/application';
@@ -79,6 +84,11 @@ function buildApp(bed: ProjectsTestbed) {
       addMember: new AddProjectMemberUseCase(bed),
       changeMemberRole: new ChangeProjectMemberRoleUseCase(bed),
       removeMember: new RemoveProjectMemberUseCase(bed),
+      createStatus: new CreateStatusUseCase(bed),
+      updateStatus: new UpdateStatusUseCase(bed),
+      removeStatus: new RemoveStatusUseCase(bed),
+      reorderStatuses: new ReorderStatusesUseCase(bed),
+      replaceTransitions: new ReplaceTransitionsUseCase(bed),
     },
     rateLimiter: bed.rateLimiter,
   });
@@ -121,7 +131,11 @@ function clientFor(app: express.Express, userId: string) {
     return issued;
   };
 
-  const mutate = async (method: 'post' | 'patch' | 'delete', path: string, body?: object) => {
+  const mutate = async (
+    method: 'post' | 'patch' | 'put' | 'delete',
+    path: string,
+    body?: object,
+  ) => {
     const value = await token();
     return request(app)
       [method](`/api/v1/organizations/${ORG}${path}`)
@@ -136,6 +150,7 @@ function clientFor(app: express.Express, userId: string) {
       request(app).get(`/api/v1/organizations/${ORG}${path}`).set('x-test-user', userId),
     post: (path: string, body?: object) => mutate('post', path, body),
     patch: (path: string, body?: object) => mutate('patch', path, body),
+    put: (path: string, body?: object) => mutate('put', path, body),
     delete: (path: string) => mutate('delete', path),
   };
 }
@@ -266,6 +281,131 @@ describe('projects router (spec 003, T8)', () => {
       'Concluído',
     ]);
     expect(workflow.transitions).toHaveLength(4);
+  });
+
+  describe('workflow (spec 005, T8)', () => {
+    it('creates, renames, reorders, replaces transitions and removes statuses with the workflow version', async () => {
+      const { mia, project } = await world();
+      const base = `/projects/${project.id}/workflow`;
+
+      const created = await mia.post(`${base}/statuses`, {
+        name: 'Em revisão',
+        category: 'in_progress',
+        version: 1,
+      });
+      expect(created.status).toBe(201);
+      const afterCreate = workflowSchema.parse(created.body);
+      expect(afterCreate.version).toBe(2);
+      const review = afterCreate.statuses.find((status) => status.name === 'Em revisão');
+      const [todo, doing, done] = afterCreate.statuses;
+      if (!review || !todo || !doing || !done) throw new Error('workflow');
+      expect(review).toMatchObject({ category: 'in_progress', inUse: false });
+
+      const renamed = workflowSchema.parse(
+        (await mia.patch(`${base}/statuses/${review.id}`, { name: 'Revisão', version: 2 })).body,
+      );
+      expect(renamed.statuses.map((status) => status.name)).toContain('Revisão');
+      const reordered = workflowSchema.parse(
+        (
+          await mia.put(`${base}/order`, {
+            statusIds: [todo.id, doing.id, review.id, done.id],
+            version: 3,
+          })
+        ).body,
+      );
+      expect(reordered.statuses.map((status) => status.name)).toEqual([
+        'A fazer',
+        'Em andamento',
+        'Revisão',
+        'Concluído',
+      ]);
+      const transitions = workflowSchema.parse(
+        (
+          await mia.put(`${base}/transitions`, {
+            transitions: [
+              { fromStatusId: todo.id, toStatusId: doing.id },
+              { fromStatusId: doing.id, toStatusId: review.id },
+            ],
+            version: 4,
+          })
+        ).body,
+      );
+      expect(transitions.transitions).toHaveLength(2);
+      const removed = await mia.delete(`${base}/statuses/${review.id}?version=5`);
+      expect(removed.status).toBe(200);
+      expect(workflowSchema.parse(removed.body).statuses).toHaveLength(3);
+    });
+
+    it('400 for unknown fields and missing version; 404 for malformed or foreign statuses; 409 for in use and stale', async () => {
+      const { bed, mia, project } = await world();
+      const base = `/projects/${project.id}/workflow`;
+      const workflow = workflowSchema.parse((await mia.get(base)).body);
+      const doing = workflow.statuses[1]?.id ?? '';
+
+      expect(
+        problem(
+          await mia.post(`${base}/statuses`, {
+            name: 'X',
+            category: 'todo',
+            version: 1,
+            position: 0,
+          }),
+        ).code,
+      ).toBe('VALIDATION_FAILED');
+      expect(problem(await mia.patch(`${base}/statuses/${doing}`, { version: 1 })).code).toBe(
+        'VALIDATION_FAILED',
+      );
+      expect(problem(await mia.delete(`${base}/statuses/${doing}`)).code).toBe('VALIDATION_FAILED');
+      expect(
+        problem(await mia.patch(`${base}/statuses/not-a-uuid`, { name: 'X', version: 1 })).code,
+      ).toBe('STATUS_NOT_FOUND');
+      expect(
+        problem(await mia.patch(`${base}/statuses/${MISSING}`, { name: 'X', version: 1 })).code,
+      ).toBe('STATUS_NOT_FOUND');
+      expect(
+        problem(await mia.put(`${base}/order`, { statusIds: [MISSING], version: 1 })).code,
+      ).toBe('STATUS_NOT_FOUND');
+      bed.workflowStatusUsage.counts.set(doing, 1);
+      const inUse = await mia.patch(`${base}/statuses/${doing}`, { category: 'done', version: 1 });
+      expect(inUse.status).toBe(409);
+      expect(problem(inUse).code).toBe('STATUS_IN_USE');
+      const stale = await mia.patch(`${base}/statuses/${doing}`, { name: 'Y', version: 9 });
+      expect(problem(stale)).toMatchObject({ status: 409, code: 'VERSION_CONFLICT' });
+      const target = await mia.delete(`${base}/statuses/${doing}?version=1`);
+      expect(problem(target)).toMatchObject({ status: 422, code: 'INVALID_STATUS_TARGET' });
+      const review = workflowSchema
+        .parse(
+          (
+            await mia.post(`${base}/statuses`, {
+              name: 'Revisão',
+              category: 'in_progress',
+              version: 1,
+            })
+          ).body,
+        )
+        .statuses.find((status) => status.name === 'Revisão');
+      const removed = await mia.delete(
+        `${base}/statuses/${doing}?version=2&moveTasksToStatusId=${review?.id ?? ''}`,
+      );
+      expect(removed.status).toBe(200);
+      expect(bed.workflowStatusUsage.reassignments).toEqual([
+        { projectId: project.id, fromStatusId: doing, toStatusId: review?.id },
+      ]);
+    });
+
+    it('a participant member gets 403 on every workflow edit', async () => {
+      const { app, project } = await world();
+      const bia = clientFor(app, BIA);
+      const base = `/projects/${project.id}/workflow`;
+
+      for (const response of [
+        await bia.post(`${base}/statuses`, { name: 'X', category: 'todo', version: 9 }),
+        await bia.put(`${base}/order`, { statusIds: [MISSING], version: 9 }),
+        await bia.put(`${base}/transitions`, { transitions: [], version: 9 }),
+      ]) {
+        expect(problem(response)).toMatchObject({ status: 403, code: 'INSUFFICIENT_ROLE' });
+      }
+    });
   });
 
   it('participants: list, candidates, add, change, remove and leave, with the errors of BR-027', async () => {

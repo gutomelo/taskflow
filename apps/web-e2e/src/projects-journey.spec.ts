@@ -17,7 +17,7 @@ test('CA-10: create a project, add a participant, archive and restore; then its 
   browser,
 }) => {
   // Jornada longa (projetos e tarefas com as mesmas contas): mais que os 30 s padrão.
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const id = randomUUID().slice(0, 8);
   const organization = { name: `Acme ${id}`, slug: `e2e-p-${id}` };
   const owner = {
@@ -149,5 +149,64 @@ test('CA-10: create a project, add a participant, archive and restore; then its 
     await expect(guestPage.getByRole('heading', { name: 'Status: Concluído' })).toBeVisible();
     await expect(guestPage.getByRole('button', { name: 'Mover para Em andamento' })).toBeVisible();
     await expect(guestPage.getByRole('button', { name: 'Excluir tarefa' })).toHaveCount(0);
+  });
+
+  await test.step('spec 005: workflow column, board moves and BR-001 on the board', async () => {
+    const projectUrl = `/o/${organization.slug}/projects/PDC`;
+    const board = () => ownerPage.getByRole('region', { name: /^Em revisão,/ });
+    const cardAction = async (key: string, action: string) => {
+      await ownerPage.getByRole('button', { name: `Mover ${key}` }).click();
+      await ownerPage.getByRole('button', { name: action }).click();
+    };
+
+    // Gerente cria a coluna "Em revisão" e as transições Em andamento → Em revisão → Concluído
+    await ownerPage.goto(projectUrl);
+    await projectSection(ownerPage, 'Configurações').click();
+    const newStatus = ownerPage.getByRole('form', { name: 'Novo status' });
+    await newStatus.getByLabel('Nome do status').fill('Em revisão');
+    await newStatus.getByRole('combobox').selectOption('in_progress');
+    await newStatus.getByRole('button', { name: 'Criar status' }).click();
+    await expect(ownerPage.getByLabel('Nome de Em revisão')).toBeVisible();
+    await ownerPage.getByLabel('De Em andamento para Em revisão').check();
+    await ownerPage.getByLabel('De Em revisão para Concluído').check();
+    await ownerPage.getByRole('button', { name: 'Salvar transições' }).click();
+    await expect(ownerPage.getByText('Fluxo atualizado.')).toBeAttached();
+
+    // Tarefa com subtarefa obrigatória
+    await projectSection(ownerPage, 'Tarefas').click();
+    await ownerPage.getByRole('button', { name: 'Nova tarefa' }).click();
+    await ownerPage.getByLabel('Título').fill('Deploy');
+    await ownerPage.getByRole('button', { name: 'Criar tarefa' }).click();
+    await expect(ownerPage.getByText('Tarefa PDC-3 criada.')).toBeAttached();
+    await ownerPage.goto(`${projectUrl}/tasks/3`);
+    await ownerPage.getByRole('button', { name: 'Nova subtarefa' }).click();
+    const subtaskForm = ownerPage.getByRole('form', { name: 'Nova subtarefa' });
+    await subtaskForm.getByLabel('Título').fill('Checklist de deploy');
+    await subtaskForm.getByLabel('Obrigatória para concluir a tarefa').check();
+    await subtaskForm.getByRole('button', { name: 'Criar subtarefa' }).click();
+    await expect(ownerPage.getByRole('list', { name: 'Subtarefas' })).toContainText('PDC-4');
+
+    // Quadro: a coluna nova aparece; o card anda pelo teclado e a conclusão é recusada (BR-001)
+    await projectSection(ownerPage, 'Quadro').click();
+    await expect(board()).toBeVisible();
+    await cardAction('PDC-3', 'Para Em andamento');
+    await expect(ownerPage.getByText('PDC-3 movida para Em andamento.')).toBeAttached();
+    await cardAction('PDC-3', 'Para Em revisão');
+    await expect(board()).toContainText('PDC-3');
+    await cardAction('PDC-3', 'Para Concluído');
+    await expect(ownerPage.getByRole('alert')).toContainText(
+      'Conclua ou cancele as subtarefas obrigatórias pendentes antes de concluir.',
+    );
+    await expect(board()).toContainText('PDC-3');
+
+    // Conclui a subtarefa pelo detalhe; agora o card conclui no quadro
+    await ownerPage.goto(`${projectUrl}/tasks/4`);
+    await ownerPage.getByRole('button', { name: 'Mover para Em andamento' }).click();
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Em andamento' })).toBeVisible();
+    await ownerPage.getByRole('button', { name: 'Mover para Concluído' }).click();
+    await expect(ownerPage.getByRole('heading', { name: 'Status: Concluído' })).toBeVisible();
+    await ownerPage.goto(`${projectUrl}/board`);
+    await cardAction('PDC-3', 'Para Concluído');
+    await expect(ownerPage.getByRole('region', { name: /^Concluído,/ })).toContainText('PDC-3');
   });
 });

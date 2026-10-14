@@ -10,11 +10,15 @@ import type {
   AssignableUser as AssignableUserView,
   AssignTaskUseCase,
   CancelTaskUseCase,
+  CardView,
   CreateTaskUseCase,
+  GetBoardUseCase,
   DeleteTaskUseCase,
   GetTaskUseCase,
   ListAssignableUsersUseCase,
+  ListColumnCardsUseCase,
   ListTasksUseCase,
+  MoveCardUseCase,
   RemoveDependencyUseCase,
   ReopenTaskUseCase,
   TaskSummaryView,
@@ -24,6 +28,10 @@ import type {
 } from '@taskflow/backend/tasks/application';
 import {
   addDependencyRequestSchema,
+  boardQuerySchema,
+  columnParamSchema,
+  columnQuerySchema,
+  moveCardRequestSchema,
   assignableUsersQuerySchema,
   assignTaskRequestSchema,
   createTaskRequestSchema,
@@ -37,6 +45,10 @@ import {
   updateTaskRequestSchema,
   type AssignableUser,
   type AssignableUserPage,
+  type Board,
+  type Card,
+  type ColumnPage,
+  type MoveCardResponse,
   type TaskDto,
   type TaskPage,
   type TaskSummary,
@@ -59,6 +71,9 @@ export interface TasksHttpDependencies {
     deleteTask: Executes<DeleteTaskUseCase>;
     addDependency: Executes<AddDependencyUseCase>;
     removeDependency: Executes<RemoveDependencyUseCase>;
+    getBoard: Executes<GetBoardUseCase>;
+    listColumnCards: Executes<ListColumnCardsUseCase>;
+    moveCard: Executes<MoveCardUseCase>;
   }>;
 }
 
@@ -118,6 +133,10 @@ const toTaskDto = (view: TaskView): TaskDto => ({
   blocking: view.blocking.map(toSummary),
   blockingTruncated: view.blockingTruncated,
 });
+
+const toCard = (view: CardView): Card => ({ ...toSummary(view), subtasks: { ...view.subtasks } });
+const statusNotFound = () =>
+  new HttpError(404, 'STATUS_NOT_FOUND', 'Status não encontrado no workflow do projeto');
 
 const toAssignable = (view: AssignableUserView): AssignableUser => ({ ...view });
 
@@ -246,6 +265,59 @@ export function createTasksRouter(deps: TasksHttpDependencies): Router {
     const { taskId, blockingTaskId } = parseParams(request, taskDependencyParamSchema);
     await useCases.removeDependency.execute(context, { taskId, blockingTaskId });
     response.status(204).end();
+  });
+
+  // --- Quadro (spec 005): visão de `tasks` (ADR 0016) ---
+  router.get('/board', async (request, response) => {
+    const board = await useCases.getBoard.execute(
+      tenantRequestContextFrom(request),
+      parseQuery(request, boardQuerySchema),
+    );
+    response.json({
+      statuses: board.statuses.map((status) => ({ ...status })),
+      transitions: board.transitions.map((transition) => ({ ...transition })),
+      columns: board.columns.map((column) => ({
+        statusId: column.statusId,
+        cards: column.cards.map(toCard),
+        nextCursor: column.nextCursor,
+      })),
+      actions: { ...board.actions },
+    } satisfies Board);
+  });
+
+  router.get('/board/columns/:statusId', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const parsed = columnParamSchema.safeParse(request.params);
+    if (!parsed.success) throw statusNotFound();
+    const query = parseQuery(request, columnQuerySchema);
+    const page = await useCases.listColumnCards.execute(context, {
+      ...query,
+      statusId: parsed.data.statusId,
+    });
+    response.json({
+      cards: page.cards.map(toCard),
+      nextCursor: page.nextCursor,
+    } satisfies ColumnPage);
+  });
+
+  router.post('/tasks/:taskId/move', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { taskId } = parseParams(request, taskIdParamSchema);
+    const { toStatusId, afterTaskId, beforeTaskId, version } = parseBody(
+      request,
+      moveCardRequestSchema,
+    );
+    const moved = await useCases.moveCard.execute(context, {
+      taskId,
+      toStatusId,
+      version,
+      ...(afterTaskId === undefined ? {} : { afterTaskId }),
+      ...(beforeTaskId === undefined ? {} : { beforeTaskId }),
+    });
+    response.json({
+      card: toCard(moved.card),
+      statusId: moved.statusId,
+    } satisfies MoveCardResponse);
   });
 
   return router;

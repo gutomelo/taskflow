@@ -75,6 +75,50 @@ const REQUESTS: Readonly<
         version: 99,
       }),
   },
+  // Spec 005: edições do workflow (board:configure), com versão velha e status inexistente — 403 antes.
+  'POST /organizations/:organizationId/projects/:projectId/workflow/statuses': {
+    kind: 'manage',
+    send: (actor, base, target) =>
+      actor.post(`${base}/projects/${target.projectId}/workflow/statuses`, {
+        name: 'A fazer',
+        category: 'todo',
+        version: 99,
+      }),
+  },
+  'PATCH /organizations/:organizationId/projects/:projectId/workflow/statuses/:statusId': {
+    kind: 'manage',
+    send: (actor, base, target) =>
+      actor.patch(
+        `${base}/projects/${target.projectId}/workflow/statuses/0192a000-0000-7000-8000-00000000ffff`,
+        {
+          name: 'X',
+          version: 99,
+        },
+      ),
+  },
+  'DELETE /organizations/:organizationId/projects/:projectId/workflow/statuses/:statusId': {
+    kind: 'manage',
+    send: (actor, base, target) =>
+      actor.delete(
+        `${base}/projects/${target.projectId}/workflow/statuses/0192a000-0000-7000-8000-00000000ffff?version=99`,
+      ),
+  },
+  'PUT /organizations/:organizationId/projects/:projectId/workflow/order': {
+    kind: 'manage',
+    send: (actor, base, target) =>
+      actor.put(`${base}/projects/${target.projectId}/workflow/order`, {
+        statusIds: ['0192a000-0000-7000-8000-00000000ffff'],
+        version: 99,
+      }),
+  },
+  'PUT /organizations/:organizationId/projects/:projectId/workflow/transitions': {
+    kind: 'manage',
+    send: (actor, base, target) =>
+      actor.put(`${base}/projects/${target.projectId}/workflow/transitions`, {
+        transitions: [],
+        version: 99,
+      }),
+  },
   'DELETE /organizations/:organizationId/projects/:projectId/members/:userId': {
     kind: 'manage',
     send: (actor, base, target) =>

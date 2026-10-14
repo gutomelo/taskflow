@@ -149,3 +149,40 @@ export const taskDetailMessages = {
     `Conclua ou cancele as subtarefas obrigatórias pendentes: ${keys}.`,
   pendingBlockers: (keys: string) => `A tarefa está bloqueada por tarefas pendentes: ${keys}.`,
 } as const;
+
+export const boardMessages = {
+  title: 'Quadro',
+  refresh: 'Atualizar',
+  loading: 'Carregando quadro…',
+  loadFailed: 'Não foi possível carregar o quadro.',
+  retry: 'Tentar de novo',
+  columnLabel: (name: string, count: number) => `${name}, ${count} cards`,
+  emptyColumn: 'Sem cards',
+  noExit: 'Nenhuma transição sai desta coluna.',
+  loadMore: 'Carregar mais',
+  actionsFor: (key: string) => `Mover ${key}`,
+  up: 'Para cima',
+  down: 'Para baixo',
+  moveTo: (name: string) => `Para ${name}`,
+  close: 'Fechar',
+  subtasks: (done: number, total: number) => `Subtarefas ${done}/${total}`,
+  moved: (key: string, column: string) => `${key} movida para ${column}.`,
+  reordered: (key: string, position: number) => `${key} agora é o card ${position} da coluna.`,
+  pendingSubtasks: 'Conclua ou cancele as subtarefas obrigatórias pendentes antes de concluir.',
+  pendingBlockers: (keys: string) => `A tarefa está bloqueada por tarefas pendentes: ${keys}.`,
+  pendingBlockersCount: (count: number) =>
+    `A tarefa está bloqueada por ${count} tarefa(s) pendente(s).`,
+  errors: {
+    TRANSITION_NOT_ALLOWED: 'O fluxo do projeto não permite mover para esta coluna.',
+    VERSION_CONFLICT: 'A tarefa foi alterada por outra pessoa. O quadro foi atualizado.',
+    CONCURRENT_UPDATE: 'Outra pessoa moveu cards ao mesmo tempo. O quadro foi atualizado.',
+    INVALID_POSITION: 'A posição mudou enquanto você movia. O quadro foi atualizado.',
+    STATUS_NOT_FOUND: 'A coluna não existe mais. O quadro foi atualizado.',
+    TASK_NOT_FOUND: 'A tarefa não existe mais. O quadro foi atualizado.',
+    TASK_CANCELED: 'A tarefa foi cancelada. O quadro foi atualizado.',
+    PARENT_TASK_COMPLETED:
+      'A tarefa pai está concluída: esta subtarefa obrigatória não pode voltar.',
+    PROJECT_ARCHIVED: 'O projeto está arquivado: o quadro é somente leitura.',
+    INSUFFICIENT_ROLE: 'Seu papel não permite mover cards.',
+  },
+} as const;

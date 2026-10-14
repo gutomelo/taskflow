@@ -118,22 +118,56 @@ export const methodOf = (route: RouteKey) => (route.split(' ')[0] ?? '').toLower
  * deve dar 404; `no-leak` = a resposta (lista) não pode conter ids de B.
  */
 /**
- * `not-found`: 404 com o código esperado; `no-leak`: sucesso sem dados de B; `refused`: 422 com o
- * código esperado — referência a uma pessoa de B que a regra recusa (ex.: responsável, BR-003).
+ * `not-found`: 404 com o código esperado; `no-leak`: sucesso sem dados de B; `refused`: 422 (ou o
+ * status declarado) com o código esperado — referência de B que a regra recusa sem revelar
+ * existência (ex.: responsável, BR-003; vizinho no quadro; cursor de outra coluna).
  */
 export type IsolationExpectation = 'not-found' | 'no-leak' | 'refused';
 
 /** Schema de entrada declarado num caso (Zod `object`): só as chaves importam aqui. */
 export type InputSchema = Readonly<{ shape: Readonly<Record<string, unknown>> }>;
 
+type SchemaNode = Readonly<{ shape?: unknown; element?: unknown; unwrap?: unknown }>;
+
+function isNode(value: unknown): value is SchemaNode {
+  return typeof value === 'object' && value !== null;
+}
+
+function isShape(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Tira `optional`/`nullable`; arrays e objetos ficam (têm `element`/`shape`). */
+function unwrapped(value: unknown): unknown {
+  let current = value;
+  for (let depth = 0; depth < 5 && isNode(current); depth += 1) {
+    if (current.shape !== undefined || current.element !== undefined) return current;
+    const unwrap = current.unwrap;
+    if (typeof unwrap !== 'function') return current;
+    current = Reflect.apply(unwrap, current, []);
+  }
+  return current;
+}
+
+function referencesOf(shape: Readonly<Record<string, unknown>>, prefix: string): string[] {
+  return Object.entries(shape).flatMap(([key, raw]) => {
+    if (key.endsWith('Id') || key.endsWith('Ids') || key === 'cursor') return [`${prefix}${key}`];
+    const field = unwrapped(raw);
+    if (!isNode(field) || field.element === undefined) return [];
+    const element = unwrapped(field.element);
+    if (!isNode(element) || !isShape(element.shape)) return [];
+    // Lista de objetos com referências: `transitions[].fromStatusId` (achado A1 da spec 005).
+    return referencesOf(element.shape, `${prefix}${key}[].`);
+  });
+}
+
 /**
  * Referências de entrada que precisam de variante (spec 003, obrigação 6 da spec 006): campos que
- * apontam para outro recurso (`…Id`) e o cursor de paginação (`no-leak`).
+ * apontam para outro recurso (`…Id`, listas `…Ids`, e `…Id` dentro de listas de objetos) e o
+ * cursor de paginação (`no-leak`).
  */
 export function inputReferences(schema: InputSchema | null): string[] {
-  return schema
-    ? Object.keys(schema.shape).filter((key) => key.endsWith('Id') || key === 'cursor')
-    : [];
+  return schema ? referencesOf(schema.shape, '') : [];
 }
 
 /** Caso de isolamento como o harness o enxerga (corpo e query declarados, `null` = nenhum). */

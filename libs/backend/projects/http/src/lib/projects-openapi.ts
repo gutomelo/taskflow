@@ -5,6 +5,7 @@ import {
   addProjectMemberRequestSchema,
   changeProjectMemberRoleRequestSchema,
   createProjectRequestSchema,
+  createStatusRequestSchema,
   memberCandidatePageSchema,
   memberCandidateSchema,
   pageQuerySchema,
@@ -18,8 +19,12 @@ import {
   projectSummarySchema,
   projectVersionRequestSchema,
   removeProjectMemberQuerySchema,
+  removeStatusQuerySchema,
+  reorderStatusesRequestSchema,
+  replaceTransitionsRequestSchema,
   statusCategorySchema,
   updateProjectRequestSchema,
+  updateStatusRequestSchema,
   workflowSchema,
 } from '@taskflow/contracts';
 
@@ -51,6 +56,7 @@ const BASE = '/api/v1/organizations/{organizationId}/projects';
 const organizationPath = z.object({ organizationId: z.uuid() });
 const projectPath = organizationPath.extend({ projectId: z.uuid() });
 const memberPath = projectPath.extend({ userId: z.uuid() });
+const statusPath = projectPath.extend({ statusId: z.uuid() });
 
 /** Rotas de `createProjectsRouter` (spec 003). Mantenha em sincronia com o router. */
 export const projectsOpenApiPaths: ZodOpenApiPathsObject = {
@@ -255,6 +261,98 @@ export const projectsOpenApiPaths: ZodOpenApiPathsObject = {
         '403': forbidden('Papel insuficiente'),
         '404': problemResponse('Projeto sem acesso ou participante inexistente'),
         '409': conflict('VERSION_CONFLICT'),
+        '429': tooMany,
+      },
+    },
+  },
+  [`${BASE}/{projectId}/workflow/statuses`]: {
+    post: {
+      tags,
+      summary: 'Cria status no fim do fluxo, sem transições (board:configure; BR-030)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: projectPath },
+      requestBody: json(createStatusRequestSchema),
+      responses: {
+        '201': { description: 'Fluxo atualizado', ...json(workflowSchema) },
+        '400': problemResponse('Nome inválido (INVALID_STATUS_NAME)'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente (INSUFFICIENT_ROLE)'),
+        '404': notFound,
+        '409': conflict('PROJECT_ARCHIVED, VERSION_CONFLICT ou STATUS_NAME_TAKEN'),
+        '422': problemResponse('STATUS_LIMIT_REACHED'),
+        '429': tooMany,
+      },
+    },
+  },
+  [`${BASE}/{projectId}/workflow/statuses/{statusId}`]: {
+    patch: {
+      tags,
+      summary: 'Renomeia e/ou muda a categoria (só em status sem tarefas — STATUS_IN_USE)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: statusPath },
+      requestBody: json(updateStatusRequestSchema),
+      responses: {
+        '200': { description: 'Fluxo atualizado', ...json(workflowSchema) },
+        '400': problemResponse('Dados inválidos'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente'),
+        '404': problemResponse('PROJECT_NOT_FOUND ou STATUS_NOT_FOUND'),
+        '409': conflict('PROJECT_ARCHIVED, VERSION_CONFLICT, STATUS_NAME_TAKEN ou STATUS_IN_USE'),
+        '422': problemResponse('WORKFLOW_NEEDS_TODO_STATUS'),
+        '429': tooMany,
+      },
+    },
+    delete: {
+      tags,
+      summary: 'Remove o status; com tarefas, reatribui a outro da mesma categoria (D2)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: statusPath, query: removeStatusQuerySchema },
+      responses: {
+        '200': { description: 'Fluxo atualizado', ...json(workflowSchema) },
+        '400': problemResponse('Versão ausente'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente'),
+        '404': problemResponse('PROJECT_NOT_FOUND ou STATUS_NOT_FOUND (inclusive o destino)'),
+        '409': conflict('PROJECT_ARCHIVED, VERSION_CONFLICT ou STATUS_IN_USE'),
+        '422': problemResponse('INVALID_STATUS_TARGET ou WORKFLOW_NEEDS_TODO_STATUS'),
+        '429': tooMany,
+      },
+    },
+  },
+  [`${BASE}/{projectId}/workflow/order`]: {
+    put: {
+      tags,
+      summary: 'Nova ordem das colunas (exatamente os status do fluxo)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: projectPath },
+      requestBody: json(reorderStatusesRequestSchema),
+      responses: {
+        '200': { description: 'Fluxo atualizado', ...json(workflowSchema) },
+        '400': problemResponse('Dados inválidos'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente'),
+        '404': problemResponse('PROJECT_NOT_FOUND ou STATUS_NOT_FOUND'),
+        '409': conflict('PROJECT_ARCHIVED ou VERSION_CONFLICT'),
+        '422': problemResponse('INVALID_STATUS_ORDER'),
+        '429': tooMany,
+      },
+    },
+  },
+  [`${BASE}/{projectId}/workflow/transitions`]: {
+    put: {
+      tags,
+      summary: 'Substitui as transições permitidas (BR-004)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: projectPath },
+      requestBody: json(replaceTransitionsRequestSchema),
+      responses: {
+        '200': { description: 'Fluxo atualizado', ...json(workflowSchema) },
+        '400': problemResponse('Dados inválidos'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente'),
+        '404': problemResponse('PROJECT_NOT_FOUND ou STATUS_NOT_FOUND'),
+        '409': conflict('PROJECT_ARCHIVED ou VERSION_CONFLICT'),
+        '422': problemResponse('INVALID_TRANSITION'),
         '429': tooMany,
       },
     },

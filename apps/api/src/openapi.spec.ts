@@ -68,7 +68,10 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
     expect(
       Object.keys(paths).filter(
         (path) =>
-          path.includes('organizations') && !path.includes('/projects') && !path.includes('/tasks'),
+          path.includes('organizations') &&
+          !path.includes('/projects') &&
+          !path.includes('/tasks') &&
+          !path.includes('/board'),
       ),
     ).toHaveLength(8);
   });
@@ -97,7 +100,7 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
       expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
       expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
     }
-    expect(Object.keys(paths).filter((path) => path.includes('/projects'))).toHaveLength(9);
+    expect(Object.keys(paths).filter((path) => path.includes('/projects'))).toHaveLength(13);
   });
 
   it('spec 004: describes every tasks endpoint, with 404 and literal routes', () => {
@@ -124,7 +127,28 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
       expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
       expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
     }
-    expect(Object.keys(paths).filter((path) => path.includes('/tasks'))).toHaveLength(10);
+    expect(Object.keys(paths).filter((path) => path.includes('/tasks'))).toHaveLength(11);
+  });
+
+  it('spec 005: describes the board, the card move and the workflow edits, with 404', () => {
+    const projects = '/api/v1/organizations/{organizationId}/projects/{projectId}/workflow';
+    const expected: Array<[string, string]> = [
+      ['get', '/api/v1/organizations/{organizationId}/board'],
+      ['get', '/api/v1/organizations/{organizationId}/board/columns/{statusId}'],
+      ['post', '/api/v1/organizations/{organizationId}/tasks/{taskId}/move'],
+      ['post', `${projects}/statuses`],
+      ['patch', `${projects}/statuses/{statusId}`],
+      ['delete', `${projects}/statuses/{statusId}`],
+      ['put', `${projects}/order`],
+      ['put', `${projects}/transitions`],
+    ];
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of expected) {
+      const operation = paths[path]?.[method as 'get'];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      expect(Object.keys(operation?.responses ?? {}), `${method} ${path}`).toContain('404');
+    }
   });
 
   it('documents errors as Problem Details and cookie/CSRF security schemes', () => {

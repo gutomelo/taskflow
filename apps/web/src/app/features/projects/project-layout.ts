@@ -77,6 +77,7 @@ export class ProjectLayout {
   /** "Tarefas" fica ativa também no detalhe (`tasks/:number`). */
   protected readonly links: ReadonlyArray<{ path: string; label: string; exact: boolean }> = [
     { path: '.', label: projectAreaMessages.overview, exact: true },
+    { path: 'board', label: projectAreaMessages.board, exact: true },
     { path: 'tasks', label: projectAreaMessages.tasks, exact: false },
     { path: 'members', label: projectAreaMessages.members, exact: true },
     { path: 'settings', label: projectAreaMessages.settings, exact: true },

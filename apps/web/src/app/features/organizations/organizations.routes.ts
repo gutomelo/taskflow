@@ -80,6 +80,12 @@ export const organizationsRoutes: Route[] = [
               ),
           },
           {
+            path: 'board',
+            title: 'Quadro · TaskFlow',
+            loadComponent: () =>
+              import('../tasks/board/board.page').then((module) => module.BoardPage),
+          },
+          {
             path: 'tasks',
             title: 'Tarefas · TaskFlow',
             loadComponent: () =>

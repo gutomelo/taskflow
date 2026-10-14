@@ -1,5 +1,9 @@
 import type {
   AssignableUser,
+  Board,
+  Card,
+  ColumnPage,
+  MoveCardResponse,
   AssignableUserPage,
   TaskActions,
   TaskDto,
@@ -108,4 +112,62 @@ export function isAssignableUserPage(value: unknown): value is AssignableUserPag
     value['items'].every(isAssignableUser) &&
     isCursor(value['nextCursor'])
   );
+}
+
+// --- Quadro (spec 005) ---
+
+function isCard(value: unknown): value is Card {
+  if (!isRecord(value)) return false;
+  const subtasks = value['subtasks'];
+  return (
+    isRecord(subtasks) &&
+    Number.isInteger(subtasks['done']) &&
+    Number.isInteger(subtasks['total']) &&
+    isTaskSummary(value)
+  );
+}
+
+const isCardList = (value: unknown) => Array.isArray(value) && value.every(isCard);
+
+export function isBoard(value: unknown): value is Board {
+  if (!isRecord(value)) return false;
+  const { statuses, transitions, columns, actions } = value;
+  return (
+    Array.isArray(statuses) &&
+    statuses.every(
+      (status) =>
+        isRecord(status) &&
+        isUuid(status['id']) &&
+        typeof status['name'] === 'string' &&
+        typeof status['category'] === 'string' &&
+        CATEGORIES.has(status['category']) &&
+        Number.isInteger(status['position']),
+    ) &&
+    Array.isArray(transitions) &&
+    transitions.every(
+      (transition) =>
+        isRecord(transition) &&
+        isUuid(transition['fromStatusId']) &&
+        isUuid(transition['toStatusId']),
+    ) &&
+    Array.isArray(columns) &&
+    columns.every(
+      (column) =>
+        isRecord(column) &&
+        isUuid(column['statusId']) &&
+        isCardList(column['cards']) &&
+        isCursor(column['nextCursor']),
+    ) &&
+    isRecord(actions) &&
+    typeof actions['move'] === 'boolean' &&
+    typeof actions['configure'] === 'boolean'
+  );
+}
+
+export function isColumnPage(value: unknown): value is ColumnPage {
+  return isRecord(value) && isCardList(value['cards']) && isCursor(value['nextCursor']);
+}
+
+export function isMoveCardResponse(value: unknown): value is MoveCardResponse {
+  return isRecord(value) && isCard(value['card']) && isUuid(value['statusId']);
 }

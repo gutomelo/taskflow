@@ -20,13 +20,22 @@ import { commonErrorMessage, formMessages } from '../../shared/forms/form.messag
 import { codeMessage } from '../organizations/organizations.messages';
 import { ActiveProjectStore } from './active-project.store';
 import { ProjectApi } from './project-api';
+import { WorkflowSettings } from './workflow-settings';
 import { projectSettingsMessages } from './projects.messages';
 
 /** Configurações do projeto (RF-04, RF-05, BR-008, BR-026). */
 @Component({
   selector: 'tf-project-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButton, MatError, MatFormField, MatInput, MatLabel, ReactiveFormsModule],
+  imports: [
+    WorkflowSettings,
+    MatButton,
+    MatError,
+    MatFormField,
+    MatInput,
+    MatLabel,
+    ReactiveFormsModule,
+  ],
   template: `
     <section class="mx-auto max-w-xl px-4 py-6" aria-labelledby="project-settings-title">
       <h2 id="project-settings-title" class="text-lg font-semibold">{{ m.title }}</h2>
@@ -113,6 +122,11 @@ import { projectSettingsMessages } from './projects.messages';
         </div>
       }
     </section>
+    @if (store.can('board:configure')) {
+      <div class="mx-auto max-w-xl px-4 pb-10">
+        <tf-workflow-settings />
+      </div>
+    }
   `,
 })
 export class ProjectSettingsPage {

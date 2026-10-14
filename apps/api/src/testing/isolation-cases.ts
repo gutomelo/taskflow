@@ -22,6 +22,14 @@ import {
   taskVersionRequestSchema,
   transitionTaskRequestSchema,
   updateTaskRequestSchema,
+  boardQuerySchema,
+  columnQuerySchema,
+  createStatusRequestSchema,
+  moveCardRequestSchema,
+  removeStatusQuerySchema,
+  reorderStatusesRequestSchema,
+  replaceTransitionsRequestSchema,
+  updateStatusRequestSchema,
 } from '@taskflow/contracts';
 import type { InputSchema, IsolationExpectation, RouteKey } from './tenant-isolation';
 
@@ -52,6 +60,8 @@ export interface IsolationWorld {
     participantUserId: string;
     /** Tarefa de A (versão 1, status inicial), para trocar só a outra referência. */
     taskId: string;
+    /** Status do workflow de A, na ordem (versão do workflow 1). */
+    statusIds: ReadonlyArray<string>;
   }>;
   /** Ids, chaves e cursores reais de B, por nome de referência. */
   readonly ofB: Readonly<Record<string, string>>;
@@ -65,6 +75,8 @@ export type IsolationVariant = Readonly<{
   expect: IsolationExpectation;
   /** Código do Problem Details esperado em `not-found` (prova que a referência trocada foi a barrada). */
   code?: string;
+  /** Status de `refused` (padrão 422). */
+  status?: number;
   /** Quem executa: só o owner de A (rotas que exigem papel de organização) ou os dois atores. */
   actors: 'owner-of-A' | 'both';
   call: (world: IsolationWorld, actor: TestClient) => Promise<Response>;
@@ -88,9 +100,10 @@ const noLeak = (
   actors: IsolationVariant['actors'] = 'both',
 ): IsolationVariant => ({ expect: 'no-leak', actors, call });
 
-const refused = (code: string, call: IsolationVariant['call']): IsolationVariant => ({
+const refused = (code: string, call: IsolationVariant['call'], status = 422): IsolationVariant => ({
   expect: 'refused',
   code,
+  status,
   actors: 'both',
   call,
 });
@@ -492,6 +505,160 @@ export const ISOLATION_CASES: Readonly<Record<RouteKey, IsolationCase>> = {
       ),
       blockingTaskId: notFound('DEPENDENCY_NOT_FOUND', (world, actor) =>
         actor.delete(`${taskOfA(world)}/dependencies/${world.ofB['blockingTaskId']}`),
+      ),
+    },
+  },
+
+  // --- workflow configurável (spec 005): listas e referências aninhadas (achado A1) ---
+  'POST /organizations/:organizationId/projects/:projectId/workflow/statuses': {
+    body: createStatusRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/workflow/statuses', (actor, path) =>
+        actor.post(path, { name: 'Tomada', category: 'todo', version: 1 }),
+      ),
+    },
+  },
+  'PATCH /organizations/:organizationId/projects/:projectId/workflow/statuses/:statusId': {
+    body: updateStatusRequestSchema,
+    query: null,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.patch(`${projectOfB(world)}/workflow/statuses/${world.ofA.statusIds[0] ?? ''}`, {
+          name: 'Tomada',
+          version: 1,
+        }),
+      ),
+      statusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.patch(`${projectOfA(world)}/workflow/statuses/${world.ofB['statusId']}`, {
+          name: 'Tomada',
+          version: 1,
+        }),
+      ),
+    },
+  },
+  'DELETE /organizations/:organizationId/projects/:projectId/workflow/statuses/:statusId': {
+    body: null,
+    query: removeStatusQuerySchema,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.delete(
+          `${projectOfB(world)}/workflow/statuses/${world.ofA.statusIds[1] ?? ''}?version=1`,
+        ),
+      ),
+      statusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.delete(`${projectOfA(world)}/workflow/statuses/${world.ofB['statusId']}?version=1`),
+      ),
+      // Status de A em uso? Não: "Em andamento" de A está vazio; o destino de B é barrado antes.
+      moveTasksToStatusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.delete(
+          `${projectOfA(world)}/workflow/statuses/${world.ofA.statusIds[1] ?? ''}?version=1&moveTasksToStatusId=${world.ofB['statusId']}`,
+        ),
+      ),
+    },
+  },
+  'PUT /organizations/:organizationId/projects/:projectId/workflow/order': {
+    body: reorderStatusesRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/workflow/order', (actor, path) =>
+        actor.put(path, { statusIds: ['00000000-0000-7000-8000-000000000001'], version: 1 }),
+      ),
+      statusIds: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.put(`${projectOfA(world)}/workflow/order`, {
+          statusIds: [...world.ofA.statusIds.slice(0, 2), world.ofB['statusId']],
+          version: 1,
+        }),
+      ),
+    },
+  },
+  'PUT /organizations/:organizationId/projects/:projectId/workflow/transitions': {
+    body: replaceTransitionsRequestSchema,
+    query: null,
+    references: {
+      projectId: foreignProject('/workflow/transitions', (actor, path) =>
+        actor.put(path, { transitions: [], version: 1 }),
+      ),
+      'transitions[].fromStatusId': notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.put(`${projectOfA(world)}/workflow/transitions`, {
+          transitions: [
+            { fromStatusId: world.ofB['statusId'], toStatusId: world.ofA.statusIds[0] },
+          ],
+          version: 1,
+        }),
+      ),
+      'transitions[].toStatusId': notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.put(`${projectOfA(world)}/workflow/transitions`, {
+          transitions: [
+            { fromStatusId: world.ofA.statusIds[0], toStatusId: world.ofB['statusId'] },
+          ],
+          version: 1,
+        }),
+      ),
+    },
+  },
+
+  // --- quadro (spec 005) ---
+  'GET /organizations/:organizationId/board': {
+    body: null,
+    query: boardQuerySchema,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.get(`${org(world)}/board?projectId=${world.ofB['projectId']}`),
+      ),
+      list: noLeak((world, actor) =>
+        actor.get(`${org(world)}/board?projectId=${world.ofA.projectId}`),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/board/columns/:statusId': {
+    body: null,
+    query: columnQuerySchema,
+    references: {
+      projectId: notFound('PROJECT_NOT_FOUND', (world, actor) =>
+        actor.get(
+          `${org(world)}/board/columns/${world.ofA.statusIds[0] ?? ''}?projectId=${world.ofB['projectId']}`,
+        ),
+      ),
+      statusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.get(
+          `${org(world)}/board/columns/${world.ofB['statusId']}?projectId=${world.ofA.projectId}`,
+        ),
+      ),
+      // Cursor de uma coluna de B: amarrado à coluna dele ⇒ 400, sem chegar ao banco (B3).
+      cursor: refused(
+        'INVALID_CURSOR',
+        (world, actor) =>
+          actor.get(
+            `${org(world)}/board/columns/${world.ofA.statusIds[0] ?? ''}?projectId=${world.ofA.projectId}&cursor=${world.ofB['boardCursor']}`,
+          ),
+        400,
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/move': {
+    body: moveCardRequestSchema,
+    query: null,
+    references: {
+      taskId: foreignTask('/move', (actor, path) =>
+        actor.post(path, { toStatusId: '00000000-0000-7000-8000-000000000001', version: 1 }),
+      ),
+      toStatusId: notFound('STATUS_NOT_FOUND', (world, actor) =>
+        actor.post(`${taskOfA(world)}/move`, { toStatusId: world.ofB['statusId'], version: 1 }),
+      ),
+      afterTaskId: refused('INVALID_POSITION', (world, actor) =>
+        actor.post(`${taskOfA(world)}/move`, {
+          toStatusId: world.ofA.statusIds[0],
+          afterTaskId: world.ofB['taskId'],
+          version: 1,
+        }),
+      ),
+      beforeTaskId: refused('INVALID_POSITION', (world, actor) =>
+        actor.post(`${taskOfA(world)}/move`, {
+          toStatusId: world.ofA.statusIds[0],
+          beforeTaskId: world.ofB['taskId'],
+          version: 1,
+        }),
       ),
     },
   },

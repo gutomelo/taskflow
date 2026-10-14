@@ -3,6 +3,10 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   AssignableUserPage,
+  Board,
+  ColumnPage,
+  MoveCardRequest,
+  MoveCardResponse,
   CreateTaskRequest,
   TaskDto,
   TaskPage,
@@ -11,7 +15,14 @@ import type {
 } from '@taskflow/contracts';
 import { ContractViolationError } from '../../core/http/contract-guards';
 import { tenantUrl } from '../../core/organizations';
-import { isAssignableUserPage, isTask, isTaskPage } from './tasks-contract-guards';
+import {
+  isAssignableUserPage,
+  isBoard,
+  isColumnPage,
+  isMoveCardResponse,
+  isTask,
+  isTaskPage,
+} from './tasks-contract-guards';
 
 function checked<T>(body: unknown, guard: (value: unknown) => value is T, endpoint: string): T {
   if (!guard(body)) throw new ContractViolationError(endpoint);
@@ -126,6 +137,42 @@ export class TaskApi {
     if (cursor) params = params.set('cursor', cursor);
     const body = await firstValueFrom(this.http.get<unknown>(url, { params }));
     return checked(body, isAssignableUserPage, url);
+  }
+
+  // --- Quadro (spec 005) ---
+
+  async board(organizationId: string, projectId: string): Promise<Board> {
+    const url = tenantUrl(organizationId, '/board');
+    const params = new HttpParams().set('projectId', projectId);
+    return checked(await firstValueFrom(this.http.get<unknown>(url, { params })), isBoard, url);
+  }
+
+  async column(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    cursor: string,
+  ): Promise<ColumnPage> {
+    const url = tenantUrl(organizationId, `/board/columns/${encodeURIComponent(statusId)}`);
+    const params = new HttpParams().set('projectId', projectId).set('cursor', cursor);
+    return checked(
+      await firstValueFrom(this.http.get<unknown>(url, { params })),
+      isColumnPage,
+      url,
+    );
+  }
+
+  async moveCard(
+    organizationId: string,
+    taskId: string,
+    request: MoveCardRequest,
+  ): Promise<MoveCardResponse> {
+    const url = `${this.taskUrl(organizationId, taskId)}/move`;
+    return checked(
+      await firstValueFrom(this.http.post<unknown>(url, request)),
+      isMoveCardResponse,
+      url,
+    );
   }
 
   private taskUrl(organizationId: string, taskId: string): string {

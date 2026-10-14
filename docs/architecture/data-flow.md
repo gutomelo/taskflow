@@ -72,36 +72,37 @@ sequenceDiagram
     API-->>UI: 200 { task, version+1 }
 ```
 
-## 3. Sincronização Kanban (BR-004, BR-009)
+## 3. Movimento de card no quadro (BR-004, BR-009, BR-010)
+
+**Implementado** (spec 005; o quadro é uma visão de `tasks`, [ADR 0016](adr/0016-kanban-board-as-tasks-view.md)). Sem tempo real nesta fase: o cliente recarrega depois de conflitos e em "Atualizar".
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant A as Usuário A (Angular)
-    participant B as Usuário B (Angular)
-    participant API as POST /api/v1/boards/:id/moves
-    participant UC as MoveCardUseCase
+    participant A as Usuário (Angular)
+    participant API as POST /api/v1/organizations/{org}/tasks/{taskId}/move
+    participant UC as MoveCardUseCase (tasks)
+    participant PA as ProjectAccess (projects)
     participant DB as PostgreSQL
-    participant IO as Socket.IO (room project:{id})
 
-    A->>A: move otimista (guarda estado anterior)
-    A->>API: { taskId, toColumnId, afterTaskId, version }
-    API->>UC: execute
-    UC->>UC: valida transição (BR-004) e regras de conclusão se coluna "done"
-    UC->>DB: tx: atualiza status da tarefa + rank do card (version)
-    alt conflito / transição inválida
-        API-->>A: 409/422
-        A->>A: rollback + recarrega coluna
+    A->>A: move otimista (guarda o estado anterior)
+    A->>API: { toStatusId, afterTaskId | beforeTaskId, version }
+    API->>UC: execute (limite de escritas, lock_timeout 2 s)
+    UC->>PA: projeto FOR SHARE, memberships FOR SHARE, workflow relido
+    UC->>DB: lock do projeto em tasks → tarefa FOR NO KEY UPDATE
+    UC->>UC: posição (vizinho na coluna destino; empate ⇒ rebalanceia)
+    UC->>UC: coluna nova ⇒ applyTransition (BR-004, BR-001, BR-006)
+    UC->>DB: status + board_rank (uma linha), na mesma transação
+    alt recusado (409/422)
+        API-->>A: Problem Details (com taskIds em BR-001/BR-006)
+        A->>A: reverte o card; recarrega o quadro se os dados estavam velhos
     else sucesso
-        API-->>A: 200 { rank, version }
-        UC->>IO: após commit: card.moved { taskId, columnId, rank, version }
-        IO-->>B: card.moved
-        B->>B: reconcilia (aplica se version > local)
-        IO-->>A: card.moved (ignorado: já aplicado)
+        API-->>A: 200 { card, statusId }
+        UC-->>UC: eventos tasks.card_moved / tasks.status_changed no log, após o commit
     end
 ```
 
-Clientes nunca alteram estado via socket; o socket apenas distribui o resultado de casos de uso HTTP autorizados.
+**Planejado (Fase 2)**: publicar `card.moved` por Socket.IO (room `project:{id}`) depois do commit, para os outros usuários reconciliarem pela versão.
 
 ## 4. Comunicação assíncrona
 

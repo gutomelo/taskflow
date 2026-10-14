@@ -14,6 +14,7 @@ import {
   taskPageSchema,
   taskSchema,
   workflowSchema,
+  boardSchema,
 } from '@taskflow/contracts';
 import { startIntegrationApi, type IntegrationApi } from '../testing/integration-api';
 import { ISOLATION_CASES, type IsolationWorld, type TestClient } from '../testing/isolation-cases';
@@ -204,6 +205,14 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         })
       ).status,
     ).toBe(201);
+    const workflowA = workflowSchema.parse(
+      (await asDual.get(`/organizations/${orgA}/projects/${projectA.id}/workflow`)).body,
+    );
+    const boardB = boardSchema.parse(
+      (await asBob.get(`/organizations/${orgB}/board?projectId=${projectB.id}&limit=1`)).body,
+    );
+    const boardCursor = boardB.columns[0]?.nextCursor;
+    if (!boardCursor) throw new Error('expected a second page in the first column of B');
     const workflowB = workflowSchema.parse(
       (await asBob.get(`/organizations/${orgB}/projects/${projectB.id}/workflow`)).body,
     );
@@ -216,6 +225,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         key: projectA.key,
         participantUserId: carol,
         taskId: taskA.id,
+        statusIds: workflowA.statuses.map((status) => status.id),
       },
       ofB: {
         userId: bia,
@@ -229,6 +239,7 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
           asBob.get(`/organizations/${orgB}/projects/${projectB.id}/members?limit=1`),
         ),
         taskId: taskB.id,
+        boardCursor,
         taskKey: taskB.key,
         blockingTaskId: blockerB.id,
         // Status inicial de B: é onde estão as tarefas de B (um filtro sem tenant as vazaria).
@@ -326,7 +337,9 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
           const response = await variant.call(setup, actor);
           const label = `${route} › ${reference} › ${actorName}`;
           if (variant.expect === 'not-found' || variant.expect === 'refused') {
-            expect(response.status, label).toBe(variant.expect === 'not-found' ? 404 : 422);
+            expect(response.status, label).toBe(
+              variant.expect === 'not-found' ? 404 : (variant.status ?? 422),
+            );
             if (variant.code)
               expect(problemDetailsSchema.parse(response.body).code, label).toBe(variant.code);
           } else {

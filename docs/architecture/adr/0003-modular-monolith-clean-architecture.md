@@ -1,6 +1,6 @@
 # 0003 — Modular monolith com Clean Architecture e bibliotecas por contexto e camada
 
-- **Status**: Aceito
+- **Status**: Aceito (a "Exceção conhecida" Tasks × Boards foi substituída pelo [ADR 0016](0016-kanban-board-as-tasks-view.md))
 - **Data**: 2026-10-08
 - **Relacionados**: [overview](../overview.md), [dependency-rules](../dependency-rules.md), [bounded-contexts](../bounded-contexts.md)
 
@@ -38,5 +38,5 @@ Adotamos **D**. Cada contexto terá bibliotecas `domain`, `application`, `infras
 
 - **Positivas**: arquitetura verificável pelo CI; domínio testável sem infraestrutura; boa legibilidade para avaliação técnica.
 - **Negativas**: mais arquivos de configuração por contexto; risco de cerimônia — mitigado pela skill `/create-domain-module` e pela regra "crie apenas camadas com código".
-- **Exceção conhecida**: Tasks e Boards compartilham uma fronteira transacional na movimentação de cards (documentada na spec 005).
+- **Exceção conhecida**: Tasks e Boards compartilham uma fronteira transacional na movimentação de cards (documentada na spec 005). **Substituída pelo [ADR 0016](0016-kanban-board-as-tasks-view.md)**: o quadro é uma visão de `tasks` e não há fronteira transacional compartilhada.
 - **Como verificar**: `pnpm lint` falha em violação de limites; `/review-code` verifica regras intra-projeto.

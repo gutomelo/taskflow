@@ -113,6 +113,29 @@ const REQUESTS: Readonly<
     send: (actor, base, target) =>
       actor.post(`${base}/tasks/${target.taskId}/dependencies`, { blockingTaskId: target.taskId }),
   },
+  // Spec 005: quadro (leitura por projectId) e movimento (escrita por tarefa).
+  'GET /organizations/:organizationId/board': {
+    kind: 'read',
+    by: 'project',
+    send: (actor, base, target) => actor.get(`${base}/board?projectId=${target.projectId}`),
+  },
+  'GET /organizations/:organizationId/board/columns/:statusId': {
+    kind: 'read',
+    by: 'project',
+    send: (actor, base, target) =>
+      actor.get(`${base}/board/columns/${target.statusId}?projectId=${target.projectId}`),
+  },
+  'POST /organizations/:organizationId/tasks/:taskId/move': {
+    kind: 'write',
+    by: 'task',
+    // Versão velha e transição proibida: com permissão seria 409 ou 422.
+    send: (actor, base, target) =>
+      actor.post(`${base}/tasks/${target.taskId}/move`, {
+        toStatusId: target.statusId,
+        afterTaskId: target.otherTaskId,
+        version: 99,
+      }),
+  },
   'DELETE /organizations/:organizationId/tasks/:taskId/dependencies/:blockingTaskId': {
     kind: 'write',
     by: 'task',
@@ -213,7 +236,8 @@ describe('tasks authorization within the organization (integration, spec 004 T10
     };
   }
 
-  const taskRoutes = () => api.tenantRoutes.filter((route) => route.includes('/tasks'));
+  const taskRoutes = () =>
+    api.tenantRoutes.filter((route) => route.includes('/tasks') || route.includes('/board'));
 
   it('covers every task route (a new one without a request makes this fail)', () => {
     expect([...taskRoutes()].sort()).toEqual(Object.keys(REQUESTS).sort());
@@ -359,6 +383,65 @@ describe('tasks authorization within the organization (integration, spec 004 T10
     expect(await api.prisma.task.findMany({ where: { organizationId, projectId: p2.id } })).toEqual(
       before,
     );
+    // Spec 005: quadro e workflow com referências de P2 em P1, também para o owner.
+    const owner = api.clientFor(users.owner);
+    const p1Statuses = statusesOf.p1.statuses.map((status) => status.id);
+    const spec005: Array<[string, Response, number, string]> = [
+      [
+        'column of P2 status',
+        await owner.get(`${base}/board/columns/${p2Status}?projectId=${p1.id}`),
+        404,
+        'STATUS_NOT_FOUND',
+      ],
+      [
+        'move to P2 status',
+        await owner.post(`${base}/tasks/${t1.id}/move`, { toStatusId: p2Status, version: 1 }),
+        404,
+        'STATUS_NOT_FOUND',
+      ],
+      [
+        'move after P2 card',
+        await owner.post(`${base}/tasks/${t1.id}/move`, {
+          toStatusId: p1Statuses[0],
+          afterTaskId: inP2.id,
+          version: 1,
+        }),
+        422,
+        'INVALID_POSITION',
+      ],
+      [
+        'reorder with P2 status',
+        await owner.put(`${base}/projects/${p1.id}/workflow/order`, {
+          statusIds: [...p1Statuses.slice(0, 2), p2Status],
+          version: 1,
+        }),
+        404,
+        'STATUS_NOT_FOUND',
+      ],
+      [
+        'transition to P2 status',
+        await owner.put(`${base}/projects/${p1.id}/workflow/transitions`, {
+          transitions: [{ fromStatusId: p1Statuses[0], toStatusId: p2Status }],
+          version: 1,
+        }),
+        404,
+        'STATUS_NOT_FOUND',
+      ],
+      [
+        'remove into P2 status',
+        await owner.delete(
+          `${base}/projects/${p1.id}/workflow/statuses/${p1Statuses[1] ?? ''}?version=1&moveTasksToStatusId=${p2Status}`,
+        ),
+        404,
+        'STATUS_NOT_FOUND',
+      ],
+    ];
+    for (const [label, response, status, errorCode] of spec005) {
+      expect(response.status, label).toBe(status);
+      expect(problemDetailsSchema.parse(response.body).code, label).toBe(errorCode);
+    }
+    expect(await api.prisma.workflowStatus.count({ where: { projectId: p1.id } })).toBe(3);
+
     // E o manager de P1 não enxerga P2 (não participa): 404 do projeto, não 403.
     const direct = await api.clientFor(users.manager).get(`${base}/tasks/${inP2.id}`);
     expect(comparable(direct)).toMatchObject({ status: 404, code: 'TASK_NOT_FOUND' });

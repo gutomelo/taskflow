@@ -16,7 +16,10 @@ import {
   CancelTaskUseCase,
   CreateTaskUseCase,
   DeleteTaskUseCase,
+  GetBoardUseCase,
   GetTaskUseCase,
+  ListColumnCardsUseCase,
+  MoveCardUseCase,
   ListAssignableUsersUseCase,
   ListTasksUseCase,
   RemoveDependencyUseCase,
@@ -28,6 +31,9 @@ import {
 import { createTasksTestbed, type TasksTestbed } from '@taskflow/backend/tasks/application/testing';
 import {
   assignableUserPageSchema,
+  boardSchema,
+  columnPageSchema,
+  moveCardResponseSchema,
   problemDetailsSchema,
   taskPageSchema,
   taskSchema,
@@ -114,6 +120,9 @@ function buildApp(bed: TasksTestbed) {
       deleteTask: new DeleteTaskUseCase(bed),
       addDependency: new AddDependencyUseCase(bed),
       removeDependency: new RemoveDependencyUseCase(bed),
+      getBoard: new GetBoardUseCase(bed),
+      listColumnCards: new ListColumnCardsUseCase(bed),
+      moveCard: new MoveCardUseCase(bed),
     },
   });
   const app = express();
@@ -394,6 +403,102 @@ describe('tasks router (spec 004, T9)', () => {
 
     expect(problem(response).code).toBe('RATE_LIMITED');
     expect(response.headers['retry-after']).toBeDefined();
+  });
+
+  describe('board (spec 005, T8)', () => {
+    it('GET /board answers the contract; columns page with a cursor bound to the column', async () => {
+      for (let index = 0; index < 3; index += 1)
+        await created({ projectId: WEB, title: `C${index}` });
+
+      const board = boardSchema.parse(
+        (await at(mia.get(`/board?projectId=${WEB}&limit=2`), 200)).body,
+      );
+      expect(board.statuses.map((status) => status.id)).toEqual([TODO, DOING, DONE]);
+      expect(board.columns[0]?.cards.map((card) => card.key)).toEqual(['WEB-1', 'WEB-2']);
+      expect(board.columns[0]?.cards[0]?.subtasks).toEqual({ done: 0, total: 0 });
+      expect(board.actions).toEqual({ move: true, configure: true });
+      const cursor = board.columns[0]?.nextCursor ?? '';
+      const next = columnPageSchema.parse(
+        (await at(mia.get(`/board/columns/${TODO}?projectId=${WEB}&cursor=${cursor}`), 200)).body,
+      );
+      expect(next.cards.map((card) => card.key)).toEqual(['WEB-3']);
+      expect(
+        problem(await at(mia.get(`/board/columns/${DOING}?projectId=${WEB}&cursor=${cursor}`), 400))
+          .code,
+      ).toBe('INVALID_CURSOR');
+      expect(
+        problem(await at(mia.get(`/board/columns/not-a-uuid?projectId=${WEB}`), 404)).code,
+      ).toBe('STATUS_NOT_FOUND');
+      expect(problem(await at(mia.get(`/board?projectId=${HIDDEN}`), 404)).code).toBe(
+        'PROJECT_NOT_FOUND',
+      );
+      expect(problem(await at(mia.get(`/board?projectId=${WEB}&limit=51`), 400)).code).toBe(
+        'VALIDATION_FAILED',
+      );
+    });
+
+    it('POST /tasks/{id}/move reorders and changes column; contract errors 400/422', async () => {
+      const a = await created({ projectId: WEB, title: 'A' });
+      const b = await created({ projectId: WEB, title: 'B' });
+      const sub = await created({ projectId: WEB, title: 'S', parentTaskId: a.id });
+
+      const moved = moveCardResponseSchema.parse(
+        (
+          await at(
+            mia.post(`/tasks/${b.id}/move`, { toStatusId: TODO, beforeTaskId: a.id, version: 1 }),
+            200,
+          )
+        ).body,
+      );
+      expect(moved).toMatchObject({ statusId: TODO, card: { key: 'WEB-2', version: 1 } });
+      const order = boardSchema.parse((await at(mia.get(`/board?projectId=${WEB}`), 200)).body);
+      expect(order.columns[0]?.cards.map((card) => card.key)).toEqual(['WEB-2', 'WEB-1']);
+      const doing = moveCardResponseSchema.parse(
+        (await at(mia.post(`/tasks/${a.id}/move`, { toStatusId: DOING, version: 1 }), 200)).body,
+      );
+      expect(doing.card).toMatchObject({
+        status: { id: DOING },
+        version: 2,
+        subtasks: { done: 0, total: 1 },
+      });
+      expect(
+        problem(
+          await at(
+            mia.post(`/tasks/${b.id}/move`, {
+              toStatusId: TODO,
+              afterTaskId: a.id,
+              beforeTaskId: a.id,
+              version: 1,
+            }),
+            400,
+          ),
+        ).code,
+      ).toBe('VALIDATION_FAILED');
+      expect(
+        problem(
+          await at(
+            mia.post(`/tasks/${b.id}/move`, { toStatusId: TODO, afterTaskId: a.id, version: 1 }),
+            422,
+          ),
+        ).code,
+      ).toBe('INVALID_POSITION');
+      expect(
+        problem(await at(mia.post(`/tasks/${sub.id}/move`, { toStatusId: TODO, version: 1 }), 422))
+          .code,
+      ).toBe('TASK_NOT_A_CARD');
+      expect(
+        problem(await at(mia.post(`/tasks/${b.id}/move`, { toStatusId: DONE, version: 1 }), 422))
+          .code,
+      ).toBe('TRANSITION_NOT_ALLOWED');
+      expect(
+        problem(
+          await at(
+            clientFor(app, VIVI).post(`/tasks/${b.id}/move`, { toStatusId: TODO, version: 1 }),
+            403,
+          ),
+        ).code,
+      ).toBe('INSUFFICIENT_ROLE');
+    });
   });
 
   it('mutations without the CSRF token are refused before any use case', async () => {

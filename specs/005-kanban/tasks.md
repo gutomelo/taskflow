@@ -23,23 +23,23 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 
 | ID  | Tarefa                                                                                                                                                                                                                                                              | Depende de | Verificação                                            | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ | ------ |
-| T8  | Contratos (`board.contract.ts`, workflow), routers de `tasks` e `projects`, erros, limites, OpenAPI                                                                                                                                                                 | T7         | Supertest: contratos, 400/403/404/409/422/429; OpenAPI | [ ]    |
-| T9  | Harness: `inputReferences` percorre listas e objetos aninhados (teste unitário de falha); casos das rotas novas (`statusIds[]`, `transitions[]`, `moveTasksToStatusId`, vizinhos `refused`, cursor); baterias intra-tenant (quadro e workflow, IDOR entre projetos) | T8         | integração (CA-08); lacunas fazem falhar               | [ ]    |
+| T8  | Contratos (`board.contract.ts`, workflow), routers de `tasks` e `projects`, erros, limites, OpenAPI                                                                                                                                                                 | T7         | Supertest: contratos, 400/403/404/409/422/429; OpenAPI | [x]    |
+| T9  | Harness: `inputReferences` percorre listas e objetos aninhados (teste unitário de falha); casos das rotas novas (`statusIds[]`, `transitions[]`, `moveTasksToStatusId`, vizinhos `refused`, cursor); baterias intra-tenant (quadro e workflow, IDOR entre projetos) | T8         | integração (CA-08); lacunas fazem falhar               | [x]    |
 
 ## Bloco D — Frontend e jornada
 
 | ID  | Tarefa                                                                                                                                      | Depende de | Verificação                     | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------- | ------ |
-| T10 | Aba "Quadro": colunas, cards, carregar mais, atualizar, arrastar e soltar (CDK) com alternativa por teclado, mensagens das regras, reversão | T8         | testes de componente (CA-09)    | [ ]    |
-| T11 | Configurações → "Fluxo de trabalho": status (criar, renomear, categoria, ordem, remover com destino) e matriz de transições                 | T8         | testes de componente            | [ ]    |
-| T12 | E2E real (continua a jornada de projetos e tarefas): coluna nova, transições, mover cards, recusa de conclusão                              | T10, T11   | Playwright no banco descartável | [ ]    |
+| T10 | Aba "Quadro": colunas, cards, carregar mais, atualizar, arrastar e soltar (CDK) com alternativa por teclado, mensagens das regras, reversão | T8         | testes de componente (CA-09)    | [x]    |
+| T11 | Configurações → "Fluxo de trabalho": status (criar, renomear, categoria, ordem, remover com destino) e matriz de transições                 | T8         | testes de componente            | [x]    |
+| T12 | E2E real (continua a jornada de projetos e tarefas): coluna nova, transições, mover cards, recusa de conclusão                              | T10, T11   | Playwright no banco descartável | [x]    |
 
 ## Bloco E — Documentação e validação
 
 | ID  | Tarefa                                                                                                                                                                                                                                                                                                                                                                     | Depende de | Verificação                                                           | Status |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------ |
-| T13 | ADR 0016 aceito e ADR 0003 com a exceção substituída; `bounded-contexts.md` (Boards adiado), `data-flow.md` (rota real; Socket.IO planejado), `dependency-rules.md`, `business-rules.md` (BR-004 e BR-009 sem Boards e sem tempo real, BR-030), `authorization.md`, `multi-tenancy.md`, `testing.md`; revisão do design da 004 (obrigação 3 substituída); índice e roadmap | T1–T12     | verificação de links                                                  | [ ]    |
-| T14 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                                                                                                                                                                  | T13        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [ ]    |
+| T13 | ADR 0016 aceito e ADR 0003 com a exceção substituída; `bounded-contexts.md` (Boards adiado), `data-flow.md` (rota real; Socket.IO planejado), `dependency-rules.md`, `business-rules.md` (BR-004 e BR-009 sem Boards e sem tempo real, BR-030), `authorization.md`, `multi-tenancy.md`, `testing.md`; revisão do design da 004 (obrigação 3 substituída); índice e roadmap | T1–T12     | verificação de links                                                  | [x]    |
+| T14 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                                                                                                                                                                  | T13        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [x]    |
 
 ## Evidências
 
@@ -154,3 +154,113 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
   - obrigação 5 da 004: excluir a organização remove projetos, workflow, tarefas e dependências.
 - **Mutation testing**, 4/4 detectados na composição real: edição do workflow só com `FOR SHARE`; adaptador sem reatribuir; adaptador sem contar; empate sem rebalanceamento.
 - **Regressão**: `pnpm test:integration` ✔ em 7 projetos (identity 50, shared 33, organizations 33, projects 24, tasks 24, worker 9, api 45). **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T8 — 2026-10-14
+
+- **Entregue**:
+  - Contratos:
+    - `board.contract.ts`: `boardQuerySchema` (limite ≤ 50), `columnQuerySchema` (≤ 100), `cardSchema` (= `TaskSummary` + `subtasks`), `boardSchema`, `columnPageSchema`, `moveCardRequestSchema` (`strictObject`; os dois vizinhos juntos ⇒ 400), `moveCardResponseSchema`;
+    - em `projects`: `workflowSchema` com `version` e `inUse`; comandos de status/ordem/transições (`strictObject`, listas limitadas a 20 e 380) e `removeStatusQuerySchema` com `moveTasksToStatusId` (sufixo `Id`, achado A1).
+  - Rotas:
+    - `tasks`: `GET /board`, `GET /board/columns/:statusId` (malformado ⇒ 404 `STATUS_NOT_FOUND`), `POST /tasks/:taskId/move`;
+    - `projects`: `POST …/workflow/statuses`, `PATCH`/`DELETE …/workflow/statuses/:statusId`, `PUT …/workflow/order`, `PUT …/workflow/transitions` (projeto malformado ⇒ `PROJECT_NOT_FOUND`, status malformado ⇒ `STATUS_NOT_FOUND`).
+    - Os limites de uso ficam nos casos de uso.
+  - Erros de `projects`: os 9 códigos do BR-030 (`STATUS_NOT_FOUND` com o mesmo status e título de `tasks`; colisão conferida em `apps/api`).
+  - OpenAPI: 3 operações do quadro (tag `Board`) e 5 do workflow; documento 3.1 válido.
+- **Antecipado da T9 (o gate exigiu)**:
+  - `inputReferences` do harness percorre listas (`…Ids`) e objetos aninhados (`transitions[].fromStatusId`), com teste unitário de falha (achado A1);
+  - `refused` aceita o status (400 para cursor de outra coluna);
+  - casos de isolamento das 8 rotas novas e mundo semeado com os status de A e o cursor de coluna de B; a integração de isolamento passou (5/5).
+- **Testes**:
+  - router de `tasks`: 2 novos (15) — quadro e coluna com cursor, 404/400; movimento antes/depois/coluna nova com a ordem conferida, 400/403/422;
+  - router de `projects`: 3 novos (14) — fluxo completo com versão, 400/404/409/422, reatribuição pelo `DELETE`, 403 do member;
+  - `apps/api`: OpenAPI das 8 operações e contagens atualizadas; harness com listas e aninhados.
+- **Mutation testing**, 9/9 detectados. Dois sobreviventes da primeira rodada (`beforeTaskId` e `moveTasksToStatusId` descartados pelo router) viraram asserções.
+- **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T9 — 2026-10-14
+
+- **Entregue** (o harness foi ampliado na T8; aqui, as baterias):
+  - **Isolamento** entre organizações para as 8 rotas novas:
+    - caminho (`statusId`, `taskId`), corpo (`toStatusId`, `afterTaskId`/`beforeTaskId` como `refused` 422 `INVALID_POSITION`, `statusIds[]`, `transitions[].fromStatusId/toStatusId`) e query (`projectId`, `moveTasksToStatusId`, cursor de coluna de B como `refused` 400 `INVALID_CURSOR`);
+    - B intacto e sem ids de B nas respostas.
+  - **Bateria de `projects`**: as 5 rotas de workflow, com 404 idêntico para quem não participa e 403 para o member antes de versão velha e status inexistente.
+  - **Bateria de `tasks`**: quadro (leitura por `projectId`) e movimento (escrita por tarefa), com 404 idêntico, 403 do viewer antes de versão velha e transição proibida, e cobertura de rotas que inclui `/board`.
+  - **IDOR entre projetos**, também para o owner: coluna com status de P2, mover para status de P2, mover depois de card de P2, reordenar/transições/remover com status de P2 ⇒ 404 `STATUS_NOT_FOUND` ou 422 `INVALID_POSITION`, e o workflow de P1 intacto.
+- **Testes**: integração `api` 45; baterias e isolamento 15/15. Um erro de digitação no teste (um `$` na URL) foi corrigido; ele mostrou que um id malformado responde `STATUS_NOT_FOUND` antes do projeto, sem revelar nada (depende só da entrada).
+- **Mutation testing**, 4/4 detectados: harness ignorando listas; coluna sem conferir o workflow; reordenação aceitando id estrangeiro; movimento sem conferir o status de destino.
+- **Regressão**: `pnpm test:integration` ✔ em 7 projetos (identity 50, shared 33, organizations 33, projects 24, worker 9, tasks 24, api 45). **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T10 — 2026-10-14
+
+- **Entregue** em `apps/web/src/app/features/tasks/board` (aba "Quadro" em `/o/:slug/projects/:key/board`, entre "Visão geral" e "Tarefas"):
+  - `TaskApi`: `board`, `column` e `moveCard`, com guards de forma (`isBoard`, `isColumnPage`, `isMoveCardResponse`).
+  - `BoardStore`:
+    - carga, "carregar mais" por coluna, "Atualizar";
+    - movimento **otimista** com o vizinho calculado da posição (`afterTaskId`/`beforeTaskId`; a chave fica no servidor) e **reversão** exata em qualquer recusa;
+    - mensagens por código: as bloqueadoras viram chaves quando estão no quadro, senão contagem; subtarefas pendentes têm mensagem própria;
+    - recarga depois de dados velhos (`VERSION_CONFLICT`, `CONCURRENT_UPDATE`, `INVALID_POSITION` etc.).
+  - `BoardPage`:
+    - colunas com rolagem horizontal, aviso de coluna sem transição de saída, estados de carregamento, erro e vazio;
+    - **CDK drag-drop**, que só aceita colunas permitidas pelo fluxo (ou a própria, para reordenar) e fica desligado sem `actions.move`;
+    - anúncio em `aria-live`; foco de volta ao card depois do movimento ou da reversão.
+  - `BoardCard`: alternativa por teclado (WCAG 2.5.7): "Mover KEY" abre "Para cima", "Para baixo" e "Para <coluna>" só com as colunas permitidas.
+  - `WorkflowDto` com `version`/`inUse` nas fixtures do frontend.
+- **Testes**: 10 de componente (297 no `web`):
+  - colunas, cards, subtarefas e links; aviso sem saída;
+  - teclado: vizinho, otimismo, anúncio e foco; outra coluna só com as permitidas;
+  - recusa revertida com a chave da bloqueadora; 409 recarrega;
+  - arrastar e soltar (predicado de entrada e `dropped` com o vizinho); sem capacidade, sem ações e com arrasto desligado;
+  - carregar mais e atualizar; erro com retry.
+- **Mutation testing**, 8/8 detectados. Um mutante foi refeito porque não compilava.
+- **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T11 — 2026-10-14
+
+- **Entregue**:
+  - `ProjectApi`: `createStatus`, `updateStatus`, `removeStatus` (com `moveTasksToStatusId`), `reorderStatuses`, `replaceTransitions`, sempre com a versão do workflow; o guard `isWorkflow` exige `version` e `inUse`.
+  - `WorkflowSettings` ("Fluxo de trabalho" em Configurações do projeto, só com a capacidade `board:configure` da API):
+    - status na ordem: renomear, categoria **travada** em status com tarefas, subir/descer (troca de vizinhos);
+    - remover com destino **só da mesma categoria** (D2), ou o aviso de que não há destino;
+    - criar status; matriz de transições com caixas rotuladas "De X para Y", salva como conjunto;
+    - anúncio em `aria-live`; conflito de versão (ou status sumido) recarrega com explicação.
+- **Testes**: 8 de componente e 2 do guard (307 no `web`): ordem e trava; criar e renomear com a versão; descer; remover com destino da mesma categoria e o caso sem destino; matriz; conflito e recarga; recusa 422; ausente sem capacidade.
+- **Mutation testing**, 9 mutantes, 9 detectados. Um mutante não casou depois do prettier e foi refeito. O sobrevivente da primeira rodada (guard ignorando `inUse`) virou teste unitário.
+- **Comandos**: `nx affected -t lint typecheck test` ✔.
+
+### T12 — 2026-10-14
+
+- **Entregue**: passo "spec 005" na jornada real `projects-journey.spec.ts` (mesmas contas; sem cadastros extras, por causa do limite de 5 por hora). O passo:
+  - o gerente cria a coluna "Em revisão" (em andamento) em Configurações → Fluxo de trabalho e marca as transições "Em andamento → Em revisão" e "Em revisão → Concluído";
+  - cria PDC-3 com a subtarefa obrigatória PDC-4;
+  - no **Quadro**, a coluna nova aparece e o card anda **pelo teclado** ("Mover PDC-3" → "Para Em andamento" → "Para Em revisão");
+  - "Para Concluído" é **recusado** com a mensagem de BR-001 e o card fica em "Em revisão" (reversão);
+  - depois de concluir PDC-4 pelo detalhe, o card conclui no quadro.
+  - O tempo da jornada subiu para 180 s.
+- **Execução**:
+  - primeira rodada: 18/19, porque o seletor da categoria esperava o nome acessível "Categoria" exato, e o nome inclui o texto da opção selecionada; trocado por `getByRole('combobox')` dentro do formulário;
+  - depois: `pnpm exec playwright test -c apps/web-e2e/playwright.config.mts` ✔ **19/19** (38,9 s), com `taskflow_e2e` (a migration `add_kanban` já aplicada), Redis índice 2 e as chaves `rate-limit:auth.*` limpas antes.
+
+### T13 — 2026-10-14
+
+- **Documentado**:
+  - ADR 0016 e ADR 0007 **Aceitos**; ADR 0003 com a "Exceção conhecida" Tasks × Boards substituída pelo 0016; índice de ADRs.
+  - `bounded-contexts.md` (quadro em Tasks, Boards adiado), `data-flow.md` §3 (rota real do movimento; Socket.IO **Planejado**, Fase 2), `dependency-rules.md` (quadro em `tasks`, workflow em `projects`, porta `WorkflowStatusUsage`).
+  - `business-rules.md`: BR-004 com contextos Tasks + Projects e transições editáveis; BR-009 **implementada**, sem tempo real nesta fase, chave fracionária, rebalanceamento, `INVALID_POSITION`/`TASK_NOT_A_CARD`/409; **BR-030** nova (workflow configurável); linha de status.
+  - `authorization.md` (`board:configure` aplicada, `actions` do quadro, ordens de decisão), `multi-tenancy.md` (harness com listas e aninhados, `refused` com status, baterias), `testing.md` (spec 005 e jornada E2E).
+  - Revisão 5 do design da 004: obrigações para a 005 cumpridas; a 3 (recalcular `completed_at`) **substituída** pela decisão 3 da 005.
+  - `specs/README.md` e `roadmap.md`: "Implementada — validação final".
+- **Verificação**: script de links relativos sobre todos os `.md` versionados — sem links quebrados além dos placeholders dos templates (`0000-template.md`, `specs/templates/technical-plan.md`), que já existiam; `prettier --write docs specs` aplicado.
+
+### T14 — 2026-10-14
+
+- **Revisões**: `/review-code` sem bloqueantes; `/security-audit` sem Críticos, Altos ou Médios. Achado comum (Importante na revisão, Baixo B1 na auditoria): o movimento rebalanceava e gastava a cota do projeto **antes** das regras, então um movimento recusado podia esgotar a cota de todos.
+- **Corrigido**:
+  - `MoveCard` valida a posição antes das regras (ordem de decisão mantida), mas rebalanceia depois de `applyTransition`; empate residual ⇒ `ConcurrentUpdateError` (409), não 500.
+  - `GetBoard` consulta as colunas em lotes de `BOARD_COLUMN_CONCURRENCY` (5).
+  - Quadro: `TRANSITION_NOT_ALLOWED` e `PROJECT_ARCHIVED` recarregam; "Atualizar" limpa a mensagem (`refresh()`). Configuração do fluxo: `STATUS_IN_USE` e `STATUS_NAME_TAKEN` recarregam.
+  - Harness: casts trocados por type guards (`isShape`, `Reflect.apply`).
+  - Design revisão 3: contrato real de `GET /board` e as correções acima.
+- **Testes novos**: "M1: a refused move neither rebalances nor spends the project quota", "queries at most a few columns at a time", "a transition removed elsewhere reloads the board; refreshing clears the message", "a category refused because the status got tasks meanwhile reloads the workflow".
+- **Mutation testing**: 5 mutantes, 5 mortos (ordem antiga do rebalanceamento; paralelismo sem limite; `TRANSITION_NOT_ALLOWED` fora de `STALE`; `refresh()` sem limpar o erro; `STATUS_IN_USE` fora da recarga do fluxo).
+- **Gate final**: `pnpm verify` exit 0 (78 tarefas, 62 do cache com o mesmo hash); `pnpm test:integration` exit 0 (7 projetos, 218 testes); E2E 19/19 (41,6 s). Aceitação em `acceptance.md`.

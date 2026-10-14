@@ -2,7 +2,7 @@
 
 Fonte canônica das regras BR-xxx. Specs referenciam estes IDs; testes usam o ID no nome (`it('BR-001: ...')`).
 
-Status: BR-001, BR-003 e BR-006 **implementadas e testadas** (spec 004); BR-004 implementada para mudanças de status de tarefa (spec 004; o quadro reutiliza na 005); BR-008 aplicada a organizações, memberships, projetos e tarefas; BR-002, BR-005, BR-007, BR-009 e BR-010 **documentadas** (dependem das specs 005+, salvo o que já está indicado); BR-028 e BR-029 **implementadas e testadas** (spec 004); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); A spec que implementa cada regra está indicada.
+Status: BR-001, BR-003 e BR-006 **implementadas e testadas** (spec 004); BR-004, BR-009 e BR-030 **implementadas e testadas** (specs 004 e 005: mudança de status, movimento de cards e workflow configurável); BR-008 aplicada a organizações, memberships, projetos e tarefas; BR-002, BR-005, BR-007 e BR-010 **documentadas** (dependem das specs 005+, salvo o que já está indicado); BR-028 e BR-029 **implementadas e testadas** (spec 004); BR-011…BR-018 **implementadas e testadas** (spec 001); BR-019…BR-022 **implementadas e testadas** (spec 002); BR-023 e BR-024 **implementadas e testadas** (spec 006; aplicadas a projetos na spec 003); BR-025…BR-027 **implementadas e testadas** (spec 003); A spec que implementa cada regra está indicada.
 
 Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` estável retornado em `ProblemDetails`.
 
@@ -38,12 +38,12 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 
 ## BR-004 — Movimentação respeita transições configuradas
 
-- **Spec**: 005-kanban · **Contextos**: Boards + Tasks
-- **Regra**: cada projeto define um workflow (status e transições permitidas). Mover um card entre colunas só é aceito se a transição `statusAtual → statusDestino` estiver permitida.
+- **Spec**: 004-tasks + 005-kanban · **Contextos**: Tasks (status e quadro) + Projects (configuração do workflow, ADR 0016)
+- **Regra**: cada projeto define um workflow (status e transições permitidas), **configurável pelo gerente** (`board:configure`, BR-030). Mover um card entre colunas só é aceito se a transição `statusAtual → statusDestino` estiver permitida.
 - **Erros**: `TRANSITION_NOT_ALLOWED` (422).
 - **Interação**: mover para coluna de categoria `done` dispara as validações de BR-001 e BR-006.
 - **Casos limite**: mover dentro da mesma coluna é só reordenação (BR-009); workflow padrão é criado com o projeto (`todo → in_progress → done`, com volta permitida).
-- **Estado**: o workflow padrão ("A fazer", "Em andamento", "Concluído", com transições de ida e volta entre vizinhos) é **implementado** na spec 003 e criado com o projeto. A validação de transições é **implementada** na mudança de status de tarefa (spec 004, `assertTransitionAllowed` em `tasks/domain`, inclusive "mesmo status não é transição"); mover cards no quadro a reutilizará (spec 005).
+- **Estado**: o workflow padrão ("A fazer", "Em andamento", "Concluído", com transições de ida e volta entre vizinhos) é **implementado** na spec 003 e criado com o projeto. A validação de transições é **implementada** na mudança de status de tarefa (spec 004, `assertTransitionAllowed` em `tasks/domain`, inclusive "mesmo status não é transição"); mover cards no quadro usa o mesmo núcleo (spec 005, `MoveCard`), e as transições são editáveis (BR-030).
 
 ## BR-005 — Sprint concluída não recebe tarefas
 
@@ -80,11 +80,12 @@ Convenções: "pendente" = não concluída nem cancelada. Erros têm `code` est�
 
 ## BR-009 — Ordenação Kanban determinística
 
-- **Spec**: 005-kanban · ADR 0007
-- **Invariante**: dentro de uma coluna, as tarefas têm ordem total e estável: `(rank, id)`.
+- **Spec**: 005-kanban · ADRs 0007 e 0016 · **Implementada e testada**
+- **Invariante**: dentro de uma coluna, os cards (tarefas de primeiro nível não canceladas) têm ordem total e estável: `(board_rank, id)`, chave fracionária comparada em ASCII (collation `"C"`).
 - **Movimento**: o cliente informa a posição relativa (`afterTaskId`/`beforeTaskId`); o servidor calcula a nova chave de ordenação entre os vizinhos.
-- **Concorrência**: dois movimentos simultâneos para a mesma posição produzem ordem determinística (desempate por `id`), sem perder nenhum card; o resultado final é publicado em tempo real para todos.
-- **Erros**: vizinho inexistente ou de outra coluna → `INVALID_POSITION` (422); conflito de versão do card → 409.
+- **Concorrência**: dois movimentos simultâneos para a mesma posição produzem ordem determinística (desempate por `id`), sem perder nenhum card; os movimentos de um projeto são serializados pelo lock do projeto em `tasks`. Chaves empatadas ou longas demais disparam o rebalanceamento da coluna (limitado por projeto). **Sem tempo real nesta fase** (decisão 5 da spec 005): o cliente recarrega; a publicação por Socket.IO é da Fase 2.
+- **Erros**: vizinho inexistente, de outra coluna, de outro projeto, subtarefa ou cancelado → `INVALID_POSITION` (422, mesmo corpo); mover subtarefa → `TASK_NOT_A_CARD` (422); versão do card → 409 (conferida sempre; incrementada só ao mudar de coluna).
+- **Fim da coluna**: tarefa criada, movida pelo detalhe ou reaberta entra no fim da coluna do seu status.
 
 ## BR-010 — Consistência transacional
 
@@ -182,3 +183,9 @@ Cada projeto numera as tarefas em sequência (`CHAVE-N`, ex.: `WEB-42`), a parti
 ### BR-029 — Tarefa cancelada
 
 Cancelar e reabrir são ações próprias, independentes do status, que registram quando e quem (idempotentes). Cancelada sai das listas padrão (filtro `canceled=true` a inclui), não conta como pendente em BR-001 nem em BR-006 e é só leitura até ser reaberta (`TASK_CANCELED`, 409); pode ser excluída.
+
+## Kanban (spec 005)
+
+### BR-030 — Workflow configurável
+
+O gerente do projeto (`board:configure`) cria, renomeia, reordena e remove status e define as transições, sempre com a versão do workflow (BR-008). Nomes de 1 a 40 caracteres de texto exibível, únicos no projeto sem diferenciar maiúsculas (`STATUS_NAME_TAKEN`, 409); sempre ao menos um status `todo` — o primeiro pela ordem é o inicial das tarefas novas (`WORKFLOW_NEEDS_TODO_STATUS`, 422); no máximo 20 status (`STATUS_LIMIT_REACHED`, 422). A **categoria só muda em status sem nenhuma tarefa** — canceladas e subtarefas contam (`STATUS_IN_USE`, 409): a conclusão das tarefas nunca muda por configuração. Remover um status com tarefas exige outro status **da mesma categoria** para recebê-las (`INVALID_STATUS_TARGET`, 422); a reatribuição e a remoção acontecem juntas, e as transições do status removido caem. Transições ligam status distintos do workflow, sem repetição (`INVALID_TRANSITION`, 422). Referências fora do workflow ⇒ `STATUS_NOT_FOUND` (404), antes das regras.

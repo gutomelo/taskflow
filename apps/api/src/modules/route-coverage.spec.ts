@@ -50,7 +50,12 @@ import {
   ListMemberCandidatesUseCase,
   ListProjectMembersUseCase,
   ListProjectsUseCase,
+  CreateStatusUseCase,
   RemoveProjectMemberUseCase,
+  RemoveStatusUseCase,
+  ReorderStatusesUseCase,
+  ReplaceTransitionsUseCase,
+  UpdateStatusUseCase,
   RestoreProjectUseCase,
   UpdateProjectUseCase,
 } from '@taskflow/backend/projects/application';
@@ -63,7 +68,10 @@ import {
   CancelTaskUseCase,
   CreateTaskUseCase,
   DeleteTaskUseCase,
+  GetBoardUseCase,
   GetTaskUseCase,
+  ListColumnCardsUseCase,
+  MoveCardUseCase,
   ListAssignableUsersUseCase as ListAssignableTaskUsersUseCase,
   ListTasksUseCase,
   RemoveDependencyUseCase,
@@ -163,6 +171,11 @@ function composed() {
       addMember: new AddProjectMemberUseCase(projectsBed),
       changeMemberRole: new ChangeProjectMemberRoleUseCase(projectsBed),
       removeMember: new RemoveProjectMemberUseCase(projectsBed),
+      createStatus: new CreateStatusUseCase(projectsBed),
+      updateStatus: new UpdateStatusUseCase(projectsBed),
+      removeStatus: new RemoveStatusUseCase(projectsBed),
+      reorderStatuses: new ReorderStatusesUseCase(projectsBed),
+      replaceTransitions: new ReplaceTransitionsUseCase(projectsBed),
     },
     rateLimiter: projectsBed.rateLimiter,
   });
@@ -181,6 +194,9 @@ function composed() {
       deleteTask: new DeleteTaskUseCase(tasksBed),
       addDependency: new AddDependencyUseCase(tasksBed),
       removeDependency: new RemoveDependencyUseCase(tasksBed),
+      getBoard: new GetBoardUseCase(tasksBed),
+      listColumnCards: new ListColumnCardsUseCase(tasksBed),
+      moveCard: new MoveCardUseCase(tasksBed),
     },
   });
   return composeApiRouters({
@@ -263,6 +279,28 @@ describe('isolation harness fails closed', () => {
     ).toEqual([
       'POST /organizations/:organizationId/things: no variant for body.ownerId',
       'GET /organizations/:organizationId/things: no variant for query.cursor',
+    ]);
+  });
+
+  it('spec 005 (A1): references inside lists and nested objects need variants too', () => {
+    const routes = listTenantRoutes(scopeWith((router) => router.put('/things', noop)));
+
+    expect(
+      coverageGaps(routes, {
+        [routes[0] ?? '']: {
+          body: z.strictObject({
+            thingIds: z.array(z.uuid()).max(5),
+            links: z.array(z.strictObject({ fromThingId: z.uuid(), label: z.string() })).optional(),
+            version: z.int(),
+          }),
+          query: z.object({ moveToThingId: z.uuid().optional() }),
+          references: {},
+        },
+      }),
+    ).toEqual([
+      'PUT /organizations/:organizationId/things: no variant for body.thingIds',
+      'PUT /organizations/:organizationId/things: no variant for body.links[].fromThingId',
+      'PUT /organizations/:organizationId/things: no variant for query.moveToThingId',
     ]);
   });
 

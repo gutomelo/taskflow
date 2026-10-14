@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { problemResponse, SECURITY } from '@taskflow/backend/shared/http';
 import {
   addDependencyRequestSchema,
+  boardQuerySchema,
+  boardSchema,
+  cardSchema,
+  columnPageSchema,
+  columnQuerySchema,
+  moveCardRequestSchema,
+  moveCardResponseSchema,
   assignableUserPageSchema,
   assignableUserSchema,
   assignableUsersQuerySchema,
@@ -29,6 +36,9 @@ export const tasksOpenApiSchemas = {
   TaskPage: taskPageSchema,
   AssignableUser: assignableUserSchema,
   AssignableUserPage: assignableUserPageSchema,
+  Card: cardSchema,
+  Board: boardSchema,
+  ColumnPage: columnPageSchema,
 };
 
 const json = <T>(schema: T) => ({ content: { 'application/json': { schema } } });
@@ -262,6 +272,59 @@ export const tasksOpenApiPaths: ZodOpenApiPathsObject = {
         '403': forbidden('Papel insuficiente'),
         '404': problemResponse('TASK_NOT_FOUND ou DEPENDENCY_NOT_FOUND'),
         '409': problemResponse('PROJECT_ARCHIVED ou TASK_CANCELED'),
+        '429': tooMany,
+      },
+    },
+  },
+  ['/api/v1/organizations/{organizationId}/board']: {
+    get: {
+      tags: ['Board'],
+      summary:
+        'Quadro do projeto: uma coluna por status, cards por (posição, id) (project:read; RF-01)',
+      security: SECURITY.authenticated,
+      requestParams: { path: organizationPath, query: boardQuerySchema },
+      responses: {
+        '200': { description: 'Quadro', ...json(boardSchema) },
+        '400': problemResponse('Consulta inválida'),
+        '401': unauthenticated,
+        '404': projectNotFound,
+      },
+    },
+  },
+  ['/api/v1/organizations/{organizationId}/board/columns/{statusId}']: {
+    get: {
+      tags: ['Board'],
+      summary: 'Mais cards de uma coluna (cursor amarrado à coluna)',
+      security: SECURITY.authenticated,
+      requestParams: {
+        path: organizationPath.extend({ statusId: z.uuid() }),
+        query: columnQuerySchema,
+      },
+      responses: {
+        '200': { description: 'Página da coluna', ...json(columnPageSchema) },
+        '400': problemResponse('Consulta ou cursor inválidos (INVALID_CURSOR)'),
+        '401': unauthenticated,
+        '404': problemResponse('PROJECT_NOT_FOUND ou STATUS_NOT_FOUND'),
+      },
+    },
+  },
+  [`${BASE}/{taskId}/move`]: {
+    post: {
+      tags: ['Board'],
+      summary: 'Move o card: reordena ou muda de coluna pelo fluxo (task:update; BR-009, BR-004)',
+      security: SECURITY.authenticatedWithCsrf,
+      requestParams: { path: taskPath },
+      requestBody: json(moveCardRequestSchema),
+      responses: {
+        '200': { description: 'Card movido', ...json(moveCardResponseSchema) },
+        '400': problemResponse('Dados inválidos (inclusive os dois vizinhos juntos)'),
+        '401': unauthenticated,
+        '403': forbidden('Papel insuficiente'),
+        '404': problemResponse('TASK_NOT_FOUND ou STATUS_NOT_FOUND'),
+        '409': writeConflict,
+        '422': problemResponse(
+          'TASK_NOT_A_CARD, INVALID_POSITION, TRANSITION_NOT_ALLOWED, TASK_HAS_PENDING_REQUIRED_SUBTASKS ou TASK_BLOCKED_BY_DEPENDENCIES (com taskIds)',
+        ),
         '429': tooMany,
       },
     },

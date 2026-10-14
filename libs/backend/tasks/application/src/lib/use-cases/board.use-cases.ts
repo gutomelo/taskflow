@@ -1,5 +1,5 @@
 import type { TenantRequestContext } from '@taskflow/backend/shared/application';
-import { RateLimitedError } from '@taskflow/backend/shared/application';
+import { ConcurrentUpdateError, RateLimitedError } from '@taskflow/backend/shared/application';
 import { canOnProject } from '@taskflow/backend/shared/kernel';
 import {
   findStatus,
@@ -90,9 +90,24 @@ async function columnOf(
   };
 }
 
+/** Colunas consultadas ao mesmo tempo: um quadro não ocupa sozinho o pool de conexões (T14). */
+export const BOARD_COLUMN_CONCURRENCY = 5;
+
+async function inBatches<T, R>(
+  items: ReadonlyArray<T>,
+  size: number,
+  work: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let start = 0; start < items.length; start += size) {
+    results.push(...(await Promise.all(items.slice(start, start + size).map(work))));
+  }
+  return results;
+}
+
 /**
  * RF-01, RF-04: o quadro do projeto — uma coluna por status, cards de primeiro nível não
- * cancelados por `(rank, id)`. Consultas: uma por coluna (≤ 20) + nomes + contagens.
+ * cancelados por `(rank, id)`. Consultas: uma por coluna (≤ 20, em lotes) + nomes + contagens.
  */
 export class GetBoardUseCase {
   constructor(private readonly deps: TasksDependencies) {}
@@ -110,10 +125,8 @@ export class GetBoardUseCase {
     if (!project) throw new ProjectNotFoundError();
     const limit = clamp(query.limit, BOARD_DEFAULT_CARDS, BOARD_MAX_CARDS);
     const statuses = ordered(project.workflow);
-    const pages = await Promise.all(
-      statuses.map((status) =>
-        columnOf(this.deps, organizationId, project.projectId, status.id, limit, null),
-      ),
+    const pages = await inBatches(statuses, BOARD_COLUMN_CONCURRENCY, (status) =>
+      columnOf(this.deps, organizationId, project.projectId, status.id, limit, null),
     );
     const cards = await toCards(
       this.deps,
@@ -217,16 +230,21 @@ export class MoveCardUseCase {
     if (!target) throw new StatusNotFoundError();
     const { projectId } = project;
 
+    // A posição é validada antes das regras (ordem de decisão), mas o rebalanceamento — que
+    // trava a coluna e gasta a cota do projeto fora da transação — só depois delas: um
+    // movimento recusado não pode esgotar a cota de todos (achado da revisão da T14).
     let rank = await this.rankFor(organizationId, projectId, target.id, task.id, command);
-    if (rank === null || needsRebalance(rank)) {
-      await this.rebalance(context, projectId, target.id);
-      rank = await this.rankFor(organizationId, projectId, target.id, task.id, command);
-      if (rank === null) throw new Error('Rank still tied after rebalancing');
-    }
     const from = task.statusId;
     const events: TasksEvent[] = [];
     if (target.id !== from) {
       events.push(await applyTransition(this.deps, context, task, project.workflow, target));
+    }
+    if (rank === null || needsRebalance(rank)) {
+      await this.rebalance(context, projectId, target.id);
+      rank = await this.rankFor(organizationId, projectId, target.id, task.id, command);
+      // Um acréscimo concorrente (sem o lock da coluna) pode empatar com uma chave nova: 409
+      // recuperável, o cliente recarrega.
+      if (rank === null) throw new ConcurrentUpdateError();
     }
     await this.deps.tasks.placeCard(organizationId, projectId, task.id, rank);
     events.push({

@@ -3,6 +3,10 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   CreateProjectRequest,
+  CreateStatusRequest,
+  ReorderStatusesRequest,
+  ReplaceTransitionsRequest,
+  UpdateStatusRequest,
   MemberCandidatePage,
   ProjectDto,
   ProjectMemberDto,
@@ -86,6 +90,77 @@ export class ProjectApi {
   async workflow(organizationId: string, projectId: string): Promise<WorkflowDto> {
     const url = tenantUrl(organizationId, `/projects/${encodeURIComponent(projectId)}/workflow`);
     return checked(await firstValueFrom(this.http.get<unknown>(url)), isWorkflow, url);
+  }
+
+  // --- Workflow configurável (spec 005, BR-030): toda edição informa a versão do workflow ---
+
+  async createStatus(
+    organizationId: string,
+    projectId: string,
+    request: CreateStatusRequest,
+  ): Promise<WorkflowDto> {
+    const url = this.workflowUrl(organizationId, projectId, '/statuses');
+    return checked(await firstValueFrom(this.http.post<unknown>(url, request)), isWorkflow, url);
+  }
+
+  async updateStatus(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    request: UpdateStatusRequest,
+  ): Promise<WorkflowDto> {
+    const url = this.workflowUrl(
+      organizationId,
+      projectId,
+      `/statuses/${encodeURIComponent(statusId)}`,
+    );
+    return checked(await firstValueFrom(this.http.patch<unknown>(url, request)), isWorkflow, url);
+  }
+
+  async removeStatus(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    options: Readonly<{ version: number; moveTasksToStatusId: string | null }>,
+  ): Promise<WorkflowDto> {
+    const url = this.workflowUrl(
+      organizationId,
+      projectId,
+      `/statuses/${encodeURIComponent(statusId)}`,
+    );
+    let params = new HttpParams().set('version', options.version);
+    if (options.moveTasksToStatusId)
+      params = params.set('moveTasksToStatusId', options.moveTasksToStatusId);
+    return checked(
+      await firstValueFrom(this.http.delete<unknown>(url, { params })),
+      isWorkflow,
+      url,
+    );
+  }
+
+  async reorderStatuses(
+    organizationId: string,
+    projectId: string,
+    request: ReorderStatusesRequest,
+  ): Promise<WorkflowDto> {
+    const url = this.workflowUrl(organizationId, projectId, '/order');
+    return checked(await firstValueFrom(this.http.put<unknown>(url, request)), isWorkflow, url);
+  }
+
+  async replaceTransitions(
+    organizationId: string,
+    projectId: string,
+    request: ReplaceTransitionsRequest,
+  ): Promise<WorkflowDto> {
+    const url = this.workflowUrl(organizationId, projectId, '/transitions');
+    return checked(await firstValueFrom(this.http.put<unknown>(url, request)), isWorkflow, url);
+  }
+
+  private workflowUrl(organizationId: string, projectId: string, suffix: string): string {
+    return tenantUrl(
+      organizationId,
+      `/projects/${encodeURIComponent(projectId)}/workflow${suffix}`,
+    );
   }
 
   async members(

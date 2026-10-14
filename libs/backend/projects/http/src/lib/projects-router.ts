@@ -7,13 +7,13 @@ import {
   parseBody,
   tenantRequestContextFrom,
 } from '@taskflow/backend/shared/http';
-import type { Workflow } from '@taskflow/backend/projects/domain';
 import type {
   AddProjectMemberUseCase,
   ArchiveProjectUseCase,
   ChangeProjectMemberRoleUseCase,
   CreateProjectUseCase,
   GetProjectUseCase,
+  CreateStatusUseCase,
   GetWorkflowUseCase,
   ListMemberCandidatesUseCase,
   ListProjectMembersUseCase,
@@ -23,11 +23,17 @@ import type {
   ProjectSummaryView,
   ProjectView,
   RemoveProjectMemberUseCase,
+  RemoveStatusUseCase,
+  ReorderStatusesUseCase,
+  ReplaceTransitionsUseCase,
   RestoreProjectUseCase,
   UpdateProjectUseCase,
+  UpdateStatusUseCase,
+  WorkflowView,
 } from '@taskflow/backend/projects/application';
 import {
   addProjectMemberRequestSchema,
+  createStatusRequestSchema,
   changeProjectMemberRoleRequestSchema,
   createProjectRequestSchema,
   pageQuerySchema,
@@ -37,7 +43,12 @@ import {
   projectMemberParamSchema,
   projectVersionRequestSchema,
   removeProjectMemberQuerySchema,
+  removeStatusQuerySchema,
+  reorderStatusesRequestSchema,
+  replaceTransitionsRequestSchema,
+  statusParamSchema,
   updateProjectRequestSchema,
+  updateStatusRequestSchema,
   type MemberCandidate,
   type MemberCandidatePage,
   type ProjectDto,
@@ -66,6 +77,11 @@ export interface ProjectsHttpDependencies {
     addMember: Executes<AddProjectMemberUseCase>;
     changeMemberRole: Executes<ChangeProjectMemberRoleUseCase>;
     removeMember: Executes<RemoveProjectMemberUseCase>;
+    createStatus: Executes<CreateStatusUseCase>;
+    updateStatus: Executes<UpdateStatusUseCase>;
+    removeStatus: Executes<RemoveStatusUseCase>;
+    reorderStatuses: Executes<ReorderStatusesUseCase>;
+    replaceTransitions: Executes<ReplaceTransitionsUseCase>;
   }>;
   readonly rateLimiter: RateLimiter;
 }
@@ -120,16 +136,26 @@ const toCandidate = (view: MemberCandidateView): MemberCandidate => ({
   ...view,
   allowedRoles: [...view.allowedRoles],
 });
-const toWorkflowDto = (workflow: Workflow): WorkflowDto => ({
+const toWorkflowDto = (workflow: WorkflowView): WorkflowDto => ({
+  version: workflow.version,
   statuses: workflow.statuses.map((status) => ({ ...status })),
   transitions: workflow.transitions.map((transition) => ({ ...transition })),
 });
+const statusNotFound = () =>
+  new HttpError(404, 'STATUS_NOT_FOUND', 'Status não encontrado no workflow do projeto');
 
 /**
  * Rotas tenant-scoped de Projects (spec 003) com caminhos **relativos**: só funcionam montadas
  * pelo composition root no `createTenantScope` (ADR 0012); `tenantRequestContextFrom` falha
  * fechado fora dele. Controllers finos: validam o contrato, chamam um caso de uso e mapeiam.
  */
+/** Projeto malformado ⇒ 404 do projeto; status malformado ⇒ 404 do status (sem chegar ao banco). */
+function parseStatusParams(request: Request) {
+  const { projectId } = parseParams(request, projectIdParamSchema, projectNotFound);
+  const { statusId } = parseParams(request, statusParamSchema, statusNotFound);
+  return { projectId, statusId };
+}
+
 export function createProjectsRouter(deps: ProjectsHttpDependencies): Router {
   const { useCases } = deps;
   const limit = (policy: RateLimitPolicy) =>
@@ -210,6 +236,61 @@ export function createProjectsRouter(deps: ProjectsHttpDependencies): Router {
     const context = tenantRequestContextFrom(request);
     const { projectId } = parseParams(request, projectIdParamSchema, projectNotFound);
     const workflow = await useCases.getWorkflow.execute(context, projectId);
+    response.json(toWorkflowDto(workflow) satisfies WorkflowDto);
+  });
+
+  // --- Workflow configurável (spec 005). Limites de uso nos casos de uso (contam recusas). ---
+  router.post('/projects/:projectId/workflow/statuses', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { projectId } = parseParams(request, projectIdParamSchema, projectNotFound);
+    const workflow = await useCases.createStatus.execute(context, {
+      projectId,
+      ...parseBody(request, createStatusRequestSchema),
+    });
+    response.status(201).json(toWorkflowDto(workflow) satisfies WorkflowDto);
+  });
+
+  router.patch('/projects/:projectId/workflow/statuses/:statusId', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { projectId, statusId } = parseStatusParams(request);
+    const workflow = await useCases.updateStatus.execute(context, {
+      projectId,
+      statusId,
+      ...parseBody(request, updateStatusRequestSchema),
+    });
+    response.json(toWorkflowDto(workflow) satisfies WorkflowDto);
+  });
+
+  router.delete('/projects/:projectId/workflow/statuses/:statusId', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { projectId, statusId } = parseStatusParams(request);
+    const { moveTasksToStatusId, version } = parseQuery(request, removeStatusQuerySchema);
+    const workflow = await useCases.removeStatus.execute(context, {
+      projectId,
+      statusId,
+      version,
+      ...(moveTasksToStatusId === undefined ? {} : { moveTasksToStatusId }),
+    });
+    response.json(toWorkflowDto(workflow) satisfies WorkflowDto);
+  });
+
+  router.put('/projects/:projectId/workflow/order', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { projectId } = parseParams(request, projectIdParamSchema, projectNotFound);
+    const workflow = await useCases.reorderStatuses.execute(context, {
+      projectId,
+      ...parseBody(request, reorderStatusesRequestSchema),
+    });
+    response.json(toWorkflowDto(workflow) satisfies WorkflowDto);
+  });
+
+  router.put('/projects/:projectId/workflow/transitions', async (request, response) => {
+    const context = tenantRequestContextFrom(request);
+    const { projectId } = parseParams(request, projectIdParamSchema, projectNotFound);
+    const workflow = await useCases.replaceTransitions.execute(context, {
+      projectId,
+      ...parseBody(request, replaceTransitionsRequestSchema),
+    });
     response.json(toWorkflowDto(workflow) satisfies WorkflowDto);
   });
 

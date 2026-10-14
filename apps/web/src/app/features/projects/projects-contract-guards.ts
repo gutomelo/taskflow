@@ -74,6 +74,7 @@ export function isProjectPage(value: unknown): value is ProjectPage {
 export function isWorkflow(value: unknown): value is WorkflowDto {
   return (
     isRecord(value) &&
+    Number.isInteger(value['version']) &&
     Array.isArray(value['statuses']) &&
     value['statuses'].every(
       (status) =>
@@ -82,7 +83,8 @@ export function isWorkflow(value: unknown): value is WorkflowDto {
         typeof status['name'] === 'string' &&
         typeof status['category'] === 'string' &&
         CATEGORIES.has(status['category']) &&
-        Number.isInteger(status['position']),
+        Number.isInteger(status['position']) &&
+        typeof status['inUse'] === 'boolean',
     ) &&
     Array.isArray(value['transitions']) &&
     value['transitions'].every(
