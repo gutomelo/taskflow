@@ -97,6 +97,11 @@ export interface TaskRepository {
   findByNumber(organizationId: string, projectId: string, number: number): Promise<Task | null>;
   /** `FOR NO KEY UPDATE` na tarefa. Só em transação. */
   lockById(organizationId: string, projectId: string, taskId: string): Promise<Task | null>;
+  /**
+   * `FOR SHARE` (spec 010): comentar serializa com cancelar/excluir/editar a tarefa sem serializar
+   * os comentários entre si. Nunca promovido a escrita. Só em transação.
+   */
+  lockForShare(organizationId: string, projectId: string, taskId: string): Promise<Task | null>;
   /** BR-008: `VersionConflictError` se desatualizada. */
   save(task: Task): Promise<void>;
   /** BR-008: `VersionConflictError` se a versão não bater. Subtarefas e dependências em cascata. */

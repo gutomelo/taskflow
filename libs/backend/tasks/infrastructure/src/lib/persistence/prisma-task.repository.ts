@@ -276,6 +276,24 @@ export class PrismaTaskRepository implements TaskRepository {
     return row ? toTask(row) : null;
   }
 
+  async lockForShare(
+    organizationId: string,
+    projectId: string,
+    taskId: string,
+  ): Promise<Task | null> {
+    const transaction = this.transactions.transactionalClient('TaskRepository.lockForShare');
+    const locked = await transaction.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM tasks
+      WHERE organization_id = ${organizationId}::uuid AND project_id = ${projectId}::uuid
+        AND id = ${taskId}::uuid
+      FOR SHARE`;
+    if (locked.length === 0) return null;
+    const row = await transaction.task.findUnique({
+      where: { organizationId_projectId_id: { organizationId, projectId, id: taskId } },
+    });
+    return row ? toTask(row) : null;
+  }
+
   async lockById(organizationId: string, projectId: string, taskId: string): Promise<Task | null> {
     const transaction = this.transactions.transactionalClient('TaskRepository.lockById');
     const locked = await transaction.$queryRaw<Array<{ id: string }>>`

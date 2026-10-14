@@ -1,10 +1,10 @@
 # 010 — Comentários e menções · Requisitos
 
-- **Status**: Rascunho (revisão 2: achados das revisões e decisões 9 e 10)
+- **Status**: Aprovado
 - **Fase do roadmap**: 2 — Colaboração (primeira spec da fase; base para `008-notifications`)
 - **Bounded contexts**: Collaboration (`collaboration`, **novo**: comentários e menções). Por uma porta de `collaboration`: Tasks (alvo do comentário — existência, visibilidade, estado e lock da tarefa), Projects (quem lê o projeto), Organizations (quem ainda é membro, para "Ex-membro") e Identity (nomes e busca de candidatos)
 - **Autor / data**: Claude Code (com decisões do usuário) / 2026-10-14
-- **Aprovado por / data**: —
+- **Aprovado por / data**: usuário / 2026-10-14
 
 ## Objetivo
 

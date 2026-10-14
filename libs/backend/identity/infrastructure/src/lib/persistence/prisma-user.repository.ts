@@ -3,6 +3,7 @@ import {
   EmailAlreadyRegisteredError,
   type User,
   type UserRepository,
+  type UserSearchPosition,
 } from '@taskflow/backend/identity/domain';
 import {
   isUniqueConstraintViolation,
@@ -30,6 +31,36 @@ export class PrismaUserRepository implements UserRepository {
     const rows = await this.transactions
       .client()
       .user.findMany({ where: { id: { in: [...ids] } } });
+    return rows.map(toUser);
+  }
+
+  async searchAmong(
+    ids: readonly string[],
+    query: string,
+    limit: number,
+    after: UserSearchPosition | null,
+  ): Promise<User[]> {
+    if (ids.length === 0) return [];
+    // `contains` do Prisma não escapa `%`/`_` do LIKE: escapados aqui para serem literais.
+    const literal = query.replace(/[\\%_]/g, (character) => `\\${character}`);
+    const rows = await this.transactions.client().user.findMany({
+      where: {
+        id: { in: [...ids] },
+        OR: [
+          { name: { contains: literal, mode: 'insensitive' } },
+          { email: { contains: literal, mode: 'insensitive' } },
+        ],
+        ...(after
+          ? {
+              AND: [
+                { OR: [{ name: { gt: after.name } }, { name: after.name, id: { gt: after.id } }] },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
     return rows.map(toUser);
   }
 

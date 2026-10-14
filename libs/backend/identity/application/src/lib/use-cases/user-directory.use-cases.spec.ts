@@ -5,6 +5,8 @@ import {
   FindUserIdByEmailUseCase,
   GetUserAccountsUseCase,
   MAX_ACCOUNTS_PER_QUERY,
+  MAX_SEARCH_IDS,
+  SearchUsersAmongUseCase,
 } from './user-directory.use-cases';
 
 async function addUser(bed: IdentityTestbed, email: string, name: string) {
@@ -68,5 +70,55 @@ describe('FindUserIdByEmailUseCase (UserDirectory, spec 002)', () => {
 
     expect(await find.execute(EmailAddress.create('  ANA@Exemplo.com '))).toBe(ana.id);
     expect(await find.execute(EmailAddress.create('outra@exemplo.com'))).toBeNull();
+  });
+});
+
+describe('SearchUsersAmongUseCase (spec 010, mention candidates)', () => {
+  async function people() {
+    const bed = createIdentityTestbed();
+    const ana = await addUser(bed, 'ana@exemplo.com', 'Ana Souza');
+    const bia = await addUser(bed, 'bia@exemplo.com', 'Bia Lima');
+    const bruno = await addUser(bed, 'bruno@exemplo.com', 'Bruno Lima');
+    const outsider = await addUser(bed, 'lima@fora.com', 'Lima de Fora');
+    return { bed, ana, bia, bruno, outsider, search: new SearchUsersAmongUseCase(bed) };
+  }
+
+  it('searches name or e-mail without case, only among the given ids, by name', async () => {
+    const { ana, bia, bruno, search } = await people();
+    const ids = [ana.id, bia.id, bruno.id];
+
+    const byName = await search.execute(ids, 'LIMA', { limit: 10, cursor: null });
+    const byEmail = await search.execute(ids, 'ana@', { limit: 10, cursor: null });
+
+    expect(byName.items.map((item) => item.name)).toEqual(['Bia Lima', 'Bruno Lima']);
+    expect(byName.nextCursor).toBeNull();
+    // Página exata: sem próxima página.
+    expect((await search.execute(ids, 'LIMA', { limit: 2, cursor: null })).nextCursor).toBeNull();
+    expect(byEmail.items).toEqual([
+      { id: ana.id, name: 'Ana Souza', email: 'ana@exemplo.com', emailVerified: false },
+    ]);
+  });
+
+  it('pages with an opaque cursor; a forged cursor restarts', async () => {
+    const { ana, bia, bruno, search } = await people();
+    const ids = [ana.id, bia.id, bruno.id];
+
+    const first = await search.execute(ids, 'a', { limit: 2, cursor: null });
+    const second = await search.execute(ids, 'a', { limit: 2, cursor: first.nextCursor });
+
+    expect(first.items.map((item) => item.name)).toEqual(['Ana Souza', 'Bia Lima']);
+    expect(second.items.map((item) => item.name)).toEqual(['Bruno Lima']);
+    expect(second.nextCursor).toBeNull();
+    expect(
+      (await search.execute(ids, 'a', { limit: 2, cursor: 'lixo' })).items.map((item) => item.name),
+    ).toEqual(['Ana Souza', 'Bia Lima']);
+  });
+
+  it('rejects more ids than the cap (programming error)', async () => {
+    const { search } = await people();
+    const ids = Array.from({ length: MAX_SEARCH_IDS + 1 }, (_, index) => `id-${index}`);
+    await expect(search.execute(ids, 'a', { limit: 10, cursor: null })).rejects.toBeInstanceOf(
+      RangeError,
+    );
   });
 });

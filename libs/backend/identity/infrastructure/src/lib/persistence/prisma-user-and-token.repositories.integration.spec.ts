@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { EmailAddress, VersionConflictError } from '@taskflow/backend/shared/kernel';
 import {
   EmailAlreadyRegisteredError,
+  PersonName,
+  User,
   UserToken,
   type UserTokenPurpose,
 } from '@taskflow/backend/identity/domain';
@@ -62,6 +64,43 @@ describe('Identity repositories (integration)', () => {
 
       expect(found.map((user) => user.id).sort()).toEqual([ana.id, bruno.id].sort());
       expect(await users.findByIds([])).toEqual([]);
+    });
+
+    it('spec 010: searches name or e-mail among given ids, by (name, id), with LIKE wildcards literal', async () => {
+      const person = async (email: string, name: string) => {
+        const user = User.register({
+          id: randomUUID(),
+          email: EmailAddress.create(email),
+          name: PersonName.create(name),
+          passwordHash: '$argon2id$v=19$m=19456,t=2,p=1$fixture',
+          now: new Date(),
+        });
+        await users.add(user);
+        return user;
+      };
+      const ana = await person('ana@exemplo.com', 'Ana Souza');
+      const bia = await person('bia@exemplo.com', 'Bia LIMA');
+      const bruno = await person('bruno_lima@exemplo.com', 'Bruno Lima');
+      const cem = await person('cem@exemplo.com', '100% Cem');
+      await person('lima@fora.com', 'Lima de Fora');
+      const ids = [ana.id, bia.id, bruno.id, cem.id];
+      const names = (found: ReadonlyArray<User>) => found.map((user) => user.name.value);
+
+      expect(names(await users.searchAmong(ids, 'lima', 10, null))).toEqual([
+        'Bia LIMA',
+        'Bruno Lima',
+      ]);
+      expect(names(await users.searchAmong(ids, '%', 10, null))).toEqual(['100% Cem']);
+      expect(names(await users.searchAmong(ids, '_lima', 10, null))).toEqual(['Bruno Lima']);
+      expect(names(await users.searchAmong(ids, 'a_a', 10, null))).toEqual([]);
+      expect(names(await users.searchAmong(ids, 'EXEMPLO', 2, null))).toEqual([
+        '100% Cem',
+        'Ana Souza',
+      ]);
+      expect(
+        names(await users.searchAmong(ids, 'exemplo', 10, { name: 'Ana Souza', id: ana.id })),
+      ).toEqual(['Bia LIMA', 'Bruno Lima']);
+      expect(await users.searchAmong([], 'a', 10, null)).toEqual([]);
     });
 
     it('BR-014: translates a duplicate email into EmailAlreadyRegisteredError', async () => {

@@ -151,6 +151,38 @@ describe('tasks persistence (integration, T3)', () => {
     );
   });
 
+  it('spec 010: FOR SHARE on a task lets readers share it and makes writers wait', async () => {
+    const [a, b] = [await organization(), await organization()];
+    const target = await project(a);
+    const created = await task(a, target);
+    const order: string[] = [];
+    let shared: () => void = () => undefined;
+    const isShared = new Promise<void>((resolve) => (shared = resolve));
+
+    const holder = transactions.run(async () => {
+      await tasks.lockForShare(a, target.id, created.id);
+      shared();
+      await sleep(300);
+      order.push('share released');
+    });
+    await isShared;
+    await transactions.run(async () => {
+      expect((await tasks.lockForShare(a, target.id, created.id))?.id).toBe(created.id);
+      order.push('second share');
+    });
+    await transactions.run(async () => {
+      await tasks.lockById(a, target.id, created.id);
+      order.push('writer locked');
+    });
+    await holder;
+
+    expect(order).toEqual(['second share', 'share released', 'writer locked']);
+    expect(await transactions.run(() => tasks.lockForShare(b, target.id, created.id))).toBeNull();
+    await expect(tasks.lockForShare(a, target.id, created.id)).rejects.toBeInstanceOf(
+      TransactionRequiredError,
+    );
+  });
+
   it('finds, saves and removes with the organization, project and version', async () => {
     const [a, b] = [await organization(), await organization()];
     const target = await project(a);

@@ -227,6 +227,14 @@ export class InMemoryTaskRepository implements TaskRepository, TransactionalStor
     const row = this.in(organizationId, projectId).find((candidate) => candidate.number === number);
     return row ? Task.restore(row) : null;
   }
+  /** Tarefas travadas `FOR SHARE` (comentários, spec 010). */
+  readonly sharedTaskLocks: string[] = [];
+  async lockForShare(organizationId: string, projectId: string, taskId: string) {
+    requireTransaction(this.transactions, 'TaskRepository.lockForShare');
+    this.sharedTaskLocks.push(taskId);
+    const row = this.in(organizationId, projectId).find((candidate) => candidate.id === taskId);
+    return row ? Task.restore(row) : null;
+  }
   async lockById(organizationId: string, projectId: string, taskId: string) {
     requireTransaction(this.transactions, 'TaskRepository.lockById');
     this.taskLocks.push(taskId);

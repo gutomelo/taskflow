@@ -1,0 +1,46 @@
+// Bounded context: Collaboration (spec 010). Tabelas pertencem exclusivamente a este contexto.
+// `author_user_id`, `deleted_by_user_id` e `comment_mentions.user_id` referenciam `identity` sem FK
+// (a menção é fato passado; a 008 confere o acesso na entrega). A FK para `tasks` segue o ADR 0015
+// (critério a; tabela em docs/architecture/bounded-contexts.md); a back-relation `Task.comments` é
+// inerte e barrada por lint.
+
+/// Comentário de uma tarefa (BR-031). Removido ⇔ `body` nulo e `deleted_at` preenchido (D4).
+model Comment {
+  id              String    @id @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  taskId          String    @map("task_id") @db.Uuid
+  authorUserId    String    @map("author_user_id") @db.Uuid
+  /// Texto com tokens `<@uuid>` canônicos. CHECKs de coerência e tamanho escritos à mão na
+  /// migration `add_comments` (o Prisma não os expressa) e protegidos por teste de catálogo.
+  body            String?
+  createdAt       DateTime  @map("created_at") @db.Timestamptz(3)
+  editedAt        DateTime? @map("edited_at") @db.Timestamptz(3)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedByUserId String?   @map("deleted_by_user_id") @db.Uuid
+  /// Optimistic locking (BR-008).
+  version         Int       @default(1)
+
+  task     Task             @relation(fields: [organizationId, projectId, taskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+  mentions CommentMention[]
+
+  /// Alvo da FK composta das menções.
+  @@unique([organizationId, id])
+  /// Conversa da tarefa por keyset `(created_at DESC, id DESC)`; também atende à FK da tarefa.
+  @@index([organizationId, taskId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("comments")
+}
+
+/// Pessoa mencionada num comentário (BR-032); apagada com o comentário ou na sua remoção.
+model CommentMention {
+  organizationId String @map("organization_id") @db.Uuid
+  commentId      String @map("comment_id") @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+
+  comment Comment @relation(fields: [organizationId, commentId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@id([organizationId, commentId, userId])
+  /// Para a 008 ("onde fui mencionado").
+  @@index([organizationId, userId])
+  @@map("comment_mentions")
+}

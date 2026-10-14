@@ -54,6 +54,8 @@ model Task {
   subtasks  Task[]           @relation("Subtasks")
   blockedBy TaskDependency[] @relation("Blocked")
   blocking  TaskDependency[] @relation("Blocking")
+  /// Inerte (ADR 0015, item 3): existe só pela FK de `comments` (spec 010); barrada por lint.
+  comments  Comment[]
 
   /// Alvo das FKs compostas internas.
   @@unique([organizationId, projectId, id])

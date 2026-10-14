@@ -18,6 +18,16 @@ export { Prisma }
 export * as $Enums from './enums'
 export * from './enums';
 /**
+ * Model Comment
+ * Comentário de uma tarefa (BR-031). Removido ⇔ `body` nulo e `deleted_at` preenchido (D4).
+ */
+export type Comment = Prisma.CommentModel
+/**
+ * Model CommentMention
+ * Pessoa mencionada num comentário (BR-032); apagada com o comentário ou na sua remoção.
+ */
+export type CommentMention = Prisma.CommentMentionModel
+/**
  * Model User
  * Usuário. E-mail normalizado (minúsculas, sem espaços) — reforçado por CHECK na migration.
  */

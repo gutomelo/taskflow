@@ -22,6 +22,18 @@
     "skipDefaultLibCheck": true,
     "importHelpers": true,
     "paths": {
+      "@taskflow/backend/collaboration/application": [
+        "./libs/backend/collaboration/application/src/index.ts"
+      ],
+      "@taskflow/backend/collaboration/application/testing": [
+        "./libs/backend/collaboration/application/src/testing.ts"
+      ],
+      "@taskflow/backend/collaboration/domain": [
+        "./libs/backend/collaboration/domain/src/index.ts"
+      ],
+      "@taskflow/backend/collaboration/infrastructure": [
+        "./libs/backend/collaboration/infrastructure/src/index.ts"
+      ],
       "@taskflow/backend/identity/application": [
         "./libs/backend/identity/application/src/index.ts"
       ],

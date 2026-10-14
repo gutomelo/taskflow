@@ -57,11 +57,14 @@ export type { MemberCandidateView, ProjectMemberView } from './lib/shared/projec
 export type { ProjectContributorChanges } from './lib/ports/project-contributor-changes';
 export {
   ListAssignableUsersUseCase,
+  ListProjectReaderIdsUseCase,
   LockProjectForContributionUseCase,
+  MAX_PROJECT_READER_IDS,
   ResolveProjectForReadUseCase,
   type AssignableUser,
   type ProjectContribution,
   type ProjectForRead,
+  type ProjectReaderIds,
 } from './lib/use-cases/contribution.use-cases';
 export type { WorkflowStatusUsage } from './lib/ports/workflow-status-usage';
 export {

@@ -28,6 +28,7 @@ import {
   type SessionRevocationReason,
   type SessionSnapshot,
   type UserRepository,
+  type UserSearchPosition,
   type UserSnapshot,
   type UserTokenIssueResult,
   type UserTokenPurpose,
@@ -85,6 +86,39 @@ export class InMemoryUserRepository implements UserRepository, TransactionalStor
       const row = this.rows.get(id);
       return row ? [User.restore(row)] : [];
     });
+  }
+  async searchAmong(
+    ids: readonly string[],
+    query: string,
+    limit: number,
+    after: UserSearchPosition | null,
+  ) {
+    const needle = query.toLowerCase();
+    const allowed = new Set(ids);
+    return [...this.rows.values()]
+      .filter((row) => allowed.has(row.id))
+      .filter(
+        (row) =>
+          row.name.value.toLowerCase().includes(needle) ||
+          row.email.value.toLowerCase().includes(needle),
+      )
+      .sort((a, b) =>
+        a.name.value === b.name.value
+          ? a.id < b.id
+            ? -1
+            : 1
+          : a.name.value < b.name.value
+            ? -1
+            : 1,
+      )
+      .filter(
+        (row) =>
+          !after ||
+          row.name.value > after.name ||
+          (row.name.value === after.name && row.id > after.id),
+      )
+      .slice(0, limit)
+      .map((row) => User.restore(row));
   }
   async add(user: User) {
     const snapshot = user.toSnapshot();

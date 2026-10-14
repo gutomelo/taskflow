@@ -63,6 +63,8 @@ export {
   FindUserIdByEmailUseCase,
   GetUserAccountsUseCase,
   MAX_ACCOUNTS_PER_QUERY,
+  MAX_SEARCH_IDS,
+  SearchUsersAmongUseCase,
   type UserAccountView,
 } from './lib/use-cases/user-directory.use-cases';
 export { CurrentPasswordIncorrectError } from './lib/shared/identity-errors';

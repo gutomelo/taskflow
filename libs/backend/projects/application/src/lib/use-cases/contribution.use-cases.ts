@@ -201,3 +201,65 @@ export class ListAssignableUsersUseCase {
     };
   }
 }
+
+/** Teto de ids de leitores devolvidos (spec 010): participantes (≤ 500) + owners e admins. */
+export const MAX_PROJECT_READER_IDS = 1000;
+
+export type ProjectReaderIds = Readonly<{
+  userIds: ReadonlyArray<string>;
+  /** `false` se havia mais leitores que o teto (quem chama recusa). */
+  complete: boolean;
+}>;
+
+const READER_PAGE = 200;
+
+/**
+ * Quem lê o projeto (spec 010, candidatos a menção): participantes com papel efetivo (inclusive
+ * viewers) e owners/admins da organização (D1 da spec 003: não são participantes gravados). Só ids,
+ * sem paginar para fora: nome e e-mail são filtrados por `identity`.
+ */
+export class ListProjectReaderIdsUseCase {
+  constructor(
+    private readonly deps: {
+      readonly projectMembers: ProjectMemberRepository;
+      readonly organizationAccess: OrganizationAccess;
+    },
+  ) {}
+
+  async execute(organizationId: string, projectId: string): Promise<ProjectReaderIds> {
+    const readers = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page = await this.deps.projectMembers.listPage(organizationId, projectId, {
+        limit: READER_PAGE,
+        cursor,
+      });
+      const roles = await this.deps.organizationAccess.rolesOf(
+        organizationId,
+        page.items.map((member) => member.userId),
+      );
+      for (const member of page.items) {
+        const organizationRole = roles.get(member.userId);
+        if (organizationRole && effectiveProjectRole(organizationRole, member.role)) {
+          readers.add(member.userId);
+        }
+      }
+      cursor = page.nextCursor;
+    } while (cursor !== null && readers.size <= MAX_PROJECT_READER_IDS);
+    cursor = null;
+    while (readers.size <= MAX_PROJECT_READER_IDS) {
+      const managers = await this.deps.organizationAccess.listMembersPage({
+        organizationId,
+        excludeUserIds: [],
+        roles: ['owner', 'admin'],
+        limit: READER_PAGE,
+        cursor,
+      });
+      for (const item of managers.items) readers.add(item.userId);
+      cursor = managers.nextCursor;
+      if (cursor === null) break;
+    }
+    const complete = readers.size <= MAX_PROJECT_READER_IDS;
+    return { userIds: [...readers].slice(0, MAX_PROJECT_READER_IDS), complete };
+  }
+}

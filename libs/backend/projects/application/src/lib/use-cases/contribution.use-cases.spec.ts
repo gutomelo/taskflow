@@ -4,7 +4,9 @@ import { createProjectsTestbed, type ProjectsTestbed } from '../../testing/proje
 import { ApplyOrganizationRoleChangeUseCase } from './apply-organization-role-change.use-case';
 import {
   ListAssignableUsersUseCase,
+  ListProjectReaderIdsUseCase,
   LockProjectForContributionUseCase,
+  MAX_PROJECT_READER_IDS,
   ResolveProjectForReadUseCase,
 } from './contribution.use-cases';
 import { CreateProjectUseCase } from './create-project.use-case';
@@ -241,5 +243,36 @@ describe('contribution use cases for tasks (spec 004, port ProjectAccess)', () =
       ['adm', 'ADM', 'manager'],
     ]);
     expect(managers.nextCursor).toBeNull();
+  });
+});
+
+describe('project readers for mentions (spec 010)', () => {
+  it('lists every participant who still reads it (viewers too) and the owners and admins, once', async () => {
+    const { bed, p1, p2 } = await world();
+    await participate(bed, p1, 'adm', 'member');
+    // Saiu da organização: a cascata da FK apaga a participação (ADR 0015).
+    bed.organizationAccess.setMember(ORG, 'gone', 'member');
+    await participate(bed, p1, 'gone', 'member');
+    bed.projectMembers.removeMembership(ORG, 'gone');
+
+    const readers = await new ListProjectReaderIdsUseCase(bed).execute(ORG, p1);
+
+    expect([...readers.userIds].sort()).toEqual(['adm', 'ana', 'bia', 'mia', 'vivi']);
+    expect(readers.complete).toBe(true);
+    expect(
+      [...(await new ListProjectReaderIdsUseCase(bed).execute(ORG, p2)).userIds].sort(),
+    ).toEqual(['adm', 'ana', 'mia']);
+  });
+
+  it('stops at the cap and says the list is incomplete', async () => {
+    const { bed, p1 } = await world();
+    for (let index = 0; index < MAX_PROJECT_READER_IDS; index += 1) {
+      bed.organizationAccess.setMember(ORG, `admin-${index}`, 'admin');
+    }
+
+    const readers = await new ListProjectReaderIdsUseCase(bed).execute(ORG, p1);
+
+    expect(readers.complete).toBe(false);
+    expect(readers.userIds).toHaveLength(MAX_PROJECT_READER_IDS);
   });
 });

@@ -242,7 +242,8 @@ export const projectsMustNotReachTasks = {
 };
 
 /**
- * ADR 0015 (spec 004): as relações `project`, `status` e `assignee` de `Task` existem só para as FKs;
+ * ADR 0015 (specs 004 e 010): as relações `project`, `status` e `assignee` de `Task` existem só para
+ * as FKs, e a back-relation `comments` só pela FK de `collaboration`;
  * `tasks` não lê tabelas de outros contextos (status, nomes e papéis chegam por `ProjectAccess` e
  * `UserDirectory`). Incluída pelos configs das bibliotecas de `tasks`.
  */
@@ -256,9 +257,32 @@ export const tasksMustNotReachOtherContexts = {
       ...TENANT_PARAM_RESTRICTIONS,
       {
         selector:
-          'MemberExpression[property.name=/^(project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(project|status|assignee)$/]',
+          'MemberExpression[property.name=/^(project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user|comment|commentMention)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(project|status|assignee|comments)$/]',
         message:
           'ADR 0015: tasks não lê tabelas de outros contextos; use ProjectAccess ou UserDirectory.',
+      },
+    ],
+  },
+};
+
+/**
+ * ADR 0015 (spec 010): a relação `task` de `Comment` existe só para a FK; `collaboration` não lê
+ * tabelas de outros contextos (tarefa, papéis, membros e nomes chegam por `TaskDiscussionAccess` e
+ * `CollaborationUserDirectory`). Incluída pelos configs das bibliotecas de `collaboration`.
+ */
+export const collaborationMustNotReachOtherContexts = {
+  files: ['**/*.ts'],
+  // Testes de integração semeiam tabelas de outros contextos de propósito.
+  ignores: ['**/*.integration.spec.ts'],
+  rules: {
+    'no-restricted-syntax': [
+      'error',
+      ...TENANT_PARAM_RESTRICTIONS,
+      {
+        selector:
+          'MemberExpression[property.name=/^(task|taskDependency|taskCounter|taskProjectLock|project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(task)$/]',
+        message:
+          'ADR 0015: collaboration não lê tabelas de outros contextos; use TaskDiscussionAccess ou CollaborationUserDirectory.',
       },
     ],
   },
