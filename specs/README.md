@@ -57,5 +57,6 @@ Proporcionalidade: correções triviais não exigem spec; melhorias pequenas vir
 | 007-sprints                                              | 3    | Não iniciada |
 | 008-notifications                                        | 2    | Não iniciada |
 | 009-analytics                                            | 3    | Não iniciada |
+| [010-comments](010-comments/requirements.md)             | 2    | Rascunho     |
 
 Diretórios de specs são criados quando a especificação começa — sem pastas vazias.
