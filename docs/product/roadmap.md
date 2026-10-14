@@ -15,7 +15,7 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
 - Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
 
-## Fase 1 — MVP · Em andamento (specs 001, 002, 006, 003 e 004 concluídas)
+## Fase 1 — MVP · Concluído
 
 | Ordem | Spec                 | Conteúdo                                                                                                                                                                          |
 | ----- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
