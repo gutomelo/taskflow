@@ -4,3 +4,4 @@ export * from './lib/auth/auth.contract';
 export * from './lib/organizations/organizations.contract';
 export * from './lib/projects/projects.contract';
 export * from './lib/tasks/tasks.contract';
+export * from './lib/tasks/board.contract';

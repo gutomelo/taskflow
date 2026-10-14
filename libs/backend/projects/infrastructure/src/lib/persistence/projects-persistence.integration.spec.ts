@@ -23,6 +23,9 @@ import {
   ProjectKeyTakenError,
   ProjectMember,
   ProjectName,
+  StatusInUseError,
+  StatusNameTakenError,
+  type Workflow,
 } from '@taskflow/backend/projects/domain';
 import { PrismaProjectMemberRepository } from './prisma-project-member.repository';
 import { PrismaProjectRepository } from './prisma-project.repository';
@@ -300,6 +303,127 @@ describe('projects persistence (integration, T3)', () => {
         role: 'manager',
         version: 1,
       });
+    });
+  });
+
+  describe('workflow (spec 005, T4)', () => {
+    const save = (organizationId: string, projectId: string, workflow: Workflow, version: number) =>
+      transactions.run(() => projects.saveWorkflow(organizationId, projectId, workflow, version));
+
+    it('saves the whole workflow with its own version: add, rename, reorder, transitions', async () => {
+      const organizationId = await organization();
+      const projectId = await project(organizationId, 'WEB');
+      const current = await projects.findWorkflow(organizationId, projectId);
+      const [todo, doing, done] = current.statuses.map((status) => status.id);
+      if (!todo || !doing || !done) throw new Error('default workflow');
+      const reviewId = randomUUID();
+      const next: Workflow = {
+        statuses: [
+          { id: todo, name: 'Backlog', category: 'todo', position: 0 },
+          { id: reviewId, name: 'Em revisão', category: 'in_progress', position: 1 },
+          { id: doing, name: 'Em andamento', category: 'in_progress', position: 2 },
+          { id: done, name: 'Concluído', category: 'done', position: 3 },
+        ],
+        transitions: [
+          { fromStatusId: todo, toStatusId: doing },
+          { fromStatusId: doing, toStatusId: reviewId },
+          { fromStatusId: reviewId, toStatusId: done },
+        ],
+      };
+
+      expect(await projects.workflowVersion(organizationId, projectId)).toBe(1);
+      await save(organizationId, projectId, next, 1);
+
+      const saved = await projects.findWorkflow(organizationId, projectId);
+      expect(saved.statuses.map((status) => status.name)).toEqual([
+        'Backlog',
+        'Em revisão',
+        'Em andamento',
+        'Concluído',
+      ]);
+      expect(saved.transitions).toHaveLength(3);
+      expect(await projects.workflowVersion(organizationId, projectId)).toBe(2);
+      // `projects.version` (nome/descrição) não muda com o fluxo.
+      expect(
+        (
+          await prisma.project.findUniqueOrThrow({
+            where: { id: projectId },
+            select: { version: true },
+          })
+        ).version,
+      ).toBe(1);
+      await expect(save(organizationId, projectId, next, 1)).rejects.toBeInstanceOf(
+        VersionConflictError,
+      );
+      await expect(
+        projects.saveWorkflow(organizationId, projectId, next, 2),
+      ).rejects.toBeInstanceOf(TransactionRequiredError);
+    });
+
+    it('removes statuses (transitions in cascade); in use ⇒ STATUS_IN_USE; names without case ⇒ STATUS_NAME_TAKEN', async () => {
+      const organizationId = await organization();
+      const projectId = await project(organizationId, 'WEB');
+      const current = await projects.findWorkflow(organizationId, projectId);
+      const [todo, doing, done] = current.statuses;
+      if (!todo || !doing || !done) throw new Error('default workflow');
+      await prisma.task.create({
+        data: {
+          id: randomUUID(),
+          organizationId,
+          projectId,
+          number: 1,
+          title: 'Em uso',
+          statusId: doing.id,
+          createdByUserId: randomUUID(),
+          createdAt: now,
+          boardRank: 'a0',
+        },
+      });
+
+      await expect(
+        save(organizationId, projectId, { statuses: [todo, done], transitions: [] }, 1),
+      ).rejects.toBeInstanceOf(StatusInUseError);
+      await expect(
+        save(
+          organizationId,
+          projectId,
+          { statuses: [todo, { ...doing, name: 'A FAZER' }, done], transitions: [] },
+          1,
+        ),
+      ).rejects.toBeInstanceOf(StatusNameTakenError);
+      await save(
+        organizationId,
+        projectId,
+        {
+          statuses: [todo, doing],
+          transitions: current.transitions.filter(
+            (t) => t.toStatusId !== done.id && t.fromStatusId !== done.id,
+          ),
+        },
+        1,
+      );
+
+      const saved = await projects.findWorkflow(organizationId, projectId);
+      expect(saved.statuses.map((status) => status.id)).toEqual([todo.id, doing.id]);
+      expect(
+        saved.transitions.every((t) => t.fromStatusId !== done.id && t.toStatusId !== done.id),
+      ).toBe(true);
+    });
+
+    it('never touches another organization or project', async () => {
+      const [a, b] = [await organization(), await organization()];
+      const [mine, theirs] = [await project(a, 'WEB'), await project(b, 'WEB')];
+      const foreign = await projects.findWorkflow(b, theirs);
+
+      expect(await projects.workflowVersion(a, theirs)).toBeNull();
+      await expect(save(a, theirs, foreign, 1)).rejects.toBeInstanceOf(VersionConflictError);
+      // Ids de status de B num workflow de A: as escritas filtram (org, projeto, id) e não tocam B.
+      const renamedForeign: Workflow = {
+        statuses: foreign.statuses.map((status) => ({ ...status, name: `${status.name} X` })),
+        transitions: [],
+      };
+      await expect(save(a, mine, renamedForeign, 1)).rejects.toThrow();
+      expect(await projects.findWorkflow(b, theirs)).toEqual(foreign);
     });
   });
 });

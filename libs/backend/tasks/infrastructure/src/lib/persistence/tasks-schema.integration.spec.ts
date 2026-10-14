@@ -75,6 +75,7 @@ describe('tasks schema (integration, T2)', () => {
       assigneeUserId: string;
       title: string;
       statusId: string;
+      boardRank: string;
     }> = {},
   ) {
     next += 1;
@@ -91,6 +92,7 @@ describe('tasks schema (integration, T2)', () => {
         assigneeUserId: overrides.assigneeUserId ?? null,
         createdByUserId: randomUUID(),
         createdAt: now,
+        boardRank: overrides.boardRank ?? `e${String(next).padStart(5, '0')}`,
       },
     });
   }
@@ -103,6 +105,78 @@ describe('tasks schema (integration, T2)', () => {
       FROM pg_constraint c WHERE c.conname = 'tasks_organization_id_assignee_user_id_fkey'`;
 
     expect(constraint).toEqual({ deltype: 'n', columns: ['assignee_user_id'] });
+  });
+
+  describe('spec 005 (T3): board rank and editable workflow', () => {
+    it('catalog: board_rank compares in ASCII (COLLATE "C", Prisma cannot express it)', async () => {
+      const [column] = await prisma.$queryRaw<Array<{ collation: string | null }>>`
+        SELECT collation_name AS collation FROM information_schema.columns
+        WHERE table_name = 'tasks' AND column_name = 'board_rank'`;
+
+      expect(column?.collation).toBe('C');
+    });
+
+    it('catalog: the column index is not unique and replaces the status index; status names are unique without case', async () => {
+      const indexes = await prisma.$queryRaw<Array<{ name: string; definition: string }>>`
+        SELECT indexname AS name, indexdef AS definition FROM pg_indexes
+        WHERE tablename IN ('tasks', 'workflow_statuses') ORDER BY indexname`;
+      const byName = new Map(indexes.map((index) => [index.name, index.definition]));
+
+      expect(byName.get('tasks_organization_id_project_id_status_id_board_rank_id_idx')).toMatch(
+        /^CREATE INDEX .*\(organization_id, project_id, status_id, board_rank, id\)$/,
+      );
+      expect(byName.has('tasks_organization_id_project_id_status_id_idx')).toBe(false);
+      expect(byName.get('workflow_statuses_organization_id_project_id_lower_name_key')).toMatch(
+        /^CREATE UNIQUE INDEX .*\(organization_id, project_id, lower\(\(name\)::text\)\)$/,
+      );
+    });
+
+    it('ordering follows code units: uppercase before lowercase, like the domain', async () => {
+      const { organizationId, p1 } = await world();
+      for (const boardRank of ['ab', 'aB', 'a0', 'aZ', 'aa'])
+        await task(organizationId, p1, { boardRank });
+
+      const rows = await prisma.task.findMany({
+        where: { organizationId, projectId: p1.id },
+        orderBy: [{ boardRank: 'asc' }, { id: 'asc' }],
+        select: { boardRank: true },
+      });
+
+      expect(rows.map((row) => row.boardRank)).toEqual(['a0', 'aB', 'aZ', 'aa', 'ab']);
+    });
+
+    it('CHECK: rank alphabet and length; ties are allowed (the index is not unique)', async () => {
+      const { organizationId, p1 } = await world();
+      for (const boardRank of ['a_1', '0a', 'a', `a${'1'.repeat(64)}`]) {
+        await expect(task(organizationId, p1, { boardRank }), boardRank).rejects.toThrow();
+      }
+      await task(organizationId, p1, { boardRank: 'a5' });
+      await expect(task(organizationId, p1, { boardRank: 'a5' })).resolves.toBeDefined();
+    });
+
+    it('BR-030: status names are unique per project without case; workflow_version starts at 1', async () => {
+      const { organizationId, p1, p2 } = await world();
+      const status = (projectId: string, name: string) =>
+        prisma.workflowStatus.create({
+          data: {
+            id: randomUUID(),
+            organizationId,
+            projectId,
+            name,
+            category: 'todo',
+            position: 1,
+          },
+        });
+
+      await expect(status(p1.id, 'A FAZER')).rejects.toThrow();
+      await expect(status(p2.id, 'Revisão')).resolves.toBeDefined();
+      await expect(status(p1.id, 'Revisão')).resolves.toBeDefined();
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: p1.id },
+        select: { workflowVersion: true },
+      });
+      expect(project.workflowVersion).toBe(1);
+    });
   });
 
   it('BR-003: removing the membership unassigns the tasks and keeps the organization', async () => {

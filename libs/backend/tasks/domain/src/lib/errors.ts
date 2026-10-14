@@ -100,3 +100,19 @@ export class TaskNotFoundError extends DomainError {
     super('Task not found');
   }
 }
+
+/** BR-009: vizinho fora da coluna de destino (inexistente, outro projeto, subtarefa, cancelado). */
+export class InvalidPositionError extends DomainError {
+  readonly code = 'INVALID_POSITION';
+  constructor() {
+    super('Invalid position on the board');
+  }
+}
+
+/** Só tarefas de primeiro nível são cards do quadro (spec 005). */
+export class TaskNotACardError extends DomainError {
+  readonly code = 'TASK_NOT_A_CARD';
+  constructor() {
+    super('Subtasks are not board cards');
+  }
+}

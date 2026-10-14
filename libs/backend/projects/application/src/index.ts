@@ -10,11 +10,7 @@ export {
   ListProjectsUseCase,
   type ListProjectsQuery,
 } from './lib/use-cases/list-projects.use-case';
-export {
-  GetProjectUseCase,
-  GetWorkflowUseCase,
-  type ProjectLookup,
-} from './lib/use-cases/get-project.use-case';
+export { GetProjectUseCase, type ProjectLookup } from './lib/use-cases/get-project.use-case';
 export {
   ArchiveProjectUseCase,
   RestoreProjectUseCase,
@@ -67,3 +63,18 @@ export {
   type ProjectContribution,
   type ProjectForRead,
 } from './lib/use-cases/contribution.use-cases';
+export type { WorkflowStatusUsage } from './lib/ports/workflow-status-usage';
+export {
+  CreateStatusUseCase,
+  GetWorkflowUseCase,
+  RemoveStatusUseCase,
+  ReorderStatusesUseCase,
+  ReplaceTransitionsUseCase,
+  UpdateStatusUseCase,
+  WORKFLOW_WRITE_POLICY,
+  type CreateStatusCommand,
+  type RemoveStatusCommand,
+  type UpdateStatusCommand,
+  type WorkflowDependencies,
+  type WorkflowView,
+} from './lib/use-cases/workflow.use-cases';

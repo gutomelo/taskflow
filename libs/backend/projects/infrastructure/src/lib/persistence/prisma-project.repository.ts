@@ -1,6 +1,8 @@
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
 import {
   ProjectKeyTakenError,
+  StatusInUseError,
+  StatusNameTakenError,
   type Page,
   type PageRequest,
   type Project,
@@ -10,6 +12,7 @@ import {
   type Workflow,
 } from '@taskflow/backend/projects/domain';
 import {
+  isForeignKeyViolation,
   isUniqueConstraintViolation,
   type PrismaTransactionRunner,
 } from '@taskflow/backend/shared/infrastructure';
@@ -184,5 +187,63 @@ export class PrismaProjectRepository implements ProjectRepository {
       }),
     ]);
     return toWorkflow(statuses, transitions);
+  }
+
+  async workflowVersion(organizationId: string, projectId: string): Promise<number | null> {
+    const row = await this.transactions.client().project.findFirst({
+      where: { organizationId, id: projectId },
+      select: { workflowVersion: true },
+    });
+    return row?.workflowVersion ?? null;
+  }
+
+  async saveWorkflow(
+    organizationId: string,
+    projectId: string,
+    workflow: Workflow,
+    expectedVersion: number,
+  ): Promise<void> {
+    const transaction = this.transactions.transactionalClient('ProjectRepository.saveWorkflow');
+    const { count } = await transaction.project.updateMany({
+      where: { organizationId, id: projectId, workflowVersion: expectedVersion },
+      data: { workflowVersion: { increment: 1 } },
+    });
+    if (count === 0) throw new VersionConflictError('Workflow');
+    const scope = { organizationId, projectId };
+    const existing = await transaction.workflowStatus.findMany({
+      where: scope,
+      select: { id: true },
+    });
+    const kept = new Set(workflow.statuses.map((status) => status.id));
+    const removed = existing.map((status) => status.id).filter((id) => !kept.has(id));
+    const present = new Set(existing.map((status) => status.id));
+    try {
+      if (removed.length > 0) {
+        // As transições caem em cascata; tarefas já foram reatribuídas (FK RESTRICT confere).
+        await transaction.workflowStatus.deleteMany({ where: { ...scope, id: { in: removed } } });
+      }
+      for (const status of workflow.statuses.filter((candidate) => present.has(candidate.id))) {
+        await transaction.workflowStatus.updateMany({
+          where: { ...scope, id: status.id },
+          data: { name: status.name, category: status.category, position: status.position },
+        });
+      }
+      const created = workflow.statuses.filter((candidate) => !present.has(candidate.id));
+      if (created.length > 0) {
+        await transaction.workflowStatus.createMany({
+          data: created.map((status) => ({ ...status, ...scope })),
+        });
+      }
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) throw new StatusNameTakenError();
+      if (isForeignKeyViolation(error)) throw new StatusInUseError();
+      throw error;
+    }
+    await transaction.workflowTransition.deleteMany({ where: scope });
+    if (workflow.transitions.length > 0) {
+      await transaction.workflowTransition.createMany({
+        data: workflow.transitions.map((transition) => ({ ...transition, ...scope })),
+      });
+    }
   }
 }

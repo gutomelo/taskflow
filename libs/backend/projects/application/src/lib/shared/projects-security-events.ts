@@ -26,6 +26,18 @@ export type ProjectsSecurityEvent =
         fromRole: ProjectRole;
         toRole: ProjectRole;
       }>)
-  | (Base & Readonly<{ type: 'projects.member_removed'; targetUserId: string; self: boolean }>);
+  | (Base & Readonly<{ type: 'projects.member_removed'; targetUserId: string; self: boolean }>)
+  | (Base &
+      Readonly<{
+        type: 'projects.workflow_changed';
+        change:
+          | 'status_added'
+          | 'status_updated'
+          | 'status_removed'
+          | 'statuses_reordered'
+          | 'transitions_replaced';
+        /** Tarefas reatribuídas pela remoção de um status (sem eventos de tarefa, S7). */
+        reassignedTasks: number;
+      }>);
 
 export type ProjectsSecurityEventRecorder = SecurityEventRecorder<ProjectsSecurityEvent>;

@@ -22,6 +22,7 @@ export type TasksEvent =
   | (Base &
       Readonly<{ type: 'tasks.assigned'; fromUserId: string | null; toUserId: string | null }>)
   | (Base & Readonly<{ type: 'tasks.status_changed'; fromStatusId: string; toStatusId: string }>)
+  | (Base & Readonly<{ type: 'tasks.card_moved'; fromStatusId: string; toStatusId: string }>)
   | (Base &
       Readonly<{
         type: 'tasks.dependency_added' | 'tasks.dependency_removed';

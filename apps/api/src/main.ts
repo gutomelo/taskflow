@@ -17,6 +17,7 @@ import {
 import { createApp } from './app';
 import { loadConfig } from './config/env';
 import { createMembershipRoleChanges } from './modules/adapters/membership-role-changes.adapter';
+import { createWorkflowStatusUsage } from './modules/adapters/workflow-status-usage.adapter';
 import { createContributorChanges } from './modules/adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from './modules/adapters/organization-access.adapter';
 import { createProjectUserDirectory } from './modules/adapters/project-user-directory.adapter';
@@ -84,6 +85,7 @@ async function bootstrap(): Promise<void> {
   const projectsFoundation = createProjectsFoundation({
     ...shared,
     contributorChanges: createContributorChanges(tasksFoundation),
+    workflowStatusUsage: createWorkflowStatusUsage(tasksFoundation),
   });
   const organizations = createOrganizationsModule({
     ...shared,

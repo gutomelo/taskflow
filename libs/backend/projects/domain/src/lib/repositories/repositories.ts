@@ -49,6 +49,20 @@ export interface ProjectRepository {
   /** BR-008: `VersionConflictError` se a versão lida estiver desatualizada. */
   save(project: Project): Promise<void>;
   findWorkflow(organizationId: string, projectId: string): Promise<Workflow>;
+  /** Versão do workflow (BR-008 do workflow, spec 005); `null` se o projeto não existir. */
+  workflowVersion(organizationId: string, projectId: string): Promise<number | null>;
+  /**
+   * Grava o workflow inteiro se a versão bater (senão `VersionConflictError`), incrementando-a:
+   * remove os status ausentes (transições em cascata), atualiza os existentes, cria os novos e
+   * substitui as transições. Toda escrita filtra `(organizationId, projectId, id)`. Só em
+   * transação, com o projeto travado `FOR NO KEY UPDATE`.
+   */
+  saveWorkflow(
+    organizationId: string,
+    projectId: string,
+    workflow: Workflow,
+    expectedVersion: number,
+  ): Promise<void>;
 }
 
 export interface ProjectMemberRepository {

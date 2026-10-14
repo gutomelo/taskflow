@@ -9,6 +9,7 @@ import {
   ArchiveProjectUseCase,
   ChangeProjectMemberRoleUseCase,
   CreateProjectUseCase,
+  CreateStatusUseCase,
   GetProjectUseCase,
   GetWorkflowUseCase,
   ListAssignableUsersUseCase,
@@ -17,13 +18,18 @@ import {
   ListProjectsUseCase,
   LockProjectForContributionUseCase,
   RemoveProjectMemberUseCase,
+  RemoveStatusUseCase,
+  ReorderStatusesUseCase,
+  ReplaceTransitionsUseCase,
   ResolveProjectForReadUseCase,
   RestoreProjectUseCase,
   UpdateProjectUseCase,
+  UpdateStatusUseCase,
   type OrganizationAccess,
   type ProjectContributorChanges,
   type ProjectsSecurityEventRecorder,
   type UserDirectory,
+  type WorkflowStatusUsage,
 } from '@taskflow/backend/projects/application';
 import {
   PrismaProjectMemberRepository,
@@ -36,6 +42,8 @@ export interface ProjectsFoundationDependencies {
   readonly clock: Clock;
   /** Spec 004: reação de `tasks` a quem deixou de contribuir (adaptador do composition root). */
   readonly contributorChanges: ProjectContributorChanges;
+  /** Spec 005: contar e reatribuir tarefas de um status (adaptador sobre a fundação de `tasks`). */
+  readonly workflowStatusUsage: WorkflowStatusUsage;
 }
 
 /**
@@ -50,6 +58,7 @@ export function createProjectsFoundation(deps: ProjectsFoundationDependencies) {
     projects,
     projectMembers,
     contributorChanges: deps.contributorChanges,
+    workflowStatusUsage: deps.workflowStatusUsage,
     applyOrganizationRoleChange: new ApplyOrganizationRoleChangeUseCase({
       projectMembers,
       contributorChanges: deps.contributorChanges,
@@ -85,6 +94,7 @@ export function createProjectsModule(deps: ProjectsModuleDependencies) {
     projectMembers: foundation.projectMembers,
     organizationAccess: deps.organizationAccess,
     contributorChanges: foundation.contributorChanges,
+    workflowStatusUsage: foundation.workflowStatusUsage,
     users: deps.users,
     transactions: deps.transactions,
     rateLimiter: deps.rateLimiter,
@@ -105,6 +115,11 @@ export function createProjectsModule(deps: ProjectsModuleDependencies) {
     addMember: new AddProjectMemberUseCase(shared),
     changeMemberRole: new ChangeProjectMemberRoleUseCase(shared),
     removeMember: new RemoveProjectMemberUseCase(shared),
+    createStatus: new CreateStatusUseCase(shared),
+    updateStatus: new UpdateStatusUseCase(shared),
+    removeStatus: new RemoveStatusUseCase(shared),
+    reorderStatuses: new ReorderStatusesUseCase(shared),
+    replaceTransitions: new ReplaceTransitionsUseCase(shared),
   };
   return {
     useCases,

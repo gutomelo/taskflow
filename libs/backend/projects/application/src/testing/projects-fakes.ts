@@ -25,6 +25,7 @@ import {
 } from '@taskflow/backend/projects/domain';
 import type { OrganizationRole, ProjectRole } from '@taskflow/backend/shared/kernel';
 import type { OrganizationAccess } from '../lib/ports/organization-access';
+import type { WorkflowStatusUsage } from '../lib/ports/workflow-status-usage';
 import type { ProjectContributorChanges } from '../lib/ports/project-contributor-changes';
 import type { ProjectUserAccount, UserDirectory } from '../lib/ports/user-directory';
 import type {
@@ -171,10 +172,19 @@ export class InMemoryProjectRepository implements ProjectRepository, Transaction
   ) {}
 
   snapshot() {
-    return { rows: [...this.rows], workflows: new Map(this.workflows) };
+    return {
+      rows: [...this.rows],
+      workflows: new Map(this.workflows),
+      workflowVersions: new Map(this.workflowVersions),
+    };
   }
   restore(state: unknown) {
-    const saved = state as { rows: ProjectSnapshot[]; workflows: Map<string, Workflow> };
+    const saved = state as {
+      rows: ProjectSnapshot[];
+      workflows: Map<string, Workflow>;
+      workflowVersions: Map<string, number>;
+    };
+    this.workflowVersions = saved.workflowVersions;
     this.rows = saved.rows;
     this.workflows = saved.workflows;
   }
@@ -273,6 +283,25 @@ export class InMemoryProjectRepository implements ProjectRepository, Transaction
     );
     return (owned ? this.workflows.get(projectId) : undefined) ?? { statuses: [], transitions: [] };
   }
+  workflowVersions = new Map<string, number>();
+  async workflowVersion(organizationId: string, projectId: string) {
+    const owned = this.rows.some(
+      (row) => row.organizationId === organizationId && row.id === projectId,
+    );
+    return owned ? (this.workflowVersions.get(projectId) ?? 1) : null;
+  }
+  async saveWorkflow(
+    organizationId: string,
+    projectId: string,
+    workflow: Workflow,
+    expectedVersion: number,
+  ) {
+    requireTransaction(this.transactions, 'ProjectRepository.saveWorkflow');
+    const current = await this.workflowVersion(organizationId, projectId);
+    if (current !== expectedVersion) throw new VersionConflictError('Workflow');
+    this.workflows.set(projectId, workflow);
+    this.workflowVersions.set(projectId, expectedVersion + 1);
+  }
 }
 
 /**
@@ -367,6 +396,35 @@ export class RecordingContributorChanges implements ProjectContributorChanges {
   }
 }
 
+/** `tasks` vista pela porta: contagens por status e reatribuições feitas. */
+export class FakeWorkflowStatusUsage implements WorkflowStatusUsage, TransactionalStore {
+  counts = new Map<string, number>();
+  reassignments: Array<{ projectId: string; fromStatusId: string; toStatusId: string }> = [];
+  snapshot() {
+    return { counts: new Map(this.counts), reassignments: [...this.reassignments] };
+  }
+  restore(state: unknown) {
+    const saved = state as Pick<FakeWorkflowStatusUsage, 'counts' | 'reassignments'>;
+    this.counts = saved.counts;
+    this.reassignments = saved.reassignments;
+  }
+  async statusUsage() {
+    return new Map(this.counts);
+  }
+  async reassignStatus(
+    _organizationId: string,
+    projectId: string,
+    fromStatusId: string,
+    toStatusId: string,
+  ) {
+    const moved = this.counts.get(fromStatusId) ?? 0;
+    this.counts.delete(fromStatusId);
+    this.counts.set(toStatusId, (this.counts.get(toStatusId) ?? 0) + moved);
+    this.reassignments.push({ projectId, fromStatusId, toStatusId });
+    return moved;
+  }
+}
+
 export class RecordingProjectsSecurityEvents implements ProjectsSecurityEventRecorder {
   events: ProjectsSecurityEvent[] = [];
   record(event: ProjectsSecurityEvent) {
@@ -379,7 +437,8 @@ export function createProjectsTestbed() {
   const transactions = new FakeTransactionRunner();
   const projectMembers = new InMemoryProjectMemberRepository(transactions);
   const projects = new InMemoryProjectRepository(transactions, projectMembers);
-  transactions.register(projects, projectMembers);
+  const workflowStatusUsage = new FakeWorkflowStatusUsage();
+  transactions.register(projects, projectMembers, workflowStatusUsage);
   return {
     transactions,
     projects,
@@ -388,6 +447,7 @@ export function createProjectsTestbed() {
     users: new InMemoryProjectsUserDirectory(),
     securityEvents: new RecordingProjectsSecurityEvents(),
     contributorChanges: new RecordingContributorChanges(),
+    workflowStatusUsage,
     rateLimiter: new InMemoryRateLimiter(),
     clock: new FixedClock(),
     idGenerator: new SequentialIds(),

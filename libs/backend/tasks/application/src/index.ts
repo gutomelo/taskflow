@@ -9,6 +9,7 @@ export type { TaskUserDirectory } from './lib/ports/user-directory';
 export {
   AssigneeNotProjectMemberError,
   DependencyNotFoundError,
+  InvalidCursorError,
   InsufficientRoleError,
   OrganizationNotFoundError,
   ProjectArchivedError,
@@ -24,7 +25,12 @@ export {
   MAX_SUBTASKS_PER_TASK,
   MAX_TASKS_PER_ORGANIZATION,
   MAX_TASKS_PER_PROJECT,
+  BOARD_DEFAULT_CARDS,
+  BOARD_MAX_CARDS,
+  COLUMN_DEFAULT_CARDS,
+  COLUMN_MAX_CARDS,
   TASK_CREATION_POLICY,
+  TASK_REBALANCE_POLICY,
   TASK_WRITE_POLICY,
 } from './lib/shared/task-limits';
 export type { TasksEvent, TasksEventRecorder } from './lib/shared/tasks-events';
@@ -32,6 +38,19 @@ export type { TasksDependencies } from './lib/shared/tasks-dependencies';
 export type { TaskProjectContext, TaskSummaryView, TaskView } from './lib/shared/task-views';
 export type { TaskWriteOutcome } from './lib/shared/task-write';
 export type { TaskLookup } from './lib/shared/task-access';
+export { encodeColumnCursor } from './lib/shared/board-cursor';
+export {
+  CountTasksByStatusUseCase,
+  GetBoardUseCase,
+  ListColumnCardsUseCase,
+  MoveCardUseCase,
+  ReassignTasksStatusUseCase,
+  type BoardView,
+  type CardView,
+  type ColumnView,
+  type MoveCardCommand,
+  type MoveCardOutcome,
+} from './lib/use-cases/board.use-cases';
 export { CreateTaskUseCase, type CreateTaskCommand } from './lib/use-cases/create-task.use-case';
 export {
   AssignTaskUseCase,

@@ -1,6 +1,6 @@
 # 005 — Kanban · Design técnico
 
-- **Status**: Rascunho (revisão 2)
+- **Status**: Aprovado (revisão 2; D1–D6 como recomendados)
 - **Requisitos**: [requirements.md](requirements.md)
 - **Revisão de arquitetura**: feita (revisão 2 incorpora os achados: B1, B2, I1–I9, S1–S9)
 - **Revisão de segurança**: feita (revisão 2 incorpora os achados: A1, M1–M3, B1–B8)

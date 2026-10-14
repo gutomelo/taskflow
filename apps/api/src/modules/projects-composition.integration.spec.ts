@@ -40,6 +40,7 @@ import { InMemoryProjectsUserDirectory } from '@taskflow/backend/projects/applic
 import { ProjectRoleAboveCeilingError } from '@taskflow/backend/projects/domain';
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
 import { createMembershipRoleChanges } from './adapters/membership-role-changes.adapter';
+import { createWorkflowStatusUsage } from './adapters/workflow-status-usage.adapter';
 import { createContributorChanges } from './adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from './adapters/organization-access.adapter';
 import { createOrganizationsModule } from './organizations.module';
@@ -84,10 +85,12 @@ describe('projects composition (integration, spec 003 T7)', () => {
     const rateLimiter = new InMemoryRateLimiter();
     const logger = pino({ level: 'silent' });
     // Mesma ordem de montagem de `main.ts`.
+    const tasksFoundationForProjects = createTasksFoundation({ transactions, clock });
     foundation = createProjectsFoundation({
       transactions,
       clock,
-      contributorChanges: createContributorChanges(createTasksFoundation({ transactions, clock })),
+      contributorChanges: createContributorChanges(tasksFoundationForProjects),
+      workflowStatusUsage: createWorkflowStatusUsage(tasksFoundationForProjects),
     });
     membershipRoleChanges = createMembershipRoleChanges(foundation);
     const noop: RequestHandler = (_request, _response, next) => next();

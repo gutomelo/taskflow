@@ -19,6 +19,7 @@ import { InMemoryUserDirectory } from '@taskflow/backend/organizations/applicati
 import { InMemoryProjectsUserDirectory } from '@taskflow/backend/projects/application/testing';
 import { createApp } from '../app';
 import { createMembershipRoleChanges } from '../modules/adapters/membership-role-changes.adapter';
+import { createWorkflowStatusUsage } from '../modules/adapters/workflow-status-usage.adapter';
 import { createContributorChanges } from '../modules/adapters/contributor-changes.adapter';
 import { createOrganizationAccess } from '../modules/adapters/organization-access.adapter';
 import { composeApiRouters } from '../modules/api-routers';
@@ -76,6 +77,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     transactions,
     clock,
     contributorChanges: createContributorChanges(tasksFoundation),
+    workflowStatusUsage: createWorkflowStatusUsage(tasksFoundation),
   });
   const organizations = createOrganizationsModule({
     logger,

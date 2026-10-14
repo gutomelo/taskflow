@@ -74,3 +74,11 @@ export class DependencyNotFoundError extends DomainError {
     super('Dependency not found');
   }
 }
+
+/** Cursor de coluna malformado, adulterado ou de outra coluna (400; nunca chega ao banco). */
+export class InvalidCursorError extends DomainError {
+  readonly code = 'INVALID_CURSOR';
+  constructor() {
+    super('Invalid cursor');
+  }
+}

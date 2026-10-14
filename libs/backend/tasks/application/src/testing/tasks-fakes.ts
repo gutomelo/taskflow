@@ -13,10 +13,13 @@ import {
   type TransactionalStore,
 } from '@taskflow/backend/shared/application/testing';
 import {
+  spreadKeys,
   Task,
   type Page,
   type PageRequest,
+  type RankedCard,
   type RevocationScope,
+  type SubtaskCount,
   type TaskDependencyRepository,
   type TaskFilter,
   type TaskRepository,
@@ -37,6 +40,13 @@ function requireTransaction(transactions: FakeTransactionRunner, operation: stri
   if (!transactions.inTransaction) throw new Error(`${operation} must run inside a transaction`);
 }
 
+/** Ordem `(rank, id)` por código (como a collation "C"). */
+function compareCards(a: RankedCard, b: RankedCard): number {
+  if (a.rank !== b.rank) return a.rank < b.rank ? -1 : 1;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? -1 : 1;
+}
+
 function pageOf<T>(all: ReadonlyArray<T>, page: PageRequest): Page<T> {
   const start = page.cursor === null ? 0 : Number(page.cursor);
   const next = start + page.limit;
@@ -50,16 +60,23 @@ export class InMemoryTaskRepository implements TaskRepository, TransactionalStor
   readonly projectLocks: string[] = [];
   /** Tarefas travadas (`lockById`). */
   readonly taskLocks: string[] = [];
+  /** Posição de cada tarefa no quadro (fora do agregado, como no banco). */
+  ranks = new Map<string, string>();
 
   constructor(private readonly transactions: FakeTransactionRunner) {}
 
   snapshot() {
-    return { rows: [...this.rows], counters: new Map(this.counters) };
+    return { rows: [...this.rows], counters: new Map(this.counters), ranks: new Map(this.ranks) };
   }
   restore(state: unknown) {
-    const saved = state as { rows: TaskSnapshot[]; counters: Map<string, number> };
+    const saved = state as {
+      rows: TaskSnapshot[];
+      counters: Map<string, number>;
+      ranks: Map<string, string>;
+    };
     this.rows = saved.rows;
     this.counters = saved.counters;
+    this.ranks = saved.ranks;
   }
 
   private in(organizationId: string, projectId?: string) {
@@ -81,8 +98,126 @@ export class InMemoryTaskRepository implements TaskRepository, TransactionalStor
     requireTransaction(this.transactions, 'TaskRepository.lockProject');
     this.projectLocks.push(projectId);
   }
-  async add(task: Task) {
+  async add(task: Task, boardRank: string) {
     this.rows.push(task.toSnapshot());
+    this.ranks.set(task.id, boardRank);
+  }
+  private cards(organizationId: string, projectId: string, statusId: string) {
+    return this.in(organizationId, projectId)
+      .filter(
+        (row) => row.statusId === statusId && row.parentTaskId === null && row.canceledAt === null,
+      )
+      .map((row) => ({ row, rank: this.ranks.get(row.id) ?? '' }))
+      .sort((a, b) => compareCards({ id: a.row.id, rank: a.rank }, { id: b.row.id, rank: b.rank }));
+  }
+  async lastRankInColumn(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    exceptTaskId?: string,
+  ) {
+    const cards = this.cards(organizationId, projectId, statusId).filter(
+      (card) => card.row.id !== exceptTaskId,
+    );
+    return cards.at(-1)?.rank ?? null;
+  }
+  async columnPage(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    page: Readonly<{ limit: number; after: RankedCard | null }>,
+  ) {
+    const { after } = page;
+    const rest = this.cards(organizationId, projectId, statusId).filter(
+      (card) => !after || compareCards({ id: card.row.id, rank: card.rank }, after) > 0,
+    );
+    return {
+      items: rest
+        .slice(0, page.limit)
+        .map((card) => ({ task: Task.restore(card.row), rank: card.rank })),
+      hasMore: rest.length > page.limit,
+    };
+  }
+  /** Consultas de contagem feitas (prova de número fixo de consultas por página). */
+  subtaskCountCalls = 0;
+  async subtaskCounts(
+    organizationId: string,
+    projectId: string,
+    parentTaskIds: ReadonlyArray<string>,
+  ) {
+    this.subtaskCountCalls += 1;
+    const counts = new Map<string, SubtaskCount>();
+    for (const row of this.in(organizationId, projectId)) {
+      if (row.parentTaskId === null || row.canceledAt !== null) continue;
+      if (!parentTaskIds.includes(row.parentTaskId)) continue;
+      const current = counts.get(row.parentTaskId) ?? { done: 0, total: 0 };
+      counts.set(row.parentTaskId, {
+        total: current.total + 1,
+        done: current.done + (row.completedAt ? 1 : 0),
+      });
+    }
+    return counts;
+  }
+  async cardInColumn(organizationId: string, projectId: string, statusId: string, taskId: string) {
+    const card = this.cards(organizationId, projectId, statusId).find(
+      (item) => item.row.id === taskId,
+    );
+    return card ? { id: card.row.id, rank: card.rank } : null;
+  }
+  async adjacentCard(
+    organizationId: string,
+    projectId: string,
+    statusId: string,
+    card: RankedCard,
+    direction: 'next' | 'previous',
+    exceptTaskId: string,
+  ) {
+    const cards = this.cards(organizationId, projectId, statusId)
+      .filter((item) => item.row.id !== exceptTaskId)
+      .map((item) => ({ id: item.row.id, rank: item.rank }));
+    return direction === 'next'
+      ? (cards.find((item) => compareCards(item, card) > 0) ?? null)
+      : ([...cards].reverse().find((item) => compareCards(item, card) < 0) ?? null);
+  }
+  /** Posições gravadas (`placeCard`), na ordem. */
+  readonly placements: Array<{ taskId: string; rank: string }> = [];
+  async placeCard(organizationId: string, projectId: string, taskId: string, rank: string) {
+    if (this.in(organizationId, projectId).some((row) => row.id === taskId)) {
+      this.ranks.set(taskId, rank);
+      this.placements.push({ taskId, rank });
+    }
+  }
+  readonly rebalances: string[] = [];
+  async rebalanceColumn(organizationId: string, projectId: string, statusId: string) {
+    requireTransaction(this.transactions, 'TaskRepository.rebalanceColumn');
+    const cards = this.cards(organizationId, projectId, statusId);
+    const keys = spreadKeys(cards.length);
+    cards.forEach((card, index) => this.ranks.set(card.row.id, keys[index] ?? ''));
+    this.rebalances.push(statusId);
+    return cards.length;
+  }
+  async countByStatus(organizationId: string, projectId: string) {
+    const counts = new Map<string, number>();
+    for (const row of this.in(organizationId, projectId)) {
+      counts.set(row.statusId, (counts.get(row.statusId) ?? 0) + 1);
+    }
+    return counts;
+  }
+  async reassignStatus(
+    organizationId: string,
+    projectId: string,
+    fromStatusId: string,
+    toStatusId: string,
+    now: Date,
+  ) {
+    let count = 0;
+    this.rows = this.rows.map((row) => {
+      if (row.organizationId !== organizationId || row.projectId !== projectId) return row;
+      if (row.statusId !== fromStatusId) return row;
+      count += 1;
+      return { ...row, statusId: toStatusId, version: row.version + 1, updatedAt: now };
+    });
+    return count;
   }
   async findById(organizationId: string, taskId: string) {
     const row = this.in(organizationId).find((candidate) => candidate.id === taskId);

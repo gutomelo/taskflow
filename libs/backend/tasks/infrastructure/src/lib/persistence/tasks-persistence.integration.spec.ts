@@ -104,7 +104,7 @@ describe('tasks persistence (integration, T3)', () => {
         now,
       }),
     );
-    await tasks.add(created);
+    await tasks.add(created, `e${String(created.toSnapshot().number).padStart(5, '0')}`);
     return created;
   }
 
@@ -293,5 +293,249 @@ describe('tasks persistence (integration, T3)', () => {
     await expect(dependencies.add(organizationId, target.id, z.id, y.id)).rejects.toBeInstanceOf(
       TaskNotFoundError,
     );
+  });
+});
+
+describe('board persistence (integration, spec 005 T4)', () => {
+  let database: PostgresTestDatabase;
+  let prisma: PrismaClient;
+  let transactions: PrismaTransactionRunner;
+  let tasks: PrismaTaskRepository;
+  const now = new Date('2026-10-14T10:00:00.000Z');
+
+  beforeAll(async () => {
+    database = await startPostgresTestDatabase();
+    prisma = createPrismaClient({ databaseUrl: database.connectionUri });
+    transactions = new PrismaTransactionRunner(prisma, { timeoutMs: 10_000 });
+    tasks = new PrismaTaskRepository(transactions);
+  });
+
+  afterAll(async () => {
+    await prisma?.$disconnect();
+    await database?.stop();
+  });
+
+  beforeEach(async () => {
+    await prisma.$executeRaw`TRUNCATE organizations CASCADE`;
+  });
+
+  /** Projeto com dois status (todo, in_progress) e cards com chaves dadas. */
+  async function board(organizationId = randomUUID()) {
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: 'Acme',
+        slug: `o-${organizationId.slice(0, 8)}`,
+        createdAt: now,
+      },
+    });
+    const projectId = randomUUID();
+    await prisma.project.create({
+      data: {
+        id: projectId,
+        organizationId,
+        key: 'WEB',
+        name: 'WEB',
+        createdByUserId: randomUUID(),
+        createdAt: now,
+      },
+    });
+    const [todo, doing] = [randomUUID(), randomUUID()];
+    await prisma.workflowStatus.createMany({
+      data: [
+        { id: todo, organizationId, projectId, name: 'A fazer', category: 'todo', position: 0 },
+        {
+          id: doing,
+          organizationId,
+          projectId,
+          name: 'Fazendo',
+          category: 'in_progress',
+          position: 1,
+        },
+      ],
+    });
+    let number = 0;
+    const card = async (
+      boardRank: string,
+      overrides: Partial<{
+        statusId: string;
+        parentTaskId: string;
+        canceled: boolean;
+        done: boolean;
+      }> = {},
+    ) => {
+      number += 1;
+      const id = randomUUID();
+      await prisma.task.create({
+        data: {
+          id,
+          organizationId,
+          projectId,
+          number,
+          title: `T${number}`,
+          statusId: overrides.statusId ?? todo,
+          parentTaskId: overrides.parentTaskId ?? null,
+          canceledAt: overrides.canceled ? now : null,
+          canceledByUserId: overrides.canceled ? randomUUID() : null,
+          completedAt: overrides.done ? now : null,
+          completedByUserId: overrides.done ? randomUUID() : null,
+          createdByUserId: randomUUID(),
+          createdAt: now,
+          boardRank,
+        },
+      });
+      return id;
+    };
+    return { organizationId, projectId, todo, doing, card };
+  }
+
+  const ranksOf = async (organizationId: string, projectId: string, statusId: string) =>
+    (
+      await prisma.task.findMany({
+        where: { organizationId, projectId, statusId, parentTaskId: null, canceledAt: null },
+        orderBy: [{ boardRank: 'asc' }, { id: 'asc' }],
+        select: { id: true, boardRank: true },
+      })
+    ).map((row) => [row.id, row.boardRank] as const);
+
+  it('pages a column by (rank, id): only top-level, not canceled cards, ties by id', async () => {
+    const { organizationId, projectId, todo, doing, card } = await board();
+    const a = await card('a1');
+    const [t1, t2] = [await card('a2'), await card('a2')];
+    const c = await card('a3');
+    await card('a0', { canceled: true });
+    await card('a0', { parentTaskId: a });
+    await card('a0', { statusId: doing });
+
+    const first = await tasks.columnPage(organizationId, projectId, todo, {
+      limit: 2,
+      after: null,
+    });
+    const last = first.items.at(-1);
+    const second = await tasks.columnPage(organizationId, projectId, todo, {
+      limit: 5,
+      after: last ? { id: last.task.id, rank: last.rank } : null,
+    });
+
+    const tie = [t1, t2].sort();
+    expect(first.items.map((item) => item.task.id)).toEqual([a, tie[0]]);
+    expect(first.hasMore).toBe(true);
+    expect(second.items.map((item) => item.task.id)).toEqual([tie[1], c]);
+    expect(second.hasMore).toBe(false);
+    expect(await tasks.lastRankInColumn(organizationId, projectId, todo)).toBe('a3');
+    expect(await tasks.lastRankInColumn(organizationId, projectId, todo, c)).toBe('a2');
+    expect(await tasks.lastRankInColumn(organizationId, randomUUID(), todo)).toBeNull();
+  });
+
+  it('finds a card in its column and its neighbors, ignoring the moving card', async () => {
+    const { organizationId, projectId, todo, doing, card } = await board();
+    const a = await card('a1');
+    const b = await card('a2');
+    const moving = await card('a3');
+    const sub = await card('a5', { parentTaskId: a });
+    const other = await card('a1', { statusId: doing });
+
+    const anchor = await tasks.cardInColumn(organizationId, projectId, todo, a);
+    expect(anchor).toEqual({ id: a, rank: 'a1' });
+    for (const id of [sub, other, randomUUID()]) {
+      expect(await tasks.cardInColumn(organizationId, projectId, todo, id)).toBeNull();
+    }
+    expect(await tasks.cardInColumn(randomUUID(), projectId, todo, a)).toBeNull();
+    if (!anchor) throw new Error('anchor');
+    expect(
+      await tasks.adjacentCard(organizationId, projectId, todo, anchor, 'next', moving),
+    ).toEqual({ id: b, rank: 'a2' });
+    const second = { id: b, rank: 'a2' };
+    expect(
+      await tasks.adjacentCard(organizationId, projectId, todo, second, 'next', moving),
+    ).toBeNull();
+    expect(
+      await tasks.adjacentCard(organizationId, projectId, todo, second, 'previous', moving),
+    ).toEqual(anchor);
+  });
+
+  it('counts subtasks per card without canceled ones', async () => {
+    const { organizationId, projectId, card } = await board();
+    const parent = await card('a1');
+    const empty = await card('a2');
+    await card('a0', { parentTaskId: parent, done: true });
+    await card('a0', { parentTaskId: parent });
+    await card('a0', { parentTaskId: parent, canceled: true });
+
+    const counts = await tasks.subtaskCounts(organizationId, projectId, [parent, empty]);
+
+    expect(counts.get(parent)).toEqual({ done: 1, total: 2 });
+    expect(counts.has(empty)).toBe(false);
+    expect(await tasks.subtaskCounts(organizationId, projectId, [])).toEqual(new Map());
+  });
+
+  it('places a card without touching its version; rebalances a column keeping the order, only in its tenant', async () => {
+    const { organizationId, projectId, todo, card } = await board();
+    const ids = [await card('a5'), await card('a6'), await card('a7')];
+    // Ordem por chave inversa à ordem por id: o rebalanceamento tem de seguir a chave.
+    const byId = [...ids].sort();
+    const longRanks = ['a3', `a1${'V'.repeat(31)}`, `a1${'V'.repeat(30)}`];
+    for (const [index, id] of byId.entries()) {
+      await prisma.task.update({ where: { id }, data: { boardRank: longRanks[index] ?? 'a9' } });
+    }
+    const elsewhere = await board();
+    const foreign = await elsewhere.card('a1');
+    const target = byId[0] ?? '';
+
+    await tasks.placeCard(organizationId, projectId, target, 'a4');
+    expect(
+      await prisma.task.findUniqueOrThrow({
+        where: { id: target },
+        select: { boardRank: true, version: true },
+      }),
+    ).toEqual({ boardRank: 'a4', version: 1 });
+    const before = (await ranksOf(organizationId, projectId, todo)).map(([id]) => id);
+
+    const rewritten = await transactions.run(() =>
+      tasks.rebalanceColumn(organizationId, projectId, todo),
+    );
+
+    const after = await ranksOf(organizationId, projectId, todo);
+    expect(rewritten).toBe(3);
+    expect(before).toEqual([byId[2], byId[1], byId[0]]);
+    expect(after.map(([id]) => id)).toEqual(before);
+    expect(after.every(([, rank]) => rank.length <= 3)).toBe(true);
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: foreign }, select: { boardRank: true } }))
+        .boardRank,
+    ).toBe('a1');
+    await expect(tasks.rebalanceColumn(organizationId, projectId, todo)).rejects.toBeInstanceOf(
+      TransactionRequiredError,
+    );
+  });
+
+  it('counts every task by status and reassigns them all keeping the rank, bumping versions', async () => {
+    const { organizationId, projectId, todo, doing, card } = await board();
+    const parent = await card('a1', { statusId: doing });
+    await card('a2', { statusId: doing, canceled: true });
+    await card('a3', { statusId: doing, parentTaskId: parent });
+    await card('a4');
+
+    expect(await tasks.countByStatus(organizationId, projectId)).toEqual(
+      new Map([
+        [doing, 3],
+        [todo, 1],
+      ]),
+    );
+    const moved = await tasks.reassignStatus(organizationId, projectId, doing, todo, now);
+
+    expect(moved).toBe(3);
+    const rows = await prisma.task.findMany({
+      where: { organizationId, projectId },
+      orderBy: { boardRank: 'asc' },
+      select: { statusId: true, boardRank: true, version: true },
+    });
+    expect(rows.map((row) => [row.boardRank, row.statusId === todo, row.version])).toEqual([
+      ['a1', true, 2],
+      ['a2', true, 2],
+      ['a3', true, 2],
+      ['a4', true, 1],
+    ]);
+    expect(await tasks.reassignStatus(randomUUID(), projectId, todo, doing, now)).toBe(0);
   });
 });

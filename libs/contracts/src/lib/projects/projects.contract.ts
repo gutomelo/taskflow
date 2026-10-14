@@ -100,12 +100,16 @@ export const projectKeyParamSchema = z.object({ key: z.string().regex(/^[A-Z][A-
 export const projectMemberParamSchema = z.object({ projectId: z.uuid(), userId: z.uuid() });
 
 export const workflowSchema = z.object({
+  /** Versão do workflow (BR-008; spec 005): toda edição a informa. */
+  version: z.int(),
   statuses: z.array(
     z.object({
       id: z.uuid(),
       name: z.string(),
       category: statusCategorySchema,
       position: z.int(),
+      /** Tem tarefas (canceladas e subtarefas contam): categoria não muda; remover pede destino. */
+      inUse: z.boolean(),
     }),
   ),
   transitions: z.array(z.object({ fromStatusId: z.uuid(), toStatusId: z.uuid() })),
@@ -170,3 +174,48 @@ export type ChangeProjectMemberRoleRequest = z.infer<typeof changeProjectMemberR
 
 /** `DELETE /projects/{projectId}/members/{userId}?version` (BR-008). */
 export const removeProjectMemberQuerySchema = z.object({ version: z.coerce.number().int().min(1) });
+
+// --- Workflow configurável (spec 005, BR-030) ---
+
+/** Limites folgados contra payloads abusivos; as regras (1–40, teto de 20 status) são do domínio. */
+const statusNameField = z.string().max(200);
+const workflowVersionField = z.int().min(1);
+
+export const statusParamSchema = z.object({ projectId: z.uuid(), statusId: z.uuid() });
+
+export const createStatusRequestSchema = z.strictObject({
+  name: statusNameField,
+  category: statusCategorySchema,
+  version: workflowVersionField,
+});
+export type CreateStatusRequest = z.infer<typeof createStatusRequestSchema>;
+
+export const updateStatusRequestSchema = z
+  .strictObject({
+    name: statusNameField.optional(),
+    category: statusCategorySchema.optional(),
+    version: workflowVersionField,
+  })
+  .refine((value) => value.name !== undefined || value.category !== undefined, {
+    message: 'Informe ao menos um campo para alterar',
+    path: ['(body)'],
+  });
+export type UpdateStatusRequest = z.infer<typeof updateStatusRequestSchema>;
+
+/** `DELETE …/statuses/{statusId}?moveTasksToStatusId&version`: destino obrigatório se houver tarefas. */
+export const removeStatusQuerySchema = z.object({
+  moveTasksToStatusId: z.uuid().optional(),
+  version: z.coerce.number().int().min(1),
+});
+
+export const reorderStatusesRequestSchema = z.strictObject({
+  statusIds: z.array(z.uuid()).min(1).max(20),
+  version: workflowVersionField,
+});
+export type ReorderStatusesRequest = z.infer<typeof reorderStatusesRequestSchema>;
+
+export const replaceTransitionsRequestSchema = z.strictObject({
+  transitions: z.array(z.strictObject({ fromStatusId: z.uuid(), toStatusId: z.uuid() })).max(380),
+  version: workflowVersionField,
+});
+export type ReplaceTransitionsRequest = z.infer<typeof replaceTransitionsRequestSchema>;

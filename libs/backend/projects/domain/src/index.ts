@@ -42,3 +42,26 @@ export type {
   ProjectViewer,
   VisibleProject,
 } from './lib/repositories/repositories';
+export {
+  addStatus,
+  changeCategory,
+  MAX_WORKFLOW_STATUSES,
+  parseStatusName,
+  removeStatus,
+  renameStatus,
+  reorderStatuses,
+  replaceTransitions,
+  STATUS_NAME_MAX_LENGTH,
+  type StatusUsage,
+} from './lib/workflow/workflow-editing';
+export {
+  InvalidStatusNameError,
+  InvalidStatusOrderError,
+  InvalidStatusTargetError,
+  InvalidTransitionError,
+  StatusInUseError,
+  StatusLimitReachedError,
+  StatusNameTakenError,
+  StatusNotFoundError,
+  WorkflowNeedsTodoStatusError,
+} from './lib/errors';

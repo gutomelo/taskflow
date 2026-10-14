@@ -76,3 +76,76 @@ export class NotAnOrganizationMemberError extends DomainError {
     super('User is not a member of the organization');
   }
 }
+
+// --- Workflow configurável (spec 005, BR-030) ---
+
+/** Nome de status: texto exibível de 1 a 40 caracteres. */
+export class InvalidStatusNameError extends DomainError {
+  readonly code = 'INVALID_STATUS_NAME';
+  constructor() {
+    super('Invalid status name');
+  }
+}
+
+/** Nome repetido no workflow, sem diferenciar maiúsculas (também por índice único). */
+export class StatusNameTakenError extends DomainError {
+  readonly code = 'STATUS_NAME_TAKEN';
+  constructor() {
+    super('Status name already used in this workflow');
+  }
+}
+
+/** Status fora do workflow do projeto (inexistente, de outro projeto ou organização): 404. */
+export class StatusNotFoundError extends DomainError {
+  readonly code = 'STATUS_NOT_FOUND';
+  constructor() {
+    super('Status not found');
+  }
+}
+
+/** A categoria só muda em status sem nenhuma tarefa (decisão 3 da spec 005). */
+export class StatusInUseError extends DomainError {
+  readonly code = 'STATUS_IN_USE';
+  constructor() {
+    super('The status has tasks');
+  }
+}
+
+/** Destino da remoção ausente, igual ao removido ou de outra categoria (D2). */
+export class InvalidStatusTargetError extends DomainError {
+  readonly code = 'INVALID_STATUS_TARGET';
+  constructor() {
+    super('Invalid target status');
+  }
+}
+
+/** O workflow precisa de ao menos um status `todo` (status inicial das tarefas novas). */
+export class WorkflowNeedsTodoStatusError extends DomainError {
+  readonly code = 'WORKFLOW_NEEDS_TODO_STATUS';
+  constructor() {
+    super('The workflow needs a status of category todo');
+  }
+}
+
+export class StatusLimitReachedError extends DomainError {
+  readonly code = 'STATUS_LIMIT_REACHED';
+  constructor() {
+    super('Status limit reached for the project');
+  }
+}
+
+/** A nova ordem precisa listar exatamente os status do workflow, uma vez cada. */
+export class InvalidStatusOrderError extends DomainError {
+  readonly code = 'INVALID_STATUS_ORDER';
+  constructor() {
+    super('Invalid status order');
+  }
+}
+
+/** Transição de um status para ele mesmo ou repetida. */
+export class InvalidTransitionError extends DomainError {
+  readonly code = 'INVALID_TRANSITION';
+  constructor() {
+    super('Invalid transition');
+  }
+}

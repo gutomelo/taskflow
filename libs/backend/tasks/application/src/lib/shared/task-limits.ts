@@ -30,3 +30,16 @@ export const TASK_WRITE_POLICY = {
   points: 1200,
   durationSeconds: 60 * 60,
 } as const satisfies RateLimitPolicy;
+
+/** Quadro (spec 005, D5): cards por coluna na carga do quadro e na coluna paginada. */
+export const BOARD_DEFAULT_CARDS = 25;
+export const BOARD_MAX_CARDS = 50;
+export const COLUMN_DEFAULT_CARDS = 50;
+export const COLUMN_MAX_CARDS = 100;
+
+/** Rebalanceamentos de coluna por projeto (M1 da segurança): raros pelo esquema de chaves. */
+export const TASK_REBALANCE_POLICY = {
+  name: 'tasks.rebalance.project.hour',
+  points: 30,
+  durationSeconds: 60 * 60,
+} as const satisfies RateLimitPolicy;

@@ -1,6 +1,6 @@
 # 0016 — Quadro Kanban como visão de Tasks; contexto Boards adiado
 
-- **Status**: Proposto — decisão na aprovação da spec 005
+- **Status**: Aceito (2026-10-14, aprovação da spec 005)
 - **Data**: 2026-10-14
 - **Decisores**: usuário (product owner); arquitetura (Claude Code, revisão da spec 005)
 - **Relacionados**: substitui a "Exceção conhecida" (Tasks × Boards) do [ADR 0003](0003-modular-monolith-clean-architecture.md); [ADR 0007](0007-kanban-ordering.md); [ADR 0014](0014-rls-deferred.md); [ADR 0015](0015-cross-context-referential-integrity.md); [spec 005](../../../specs/005-kanban/design.md); [bounded contexts](../bounded-contexts.md)
@@ -28,7 +28,7 @@ Mantida em `boards`, essa posição obrigaria a: (1) ler colunas ordenando taref
 - Prós: uma fonte da verdade; um movimento escreve uma linha; status e posição na mesma transação de um único contexto (BR-010 sem exceção); nenhuma porta nova; as chaves servem a visões filtradas futuras (sprint, responsável).
 - Contras: `tasks` passa a conhecer a ordem do quadro; quando houver estado de quadro real, a extração exige migrar a coluna.
 
-## Decisão (proposta)
+## Decisão
 
 Adotar **C**.
 

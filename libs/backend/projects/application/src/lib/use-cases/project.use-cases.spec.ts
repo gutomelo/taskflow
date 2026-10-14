@@ -19,7 +19,8 @@ import {
   ProjectNotFoundError,
 } from '../shared/projects-errors';
 import { CreateProjectUseCase } from './create-project.use-case';
-import { GetProjectUseCase, GetWorkflowUseCase } from './get-project.use-case';
+import { GetProjectUseCase } from './get-project.use-case';
+import { GetWorkflowUseCase } from './workflow.use-cases';
 import { ListProjectsUseCase } from './list-projects.use-case';
 import {
   ArchiveProjectUseCase,

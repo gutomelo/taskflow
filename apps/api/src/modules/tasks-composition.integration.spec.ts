@@ -40,6 +40,7 @@ import {
 } from '@taskflow/backend/organizations/infrastructure';
 import { InMemoryProjectsUserDirectory } from '@taskflow/backend/projects/application/testing';
 import { InMemoryTaskUserDirectory } from '@taskflow/backend/tasks/application/testing';
+import { createWorkflowStatusUsage } from './adapters/workflow-status-usage.adapter';
 import { createContributorChanges } from './adapters/contributor-changes.adapter';
 import { createMembershipRoleChanges } from './adapters/membership-role-changes.adapter';
 import { createOrganizationAccess } from './adapters/organization-access.adapter';
@@ -83,6 +84,7 @@ describe('tasks composition (integration, spec 004 T8)', () => {
       transactions,
       clock,
       contributorChanges: createContributorChanges(tasksFoundation),
+      workflowStatusUsage: createWorkflowStatusUsage(tasksFoundation),
     });
     membershipRoleChanges = createMembershipRoleChanges(projectsFoundation);
     const noop: RequestHandler = (_request, _response, next) => next();

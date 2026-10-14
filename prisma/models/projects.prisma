@@ -33,6 +33,9 @@ model Project {
   createdByUserId String    @map("created_by_user_id") @db.Uuid
   /// Optimistic locking (BR-008).
   version         Int       @default(1)
+  /// BR-008 do workflow (spec 005): editar status e transições confere e incrementa esta versão,
+  /// independente de `version` (editar o nome do projeto não conflita com editar o fluxo).
+  workflowVersion Int       @default(1) @map("workflow_version")
   createdAt       DateTime  @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 

@@ -4,14 +4,17 @@ import {
 } from '@taskflow/backend/shared/application';
 import { canOnProject, projectGrant } from '@taskflow/backend/shared/kernel';
 import {
-  assertTransitionAllowed,
   findStatus,
-  ParentTaskCompletedError,
-  TaskBlockedByDependenciesError,
   TaskHasPendingRequiredSubtasksError,
-  type Task,
   type WorkflowView,
 } from '@taskflow/backend/tasks/domain';
+import {
+  appendToColumn,
+  applyTransition,
+  assertParentNotCompleted,
+  isDone,
+  pendingRequiredSubtasks,
+} from '../shared/apply-transition';
 import { lockTaskForWrite } from '../shared/task-access';
 import { TASK_WRITE_POLICY } from '../shared/task-limits';
 import { ownsTaskTree, type TaskView } from '../shared/task-views';
@@ -27,38 +30,14 @@ import {
 import type { TasksDependencies } from '../shared/tasks-dependencies';
 import { StatusNotFoundError } from '../shared/tasks-errors';
 
-const isDone = (workflow: WorkflowView, statusId: string) =>
-  findStatus(workflow, statusId)?.category === 'done';
-
 const mayUpdate = (role: Parameters<typeof canOnProject>[0]) =>
   canOnProject(role, 'task:update', { ownsResource: false });
-
-/** BR-001: subtarefas obrigatórias pendentes da tarefa (ids para o cliente). */
-async function pendingRequiredSubtasks(
-  deps: Pick<TasksDependencies, 'tasks'>,
-  organizationId: string,
-  task: Task,
-): Promise<string[]> {
-  const subtasks = await deps.tasks.subtasksOf(organizationId, task.projectId, task.id);
-  return subtasks.filter((subtask) => subtask.isRequired && subtask.isPending).map((s) => s.id);
-}
-
-/** D1: subtarefa obrigatória que fica pendente não pode ter o pai concluído. */
-async function assertParentNotCompleted(
-  deps: Pick<TasksDependencies, 'tasks'>,
-  organizationId: string,
-  task: Task,
-): Promise<void> {
-  if (!task.isRequired || task.parentTaskId === null) return;
-  const [parent] = await deps.tasks.findByIds(organizationId, task.projectId, [task.parentTaskId]);
-  if (parent?.isCompleted) throw new ParentTaskCompletedError();
-}
 
 export type TransitionTaskCommand = Readonly<{ taskId: string; statusId: string; version: number }>;
 
 /**
  * RF-07 (BR-004, BR-001, BR-006 como precondição — D2 —, BR-029, BR-008). Entrar ou sair de `done`
- * trava o projeto em `tasks`. A spec 005 chama o núcleo na transação de `boards`.
+ * trava o projeto em `tasks`. O núcleo é `applyTransition` (o movimento de card da spec 005 também o usa).
  */
 export class TransitionTaskUseCase {
   constructor(private readonly deps: TasksDependencies) {}
@@ -91,34 +70,13 @@ export class TransitionTaskUseCase {
     if (touchesDone(workflow, task.statusId) && !projectLocked) throw new ConcurrentUpdateError();
     const target = findStatus(workflow, command.statusId);
     if (!target) throw new StatusNotFoundError();
-    const from = task.statusId;
-    assertTransitionAllowed(workflow, from, target.id);
-    const entersDone = target.category === 'done' && !isDone(workflow, from);
-    const leavesDone = target.category !== 'done' && isDone(workflow, from);
-    if (entersDone) {
-      const pending = await pendingRequiredSubtasks(this.deps, organizationId, task);
-      if (pending.length > 0) throw new TaskHasPendingRequiredSubtasksError(pending);
-      const blockerIds = await this.deps.dependencies.blockersOf(organizationId, task.projectId, [
-        task.id,
-      ]);
-      const blockers = await this.deps.tasks.findByIds(organizationId, task.projectId, blockerIds);
-      const blocking = blockers.filter((blocker) => blocker.isPending).map((blocker) => blocker.id);
-      if (blocking.length > 0) throw new TaskBlockedByDependenciesError(blocking);
-    }
-    if (leavesDone) await assertParentNotCompleted(this.deps, organizationId, task);
-    task.moveTo(target, context.actor.userId, this.deps.clock.now());
-    await this.deps.tasks.save(task);
+    const event = await applyTransition(this.deps, context, task, workflow, target);
+    // D6 da spec 005: mudar de coluna pelo detalhe põe o card no fim da nova coluna.
+    await appendToColumn(this.deps, organizationId, task);
     return {
       task: await reloadTask(this.deps, organizationId, task),
       projectContext: project,
-      events: [
-        {
-          ...eventBase(context, task),
-          type: 'tasks.status_changed',
-          fromStatusId: from,
-          toStatusId: target.id,
-        },
-      ],
+      events: [event],
     };
   }
 }
@@ -173,6 +131,8 @@ export class ReopenTaskUseCase {
       }
       task.reopen(this.deps.clock.now());
       await this.deps.tasks.save(task);
+      // D6 da spec 005: a cancelada reaberta volta ao quadro no fim da coluna.
+      await appendToColumn(this.deps, organizationId, task);
       return {
         task: await reloadTask(this.deps, organizationId, task),
         projectContext: project,

@@ -1,10 +1,10 @@
 # 005 — Kanban · Requisitos
 
-- **Status**: Rascunho
+- **Status**: Aprovado
 - **Fase do roadmap**: 1 — MVP (ordem 6, depois de `004-tasks`)
 - **Bounded contexts**: Tasks (`tasks`: o quadro é uma visão das tarefas — posição do card, leitura do quadro e movimento; D1 do design, ADR 0016); Projects (`projects`: configuração do workflow — status e transições), que pede a `tasks` por porta para contar e reatribuir tarefas de um status (cadeia `organizations → projects → tasks`). O contexto Boards fica adiado
 - **Autor / data**: Claude Code (com decisões do usuário) / 2026-10-14
-- **Aprovado por / data**:
+- **Aprovado por / data**: usuário / 2026-10-14
 
 ## Objetivo
 

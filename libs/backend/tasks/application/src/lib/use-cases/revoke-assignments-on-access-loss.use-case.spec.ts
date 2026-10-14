@@ -24,7 +24,7 @@ async function assigned(
     createdByUserId: 'u-0',
     now: bed.clock.now(),
   });
-  await bed.tasks.add(task);
+  await bed.tasks.add(task, 'a0');
   return task.id;
 }
 

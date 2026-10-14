@@ -2,6 +2,7 @@ import type { TenantRequestContext } from '@taskflow/backend/shared/application'
 import { canOnProject } from '@taskflow/backend/shared/kernel';
 import {
   initialStatus,
+  keyAfter,
   parseDueDate,
   parseTaskDescription,
   ParentTaskCompletedError,
@@ -125,7 +126,9 @@ export class CreateTaskUseCase {
       createdByUserId: actorUserId,
       now: this.deps.clock.now(),
     });
-    await this.deps.tasks.add(task);
+    // RF-11 da spec 005: card novo no fim da coluna inicial (sem lock do projeto; empate ⇒ id).
+    const last = await this.deps.tasks.lastRankInColumn(organizationId, projectId, status.id);
+    await this.deps.tasks.add(task, keyAfter(last));
 
     const base = eventBase(context, task);
     return {

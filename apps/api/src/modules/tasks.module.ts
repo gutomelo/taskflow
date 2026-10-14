@@ -7,12 +7,17 @@ import {
   AddDependencyUseCase,
   AssignTaskUseCase,
   CancelTaskUseCase,
+  CountTasksByStatusUseCase,
   CreateTaskUseCase,
   DeleteTaskUseCase,
+  GetBoardUseCase,
   GetTaskUseCase,
+  ListColumnCardsUseCase,
   ListAssignableUsersUseCase,
   ListTasksUseCase,
+  MoveCardUseCase,
   RemoveDependencyUseCase,
+  ReassignTasksStatusUseCase,
   ReopenTaskUseCase,
   RevokeAssignmentsOnAccessLossUseCase,
   TransitionTaskUseCase,
@@ -47,6 +52,9 @@ export function createTasksFoundation(deps: TasksFoundationDependencies) {
       tasks,
       clock: deps.clock,
     }),
+    // Spec 005: servem à porta `WorkflowStatusUsage` de `projects` (só repositórios).
+    countTasksByStatus: new CountTasksByStatusUseCase({ tasks }),
+    reassignTasksStatus: new ReassignTasksStatusUseCase({ tasks, clock: deps.clock }),
   };
 }
 
@@ -96,6 +104,9 @@ export function createTasksModule(deps: TasksModuleDependencies) {
     deleteTask: new DeleteTaskUseCase(shared),
     addDependency: new AddDependencyUseCase(shared),
     removeDependency: new RemoveDependencyUseCase(shared),
+    getBoard: new GetBoardUseCase(shared),
+    listColumnCards: new ListColumnCardsUseCase(shared),
+    moveCard: new MoveCardUseCase(shared),
   };
   return {
     useCases,

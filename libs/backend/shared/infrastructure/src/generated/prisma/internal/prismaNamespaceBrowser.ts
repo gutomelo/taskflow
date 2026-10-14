@@ -196,6 +196,7 @@ export const ProjectScalarFieldEnum = {
   archivedAt: 'archivedAt',
   createdByUserId: 'createdByUserId',
   version: 'version',
+  workflowVersion: 'workflowVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -268,6 +269,7 @@ export const TaskScalarFieldEnum = {
   canceledAt: 'canceledAt',
   canceledByUserId: 'canceledByUserId',
   createdByUserId: 'createdByUserId',
+  boardRank: 'boardRank',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
