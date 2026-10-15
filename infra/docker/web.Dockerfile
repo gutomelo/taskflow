@@ -2,7 +2,7 @@
 # Imagem de produção do frontend: Nginx sem privilégios servindo o build Angular
 # e fazendo proxy de /api e /health para a API (mesma origem para cookies SameSite).
 
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NX_DAEMON=false NX_NO_CLOUD=true CI=true
 RUN corepack enable
 WORKDIR /workspace

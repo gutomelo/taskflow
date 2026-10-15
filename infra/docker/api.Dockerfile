@@ -2,7 +2,7 @@
 # Imagem de produção da API (e alvo "migrate" para aplicar migrations).
 # Build: docker build -f infra/docker/api.Dockerfile --target runtime -t taskflow-api .
 
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NX_DAEMON=false NX_NO_CLOUD=true CI=true
 RUN corepack enable
 WORKDIR /workspace
@@ -29,7 +29,7 @@ COPY --from=build /workspace/dist/apps/api/package.json /workspace/dist/apps/api
 COPY pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules

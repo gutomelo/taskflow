@@ -3,7 +3,7 @@
 # Build: docker build -f infra/docker/worker.Dockerfile -t taskflow-worker .
 # Migrations ficam a cargo do alvo "migrate" de infra/docker/api.Dockerfile.
 
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NX_DAEMON=false NX_NO_CLOUD=true CI=true
 RUN corepack enable
 WORKDIR /workspace
@@ -23,7 +23,7 @@ COPY --from=build /workspace/dist/apps/worker/package.json /workspace/dist/apps/
 COPY pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
