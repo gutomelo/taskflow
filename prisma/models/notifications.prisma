@@ -1,0 +1,54 @@
+// Bounded context: Notifications (spec 008). Tabelas pertencem exclusivamente a este contexto.
+// `actor_user_id`, `comment_id`, `source_event_id` e `notification_preferences.user_id` sem FK
+// (identity, collaboration e outbox; a validade da menção é conferida por porta). As FKs para a
+// membership do destinatário e para a tarefa seguem o ADR 0015 (tabela em
+// docs/architecture/bounded-contexts.md); as back-relations são inertes e barradas por lint.
+
+/// Tipo da notificação (BR-033).
+enum NotificationKind {
+  mention
+  assignment
+
+  @@map("notification_kind")
+}
+
+/// Notificação pessoal: só o destinatário a lê ou marca. Some na leitura se o alvo deixou de ser
+/// visível (D3); apagada com a membership, com a tarefa ou após 90 dias.
+model Notification {
+  id              String           @id @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  recipientUserId String           @map("recipient_user_id") @db.Uuid
+  kind            NotificationKind
+  actorUserId     String           @map("actor_user_id") @db.Uuid
+  projectId       String           @map("project_id") @db.Uuid
+  taskId          String           @map("task_id") @db.Uuid
+  commentId       String?          @map("comment_id") @db.Uuid
+  dedupeKey       String           @map("dedupe_key")
+  sourceEventId   String           @map("source_event_id") @db.Uuid
+  /// Hora do fato (evento), usada no teto, na ordem e na retenção.
+  occurredAt      DateTime         @map("occurred_at") @db.Timestamptz(3)
+  createdAt       DateTime         @map("created_at") @db.Timestamptz(3)
+  readAt          DateTime?        @map("read_at") @db.Timestamptz(3)
+  emailedAt       DateTime?        @map("emailed_at") @db.Timestamptz(3)
+
+  recipient Membership @relation(fields: [organizationId, recipientUserId], references: [organizationId, userId], onDelete: Cascade, onUpdate: Restrict)
+  task      Task       @relation(fields: [organizationId, projectId, taskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([organizationId, recipientUserId, dedupeKey])
+  /// Lista por keyset `(occurred_at DESC, id DESC)`; o prefixo cobre a FK da membership.
+  @@index([organizationId, recipientUserId, occurredAt(sort: Desc), id(sort: Desc)])
+  /// Cascata da tarefa.
+  @@index([organizationId, projectId, taskId])
+  /// Retenção.
+  @@index([occurredAt])
+  @@map("notifications")
+}
+
+/// Preferência global por usuário (sem linha = resumo por e-mail ligado).
+model NotificationPreference {
+  userId      String   @id @map("user_id") @db.Uuid
+  emailDigest Boolean  @map("email_digest")
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(3)
+
+  @@map("notification_preferences")
+}

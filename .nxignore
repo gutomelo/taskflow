@@ -1,0 +1,3 @@
+# O client Prisma gerado é ignorado pelo Git, mas o Nx precisa analisá-lo para detectar
+# a dependência @prisma/client (package.json gerado no build da API).
+!libs/**/src/generated/

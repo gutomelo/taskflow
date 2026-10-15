@@ -1,0 +1,18 @@
+{
+  "name": "backend-tasks-http",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/tasks/http/src",
+  "projectType": "library",
+  "tags": ["scope:backend", "domain:tasks", "type:presentation"],
+  "// targets": "to see all targets run: nx show project backend-tasks-http --web",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "options": {
+        "command": "tsc --noEmit -p libs/backend/tasks/http/tsconfig.lib.json && tsc --noEmit -p libs/backend/tasks/http/tsconfig.spec.json"
+      }
+    }
+  }
+}

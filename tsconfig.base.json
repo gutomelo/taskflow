@@ -1,0 +1,111 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "importHelpers": true,
+    "paths": {
+      "@taskflow/backend/collaboration/application": [
+        "./libs/backend/collaboration/application/src/index.ts"
+      ],
+      "@taskflow/backend/collaboration/application/testing": [
+        "./libs/backend/collaboration/application/src/testing.ts"
+      ],
+      "@taskflow/backend/collaboration/domain": [
+        "./libs/backend/collaboration/domain/src/index.ts"
+      ],
+      "@taskflow/backend/collaboration/http": ["./libs/backend/collaboration/http/src/index.ts"],
+      "@taskflow/backend/collaboration/infrastructure": [
+        "./libs/backend/collaboration/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/identity/application": [
+        "./libs/backend/identity/application/src/index.ts"
+      ],
+      "@taskflow/backend/identity/application/testing": [
+        "./libs/backend/identity/application/src/testing.ts"
+      ],
+      "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
+      "@taskflow/backend/notifications/application": [
+        "./libs/backend/notifications/application/src/index.ts"
+      ],
+      "@taskflow/backend/notifications/application/testing": [
+        "./libs/backend/notifications/application/src/testing.ts"
+      ],
+      "@taskflow/backend/notifications/domain": [
+        "./libs/backend/notifications/domain/src/index.ts"
+      ],
+      "@taskflow/backend/notifications/http": ["./libs/backend/notifications/http/src/index.ts"],
+      "@taskflow/backend/notifications/infrastructure": [
+        "./libs/backend/notifications/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/organizations/application": [
+        "./libs/backend/organizations/application/src/index.ts"
+      ],
+      "@taskflow/backend/organizations/application/testing": [
+        "./libs/backend/organizations/application/src/testing.ts"
+      ],
+      "@taskflow/backend/organizations/domain": [
+        "./libs/backend/organizations/domain/src/index.ts"
+      ],
+      "@taskflow/backend/organizations/http": ["./libs/backend/organizations/http/src/index.ts"],
+      "@taskflow/backend/organizations/infrastructure": [
+        "./libs/backend/organizations/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/identity/infrastructure": [
+        "./libs/backend/identity/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/projects/application": [
+        "./libs/backend/projects/application/src/index.ts"
+      ],
+      "@taskflow/backend/projects/application/testing": [
+        "./libs/backend/projects/application/src/testing.ts"
+      ],
+      "@taskflow/backend/projects/domain": ["./libs/backend/projects/domain/src/index.ts"],
+      "@taskflow/backend/projects/http": ["./libs/backend/projects/http/src/index.ts"],
+      "@taskflow/backend/projects/infrastructure": [
+        "./libs/backend/projects/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/tasks/application": ["./libs/backend/tasks/application/src/index.ts"],
+      "@taskflow/backend/tasks/application/testing": [
+        "./libs/backend/tasks/application/src/testing.ts"
+      ],
+      "@taskflow/backend/tasks/domain": ["./libs/backend/tasks/domain/src/index.ts"],
+      "@taskflow/backend/tasks/http": ["./libs/backend/tasks/http/src/index.ts"],
+      "@taskflow/backend/tasks/infrastructure": [
+        "./libs/backend/tasks/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/shared/application": ["./libs/backend/shared/application/src/index.ts"],
+      "@taskflow/backend/shared/application/testing": [
+        "./libs/backend/shared/application/src/testing.ts"
+      ],
+      "@taskflow/backend/shared/http": ["./libs/backend/shared/http/src/index.ts"],
+      "@taskflow/backend/shared/infrastructure": [
+        "./libs/backend/shared/infrastructure/src/index.ts"
+      ],
+      "@taskflow/backend/shared/infrastructure/testing": [
+        "./libs/backend/shared/infrastructure/src/testing.ts"
+      ],
+      "@taskflow/backend/shared/kernel": ["./libs/backend/shared/kernel/src/index.ts"],
+      "@taskflow/contracts": ["./libs/contracts/src/index.ts"],
+      "@taskflow/backend/identity/http": ["./libs/backend/identity/http/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

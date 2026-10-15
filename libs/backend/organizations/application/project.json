@@ -1,0 +1,18 @@
+{
+  "name": "backend-organizations-application",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/organizations/application/src",
+  "projectType": "library",
+  "tags": ["scope:backend", "domain:organizations", "type:application"],
+  "// targets": "to see all targets run: nx show project backend-organizations-application --web",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "options": {
+        "command": "tsc --noEmit -p libs/backend/organizations/application/tsconfig.lib.json && tsc --noEmit -p libs/backend/organizations/application/tsconfig.spec.json"
+      }
+    }
+  }
+}

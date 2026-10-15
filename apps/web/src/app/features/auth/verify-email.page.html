@@ -1,0 +1,58 @@
+@let m = messages.verifyEmail;
+<tf-auth-card [heading]="state() === 'verified' ? m.verifiedTitle : m.title">
+  @if (error(); as message) {
+  <div
+    role="alert"
+    class="mb-4 rounded-md border border-error bg-surface-muted px-3 py-2 text-sm text-error-text"
+    data-testid="form-error"
+  >
+    {{ message }}
+  </div>
+  }
+
+  <div
+    #stateMessage
+    tabindex="-1"
+    role="status"
+    class="text-sm focus:outline-none"
+    [attr.data-state]="state()"
+    data-testid="verify-email-state"
+  >
+    @switch (state()) { @case ('ready') {
+    <p>{{ m.readyBody(store.user()?.email ?? '') }}</p>
+    } @case ('needs_login') {
+    <p>{{ m.needsLoginBody }}</p>
+    } @case ('verified') {
+    <p>{{ m.verifiedBody }}</p>
+    } @case ('already_verified') {
+    <p>{{ m.alreadyVerifiedBody }}</p>
+    } @case ('wrong_account') {
+    <p>{{ m.wrongAccountBody }}</p>
+    } @case ('invalid_link') {
+    <p>{{ m.invalidLinkBody }}</p>
+    } @case ('resend_sent') {
+    <p>{{ m.resendSent }}</p>
+    } @default {
+    <p>{{ store.isAuthenticated() ? m.noTokenBody : m.noTokenAnonymousBody }}</p>
+    } }
+  </div>
+
+  <div class="mt-6 flex flex-col gap-3">
+    @switch (state()) { @case ('ready') {
+    <button matButton="filled" type="button" [disabled]="busy()" (click)="confirm()">
+      {{ busy() ? m.confirming : m.confirm }}
+    </button>
+    } @case ('needs_login') {
+    <button matButton="filled" type="button" (click)="goToLogin()">{{ m.needsLoginAction }}</button>
+    } @case ('verified') {
+    <a matButton="filled" routerLink="/">{{ m.continue }}</a>
+    } @case ('already_verified') {
+    <a matButton="filled" routerLink="/">{{ m.continue }}</a>
+    } @default { @if (store.isAuthenticated() && state() !== 'wrong_account' && state() !==
+    'resend_sent') {
+    <button matButton="outlined" type="button" [disabled]="busy()" (click)="resend()">
+      {{ busy() ? m.resending : m.resend }}
+    </button>
+    } } }
+  </div>
+</tf-auth-card>

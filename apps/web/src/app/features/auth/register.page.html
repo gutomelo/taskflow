@@ -1,0 +1,110 @@
+@if (submittedEmail(); as email) {
+<tf-auth-card [heading]="messages.register.successTitle" headingId="register-success-title">
+  <p
+    #successHeading
+    tabindex="-1"
+    role="status"
+    class="text-sm focus:outline-none"
+    data-testid="register-success"
+  >
+    {{ messages.register.successBody(email) }}
+  </p>
+  <a matButton="filled" routerLink="/login" class="mt-6 w-full">
+    {{ messages.register.successAction }}
+  </a>
+</tf-auth-card>
+} @else {
+<tf-auth-card [heading]="messages.register.title" [subtitle]="messages.register.subtitle">
+  @if (error(); as message) {
+  <div
+    #errorAlert
+    role="alert"
+    tabindex="-1"
+    class="mb-4 rounded-md border border-error bg-surface-muted px-3 py-2 text-sm text-error-text focus:outline-2 focus:outline-focus"
+    data-testid="form-error"
+  >
+    {{ message }}
+  </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex flex-col gap-2">
+    <mat-form-field appearance="outline">
+      <mat-label>{{ messages.fields.name }}</mat-label>
+      <input #nameInput matInput formControlName="name" autocomplete="name" required />
+      @if (form.controls.name.hasError('maxlength')) {
+      <mat-error>{{ messages.validation.nameTooLong }}</mat-error>
+      } @else if (form.controls.name.invalid) {
+      <mat-error>{{ messages.validation.nameRequired }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>{{ messages.fields.email }}</mat-label>
+      <input
+        #emailInput
+        matInput
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        inputmode="email"
+        spellcheck="false"
+        required
+      />
+      @if (form.controls.email.hasError('required')) {
+      <mat-error>{{ messages.validation.emailRequired }}</mat-error>
+      } @else if (form.controls.email.invalid) {
+      <mat-error>{{ messages.validation.emailInvalid }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ messages.fields.password }}</mat-label>
+      <input
+        #passwordInput
+        matInput
+        [type]="passwordVisible() ? 'text' : 'password'"
+        formControlName="password"
+        autocomplete="new-password"
+        aria-describedby="password-requirements"
+        required
+      />
+      <button
+        matSuffix
+        type="button"
+        class="me-2 rounded-sm px-2 text-sm text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-focus"
+        [attr.aria-pressed]="passwordVisible()"
+        (click)="passwordVisible.set(!passwordVisible())"
+      >
+        {{ passwordVisible() ? messages.fields.hidePassword : messages.fields.showPassword }}
+      </button>
+      @if (form.controls.password.hasError('required')) {
+      <mat-error>{{ messages.validation.passwordRequired }}</mat-error>
+      } @else if (form.controls.password.hasError('passwordPolicy')) {
+      <mat-error>{{ messages.validation.passwordPolicy }}</mat-error>
+      }
+    </mat-form-field>
+
+    <tf-password-requirements
+      id="password-requirements"
+      class="mb-2 block"
+      [password]="password()"
+      [email]="email()"
+      [serverViolations]="serverViolations()"
+    />
+
+    <button matButton="filled" type="submit" class="mt-2" [disabled]="submitting()">
+      {{ submitting() ? messages.register.submitting : messages.register.submit }}
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-muted">
+    {{ messages.register.hasAccount }}
+    <a
+      routerLink="/login"
+      queryParamsHandling="preserve"
+      class="font-medium text-primary underline-offset-2 hover:underline"
+      >{{ messages.register.loginLink }}</a
+    >
+  </p>
+</tf-auth-card>
+}

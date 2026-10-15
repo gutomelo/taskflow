@@ -1,0 +1,22 @@
+// Ponto de entrada do schema multi-arquivo do TaskFlow (modular monolith, um banco PostgreSQL).
+// Este arquivo contém apenas generator e datasource; os modelos ficam em prisma/models/,
+// um arquivo por bounded context (ex.: identity.prisma, organizations.prisma) e shared.prisma
+// para infraestrutura compartilhada. O prisma.config.ts aponta para o DIRETÓRIO prisma/.
+//
+// Convenções em .claude/rules/database.md e docs/architecture/adr/0004-multi-tenancy-shared-database.md:
+// - Modelos e colunas em inglês, tabelas em snake_case via @@map/@map.
+// - Toda tabela tenant-scoped possui organization_id e índices que começam por ele.
+// - Entidades sujeitas a edição concorrente possuem coluna `version` (optimistic locking).
+// - Relações entre arquivos são permitidas pelo Prisma, mas entre contextos diferentes só sob os
+//   critérios do ADR 0015 (exceções listadas em docs/architecture/bounded-contexts.md); fora deles,
+//   contextos não referenciam tabelas uns dos outros.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../libs/backend/shared/infrastructure/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}

@@ -1,0 +1,63 @@
+<section class="mx-auto max-w-3xl px-4 py-10" aria-labelledby="system-status-title">
+  <header class="mb-6">
+    <h1 id="system-status-title" class="text-2xl font-semibold tracking-tight">
+      {{ messages.title }}
+    </h1>
+    <p class="mt-1 text-sm text-muted">{{ messages.subtitle }}</p>
+  </header>
+
+  <div
+    class="rounded-lg border border-border bg-surface p-5 shadow-sm"
+    aria-live="polite"
+    [attr.aria-busy]="status() === 'loading'"
+  >
+    @switch (status()) { @case ('loading') {
+    <p class="sr-only">{{ messages.loading }}</p>
+    <div class="space-y-3" aria-hidden="true" data-testid="status-skeleton">
+      <div class="h-5 w-2/3 animate-pulse rounded-sm bg-surface-muted"></div>
+      <div class="h-10 animate-pulse rounded-md bg-surface-muted"></div>
+      <div class="h-10 animate-pulse rounded-md bg-surface-muted"></div>
+    </div>
+    } @case ('unavailable') {
+    <div class="flex flex-col items-start gap-4" role="alert">
+      <p class="font-medium text-error-text">{{ messages.unavailable }}</p>
+      <button matButton="filled" type="button" (click)="retry()">{{ messages.retry }}</button>
+    </div>
+    } @default {
+    <p
+      class="mb-4 font-medium"
+      [class.text-success-text]="status() === 'ready'"
+      [class.text-warning-text]="status() === 'degraded'"
+    >
+      {{ status() === 'ready' ? messages.ready : messages.degraded }}
+    </p>
+    <ul class="divide-y divide-border" aria-label="Dependências">
+      @for (check of checks(); track check.name) {
+      <li class="flex items-center justify-between gap-4 py-3">
+        <span class="text-sm">{{ dependencyLabel(check.name) }}</span>
+        <span class="flex items-center gap-2 text-sm">
+          <span
+            aria-hidden="true"
+            class="size-2.5 rounded-full"
+            [class.bg-success]="check.status === 'up'"
+            [class.bg-error]="check.status === 'down'"
+          ></span>
+          <span
+            class="font-medium"
+            [class.text-success-text]="check.status === 'up'"
+            [class.text-error-text]="check.status === 'down'"
+          >
+            {{ check.status === 'up' ? messages.up : messages.down }}
+          </span>
+          <span class="tabular-nums text-muted">{{ messages.latency(check.latencyMs) }}</span>
+        </span>
+      </li>
+      }
+    </ul>
+    @if (status() === 'degraded') {
+    <button class="mt-4" matButton="outlined" type="button" (click)="retry()">
+      {{ messages.retry }}
+    </button>
+    } } }
+  </div>
+</section>

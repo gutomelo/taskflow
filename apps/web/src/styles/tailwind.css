@@ -1,0 +1,63 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind consome somente tokens do Design System. A paleta padrão do Tailwind é
+ * removida para impedir cores fora dos tokens (ex.: bg-slate-500).
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-primary: var(--tf-color-primary);
+  --color-primary-hover: var(--tf-color-primary-hover);
+  --color-on-primary: var(--tf-color-on-primary);
+  --color-background: var(--tf-color-background);
+  --color-surface: var(--tf-color-surface);
+  --color-surface-muted: var(--tf-color-surface-muted);
+  --color-sidebar: var(--tf-color-sidebar);
+  --color-on-sidebar: var(--tf-color-on-sidebar);
+  --color-default: var(--tf-color-text);
+  --color-muted: var(--tf-color-text-muted);
+  --color-border: var(--tf-color-border);
+  --color-border-strong: var(--tf-color-border-strong);
+  --color-focus: var(--tf-color-focus-ring);
+
+  --color-success: var(--tf-color-success);
+  --color-success-text: var(--tf-color-success-text);
+  --color-warning: var(--tf-color-warning);
+  --color-warning-text: var(--tf-color-warning-text);
+  --color-error: var(--tf-color-error);
+  --color-error-text: var(--tf-color-error-text);
+  --color-info: var(--tf-color-info);
+  --color-info-text: var(--tf-color-info-text);
+
+  --color-priority-critical: var(--tf-color-priority-critical);
+  --color-priority-high: var(--tf-color-priority-high);
+  --color-priority-medium: var(--tf-color-priority-medium);
+  --color-priority-low: var(--tf-color-priority-low);
+
+  --font-sans: var(--tf-font-sans);
+  --radius-sm: var(--tf-radius-sm);
+  --radius-md: var(--tf-radius-md);
+  --radius-lg: var(--tf-radius-lg);
+  --shadow-sm: var(--tf-shadow-sm);
+  --shadow-md: var(--tf-shadow-md);
+  --shadow-lg: var(--tf-shadow-lg);
+}
+
+@layer base {
+  html {
+    font-family: var(--tf-font-sans);
+    background-color: var(--tf-color-background);
+    color: var(--tf-color-text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--tf-color-focus-ring);
+    outline-offset: 2px;
+  }
+}

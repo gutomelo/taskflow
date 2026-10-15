@@ -1,0 +1,23 @@
+# Sem pacotes publicáveis: o monorepo usa path aliases do TypeScript (ver docs/architecture/adr/0002).
+packages: []
+
+# Scripts de instalação ficam bloqueados por padrão no pnpm 11.
+# Liberar somente o necessário. Os pacotes marcados como false usam binários
+# pré-compilados (optionalDependencies) ou possuem postinstall opcional.
+allowBuilds:
+  '@parcel/watcher': false
+  # Usa binário pré-compilado (prebuilds) embarcado no pacote; dispensa compilação nativa.
+  argon2: false
+  '@prisma/engines': true
+  # Telemetria de instalação (dependência do swagger-ui-dist): mantida desligada.
+  '@scarf/scarf': false
+  '@swc/core': true
+  cpu-features: false
+  esbuild: false
+  lmdb: false
+  msgpackr-extract: false
+  nx: true
+  prisma: true
+  protobufjs: false
+  ssh2: false
+  unrs-resolver: false

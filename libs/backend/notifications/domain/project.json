@@ -1,0 +1,18 @@
+{
+  "name": "backend-notifications-domain",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/notifications/domain/src",
+  "projectType": "library",
+  "tags": ["scope:backend", "domain:notifications", "type:domain"],
+  "// targets": "to see all targets run: nx show project backend-notifications-domain --web",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "options": {
+        "command": "tsc --noEmit -p libs/backend/notifications/domain/tsconfig.lib.json && tsc --noEmit -p libs/backend/notifications/domain/tsconfig.spec.json"
+      }
+    }
+  }
+}
