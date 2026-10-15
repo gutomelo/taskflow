@@ -25,7 +25,8 @@ const CAPABILITIES: Record<string, string[]> = {
 /**
  * Sessões simuladas (login respondido pelo `page.route`) não existem na API real: o seletor de
  * organização do cabeçalho (spec 002) receberia 401 e encerraria a sessão. Responde "minhas
- * organizações" junto com o login simulado, com as capacidades de cada papel.
+ * organizações" junto com o login simulado, com as capacidades de cada papel, e o contador do sino
+ * de notificações (spec 008) dessas organizações, sem nada não lido.
  */
 export async function mockMyOrganizations(
   page: Page,
@@ -37,4 +38,13 @@ export async function mockMyOrganizations(
   await page.route('**/api/v1/me/organizations', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
   );
+  for (const { id } of items) {
+    await page.route(`**/api/v1/organizations/${id}/notifications/unread-count`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ count: 0, capped: false }),
+      }),
+    );
+  }
 }

@@ -19,6 +19,7 @@ export { InvalidCursorError } from './lib/shared/notifications-errors';
 export {
   NOTIFICATIONS_COUNT_POLICY,
   NOTIFICATIONS_LIST_POLICY,
+  NOTIFICATIONS_PREFERENCE_POLICY,
   NOTIFICATIONS_WRITE_POLICY,
 } from './lib/shared/notifications-limits';
 export {

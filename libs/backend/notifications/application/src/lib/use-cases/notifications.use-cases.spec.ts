@@ -5,7 +5,10 @@ import {
   createNotificationsTestbed,
   type NotificationsTestbed,
 } from '../../testing/notifications-fakes';
-import { NOTIFICATIONS_COUNT_POLICY } from '../shared/notifications-limits';
+import {
+  NOTIFICATIONS_COUNT_POLICY,
+  NOTIFICATIONS_PREFERENCE_POLICY,
+} from '../shared/notifications-limits';
 import {
   PlanDigestsUseCase,
   PurgeOldNotificationsUseCase,
@@ -328,6 +331,26 @@ describe('preferences (RF-09)', () => {
     await new UpdateNotificationPreferenceUseCase(bed).execute('bia', { emailDigest: false });
     expect(await new GetNotificationPreferenceUseCase(bed).execute('bia')).toEqual({
       emailDigest: false,
+    });
+  });
+
+  it('rate limited per user, reads and writes together (security audit B1)', async () => {
+    const bed = world();
+    bed.rateLimiter.consumed.set(
+      `${NOTIFICATIONS_PREFERENCE_POLICY.name}|bia`,
+      NOTIFICATIONS_PREFERENCE_POLICY.points,
+    );
+    expect(
+      await code(
+        new UpdateNotificationPreferenceUseCase(bed).execute('bia', { emailDigest: false }),
+      ),
+    ).toBe('RATE_LIMITED');
+    expect(await code(new GetNotificationPreferenceUseCase(bed).execute('bia'))).toBe(
+      'RATE_LIMITED',
+    );
+    expect(await bed.preferences.emailDigest('bia')).toBe(true);
+    expect(await new GetNotificationPreferenceUseCase(bed).execute('caio')).toEqual({
+      emailDigest: true,
     });
   });
 });

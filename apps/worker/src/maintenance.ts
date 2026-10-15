@@ -82,6 +82,8 @@ export function createMaintenance(deps: MaintenanceDependencies) {
 
   let consumer: EventWorker<DataPurgeReport, unknown> | undefined;
   let scheduleRetry: NodeJS.Timeout | undefined;
+  /** Depois do `stop()`, uma falha atrasada do agendamento não rearma a nova tentativa. */
+  let isStopped = false;
 
   function registerSchedule(): void {
     queue
@@ -98,6 +100,7 @@ export function createMaintenance(deps: MaintenanceDependencies) {
       .catch((error: unknown) => {
         // Redis fora no start: tenta de novo, senão a limpeza só voltaria no próximo restart.
         logger.warn({ err: error }, 'Could not schedule data purge; retrying in 60 s');
+        if (isStopped) return;
         scheduleRetry = setTimeout(registerSchedule, SCHEDULE_RETRY_MS);
         scheduleRetry.unref();
       });
@@ -109,6 +112,7 @@ export function createMaintenance(deps: MaintenanceDependencies) {
 
     start(): void {
       if (consumer) return;
+      isStopped = false;
       consumer = createEventWorker<DataPurgeReport, unknown>({
         queueName: MAINTENANCE_QUEUE_NAME,
         redisUrl: deps.redisUrl,
@@ -130,6 +134,7 @@ export function createMaintenance(deps: MaintenanceDependencies) {
 
     /** Para o consumidor (aguardando a limpeza em andamento) e fecha a fila. */
     async stop(): Promise<unknown[]> {
+      isStopped = true;
       clearTimeout(scheduleRetry);
       const stopped = await Promise.allSettled([consumer?.close()]);
       consumer = undefined;

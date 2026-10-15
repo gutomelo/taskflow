@@ -81,7 +81,7 @@ export function taskLink(key: string): string[] {
                         aria-hidden="true"
                         class="mt-2 size-2 shrink-0 rounded-full bg-primary"
                       ></span>
-                      <span class="sr-only">{{ messages.unread }}:</span>
+                      <span class="sr-only">{{ messages.unread }}:&ngsp;</span>
                     } @else {
                       <span aria-hidden="true" class="mt-2 size-2 shrink-0"></span>
                     }
@@ -90,9 +90,10 @@ export function taskLink(key: string): string[] {
                         item.actor.name ?? messages.formerMember
                       }}</span>
                       {{ messages.phrase(item.kind) }}
-                      <span class="font-mono">{{ item.task.key }}</span>
-                      <span class="block truncate text-muted">{{ item.task.title }}</span>
-                    </span>
+                      <span class="font-mono">{{ item.task.key }}</span
+                      >&ngsp;
+                      <span class="block truncate text-muted">{{ item.task.title }}</span> </span
+                    >&ngsp;
                     <time
                       class="shrink-0 text-xs text-muted"
                       [attr.datetime]="item.occurredAt"
@@ -171,8 +172,15 @@ export class NotificationsPage {
 
   /** Marca como lida sem segurar a navegação: a falha só deixa a notificação não lida. */
   protected open(item: NotificationDto): void {
-    if (item.readAt !== null) return;
+    // Estado atual, não o do template: dois cliques seguidos chegam antes de a lista renderizar.
+    const current = this.items().find((candidate) => candidate.id === item.id);
+    if (!current || current.readAt !== null) return;
     const organizationId = this.organization.requireId();
+    // Marca localmente: um segundo clique (ex.: ctrl+clique) não baixa o contador de novo.
+    const readAt = new Date().toISOString();
+    this.items.update((items) =>
+      items.map((candidate) => (candidate.id === item.id ? { ...candidate, readAt } : candidate)),
+    );
     this.unread.decrement();
     this.api.markRead(organizationId, item.id).then(
       () => undefined,

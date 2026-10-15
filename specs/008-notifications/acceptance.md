@@ -116,21 +116,33 @@ E o resumo chega no Mailpit sem nomes, título nem texto da tarefa
 
 ## Testes obrigatórios
 
-- [ ] Domínio: notificação, deduplicação, preferência
-- [ ] Casos de uso com fakes: registro (dedupe, teto, leitores), leitura com validade, marcar lida(s), preferência, resumo, retenção
-- [ ] Integração: catálogo e cascatas, repositórios, produtores com Outbox, worker (parado/voltando, idempotência, SMTP de teste), harness e bateria
-- [ ] HTTP: contratos, 400/404/409/429, OpenAPI
-- [ ] Frontend: sino com polling, lista, preferência
-- [ ] E2E: jornada real; jornadas existentes verdes
+- [x] Domínio: notificação, deduplicação, preferência
+- [x] Casos de uso com fakes: registro (dedupe, teto, leitores), leitura com validade, marcar lida(s), preferência, resumo, retenção
+- [x] Integração: catálogo e cascatas, repositórios, produtores com Outbox, worker (parado/voltando, idempotência, SMTP de teste), harness e bateria
+- [x] HTTP: contratos, 400/404/409/429, OpenAPI
+- [x] Frontend: sino com polling, lista, preferência
+- [x] E2E: jornada real; jornadas existentes verdes
 
 ## Evidências de validação
 
-| Critério | Evidência (comando + resultado) | Data |
-| -------- | ------------------------------- | ---- |
+| Critério | Evidência (comando + resultado)                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Data       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| CA-01    | `notifications.use-cases.spec.ts` ("records one per recipient, never for the actor…", "D4: removing and re-adding a mention…"); `collaboration-integration-events.spec.ts` (só menções novas); `notification-jobs.spec.ts` (tradução da menção); `notification-delivery.integration.spec.ts` (menção registrada para bia e dani, nunca para a autora); E2E passo "spec 008"                                                                                                                   | 2026-10-15 |
+| CA-02    | `notifications.use-cases.spec.ts` ("assigning to oneself notifies nobody; each assignment is a new fact"); `tasks-integration-events.spec.ts`; `notifications-isolation.integration.spec.ts` (atribuição via HTTP grava `tasks.assignee_changed` na outbox); E2E (PDC-1)                                                                                                                                                                                                                      | 2026-10-15 |
+| CA-03    | Rollback dos produtores (BR-010, T4); `notification-delivery.integration.spec.ts` ("records the events written while the worker was stopped…", "is idempotent: a republished event…", "a recipient who left… is dropped (FK)"); `notifications-persistence.integration.spec.ts` (inelegível nunca é erro)                                                                                                                                                                                     | 2026-10-15 |
+| CA-04    | `notifications.use-cases.spec.ts` (lista, páginas curtas, cursor, contador com teto 99, `read-all` com `upToId`); `notifications-router.spec.ts`; `notifications.spec.ts` do web (página, "carregar mais", marcar todas)                                                                                                                                                                                                                                                                      | 2026-10-15 |
+| CA-05    | `notifications.use-cases.spec.ts` ("decision 6: a mention removed, a task no longer readable or an ex-member actor", "B4: a failing port propagates"); `collaboration-persistence.integration.spec.ts` (menções ativas amarradas à tarefa); `notifications-schema.integration.spec.ts` (cascatas)                                                                                                                                                                                             | 2026-10-15 |
+| CA-06    | `notifications.use-cases.spec.ts` (bloco digest); `pt-br-digest-mailer.spec.ts` (valores hostis, sem o nome do destinatário); `notification-delivery.integration.spec.ts` ("BR-034: the hourly plan sends one digest per person…", `jobId` por hora, quem não lê não recebe); E2E (resumo no Mailpit sem nomes, títulos nem texto)                                                                                                                                                            | 2026-10-15 |
+| CA-07    | `notifications.use-cases.spec.ts` ("decision 9: mentions are capped…", limites por usuário, inclusive preferência — auditoria B1); `notifications-persistence.integration.spec.ts` (contagem por `occurred_at`)                                                                                                                                                                                                                                                                               | 2026-10-15 |
+| CA-08    | `organizations-isolation.integration.spec.ts` (4 casos de notificação, cursor `noLeak`, `/me` na allowlist); `notifications-isolation.integration.spec.ts` (owner, admin, member e viewer: 404 idêntico, `read-all` sem tocar terceiros no banco, a própria de B pelo caminho de A); `route-coverage.spec.ts`                                                                                                                                                                                 | 2026-10-15 |
+| CA-09    | `notifications.spec.ts` do web (sino "Notificações, 2 não lidas", 99+, polling de 60 s, visibilidade, anúncio repetido, resposta velha descartada, abrir marca como lida e navega, preferência com reversão); `notifications-contract-guards.spec.ts`                                                                                                                                                                                                                                         | 2026-10-15 |
+| CA-10    | `apps/web-e2e/src/projects-journey.spec.ts` (passo "spec 008"): `playwright test` 19 passed (49,1 s)                                                                                                                                                                                                                                                                                                                                                                                          | 2026-10-15 |
+| Gate     | `pnpm verify`: exit 0, 102 tarefas (92 do cache do Nx, mesmo hash de entradas); `pnpm test:integration --skip-nx-cache`: exit 0, 9 projetos, **272 testes** (api 63, worker 14, notifications 13, …); E2E 19 de 19                                                                                                                                                                                                                                                                            | 2026-10-15 |
+| Revisões | `/review-code`: sem bloqueantes; I1 (resposta velha do contador desfazia a baixa e anunciava falso aumento; duplo clique) corrigido com testes e 4 mutantes mortos; I2 resolvido no fechamento; S1–S6 aplicadas (S5 como risco aceito). `/security-audit`: sem Críticos, Altos ou Médios; B1 (limite da preferência) corrigido com teste e 2 mutantes mortos; B2 registrado como risco **Proposto** para decisão do usuário; B3 (gatilho do ADR 0014) reavaliado no design: adiamento mantido | 2026-10-15 |
 
 ## Definição de concluído
 
-- [ ] CA-01 a CA-10 comprovados por testes executados
-- [ ] `pnpm verify`, `pnpm test:integration` e E2E passando
-- [ ] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
-- [ ] Documentação, regras de negócio (BR-033, BR-034), ADRs, roadmap e índice atualizados
+- [x] CA-01 a CA-10 comprovados por testes executados
+- [x] `pnpm verify`, `pnpm test:integration` e E2E passando
+- [x] `/review-code` sem bloqueantes e `/security-audit` sem Críticos/Altos abertos
+- [x] Documentação, regras de negócio (BR-033, BR-034), ADRs, roadmap e índice atualizados

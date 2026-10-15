@@ -6,7 +6,7 @@ const MAILPIT_URL = process.env['MAILPIT_URL'] ?? 'http://localhost:58025';
 type MailpitSummary = { ID: string; Subject: string; To: Array<{ Address: string }> };
 export type MailpitMessage = MailpitSummary & { Text: string; HTML: string };
 
-async function messagesTo(address: string): Promise<MailpitMessage[]> {
+export async function messagesTo(address: string): Promise<MailpitMessage[]> {
   const response = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=200`);
   const { messages } = (await response.json()) as { messages: MailpitSummary[] };
   const summaries = messages.filter((message) =>
@@ -22,13 +22,22 @@ async function messagesTo(address: string): Promise<MailpitMessage[]> {
   );
 }
 
-/** Espera o worker entregar o e-mail (outbox → fila → SMTP) e devolve a mensagem. */
-export async function waitForEmail(address: string, subject: string): Promise<MailpitMessage> {
+/**
+ * Espera o worker entregar o e-mail (outbox → fila → SMTP) e devolve a mensagem. `matches` filtra
+ * entre várias do mesmo assunto (ex.: um resumo horário que saiu antes do esperado).
+ */
+export async function waitForEmail(
+  address: string,
+  subject: string,
+  matches: (message: MailpitMessage) => boolean = () => true,
+): Promise<MailpitMessage> {
   let found: MailpitMessage | undefined;
   await expect
     .poll(
       async () => {
-        found = (await messagesTo(address)).find((message) => message.Subject === subject);
+        found = (await messagesTo(address)).find(
+          (message) => message.Subject === subject && matches(message),
+        );
         return found !== undefined;
       },
       {

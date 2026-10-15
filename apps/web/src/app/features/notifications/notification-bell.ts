@@ -5,7 +5,7 @@ import { UnreadNotificationsStore } from './unread-notifications.store';
 
 /**
  * Sino da organização ativa (spec 008, RNF-06): link para a página de notificações com o
- * contador no nome acessível; o badge é só visual e o aumento é anunciado em `aria-live`.
+ * contador no nome acessível; o badge é só visual e o aumento é anunciado numa região `status`.
  */
 @Component({
   selector: 'tf-notification-bell',
@@ -34,7 +34,10 @@ import { UnreadNotificationsStore } from './unread-notifications.store';
         >
       }
     </a>
-    <span class="sr-only" aria-live="polite">{{ store.announcement() }}</span>
+    <!-- role="status" (região viva "polite" implícita): anúncio discreto do aumento. -->
+    <span class="sr-only" role="status" data-testid="notification-announcement">{{
+      store.announcement()
+    }}</span>
   `,
 })
 export class NotificationBell implements OnInit {

@@ -75,16 +75,16 @@ Desde a spec 010 as menções são gravadas, mas ninguém é avisado; atribuir u
 
 ## Critérios de aceitação (resumo)
 
-- [ ] CA-01 Menção gera uma notificação ao mencionado (uma vez por comentário, mesmo tirando e repondo); o autor não se notifica.
-- [ ] CA-02 Atribuição por outra pessoa gera notificação; atribuir a si mesmo não.
-- [ ] CA-03 Worker parado: os eventos esperam; ao voltar, cada notificação é criada uma vez.
-- [ ] CA-04 Lista, contador, marcar como lida e marcar todas, só das próprias notificações da organização ativa.
-- [ ] CA-05 Perdeu acesso, tarefa excluída, menção ou comentário removidos: a notificação some da lista, do contador e do e-mail.
-- [ ] CA-06 Resumo por e-mail no máximo 1/h, só das últimas 24 h, sem nomes, título nem texto, agrupado pelo slug da organização; preferência desligada não envia.
-- [ ] CA-07 Teto de menções por (ator, destinatário)/hora descarta o excedente; atribuições não têm teto.
-- [ ] CA-08 Isolamento e autorização: rotas no harness; notificação alheia ⇒ 404 idêntico a inexistente, inclusive para owner e admin da mesma organização.
-- [ ] CA-09 Interface: sino com contador acessível, lista, abrir leva à tarefa e marca como lida, preferência na conta.
-- [ ] CA-10 Jornada E2E: menção e atribuição viram notificações; o resumo chega no Mailpit sem conteúdo.
+- [x] CA-01 Menção gera uma notificação ao mencionado (uma vez por comentário, mesmo tirando e repondo); o autor não se notifica.
+- [x] CA-02 Atribuição por outra pessoa gera notificação; atribuir a si mesmo não.
+- [x] CA-03 Worker parado: os eventos esperam; ao voltar, cada notificação é criada uma vez.
+- [x] CA-04 Lista, contador, marcar como lida e marcar todas, só das próprias notificações da organização ativa.
+- [x] CA-05 Perdeu acesso, tarefa excluída, menção ou comentário removidos: a notificação some da lista, do contador e do e-mail.
+- [x] CA-06 Resumo por e-mail no máximo 1/h, só das últimas 24 h, sem nomes, título nem texto, agrupado pelo slug da organização; preferência desligada não envia.
+- [x] CA-07 Teto de menções por (ator, destinatário)/hora descarta o excedente; atribuições não têm teto.
+- [x] CA-08 Isolamento e autorização: rotas no harness; notificação alheia ⇒ 404 idêntico a inexistente, inclusive para owner e admin da mesma organização.
+- [x] CA-09 Interface: sino com contador acessível, lista, abrir leva à tarefa e marca como lida, preferência na conta.
+- [x] CA-10 Jornada E2E: menção e atribuição viram notificações; o resumo chega no Mailpit sem conteúdo.
 
 ## Casos limite
 

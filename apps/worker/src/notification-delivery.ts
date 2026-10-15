@@ -122,6 +122,8 @@ export function createNotificationDelivery(deps: NotificationDeliveryDependencie
   let consumer: EventWorker<RecordOutcome> | undefined;
   let digestConsumer: EventWorker<DigestJobResult, DigestJobData> | undefined;
   let scheduleRetry: NodeJS.Timeout | undefined;
+  /** Depois do `stop()`, uma falha atrasada do agendamento não rearma a nova tentativa. */
+  let isStopped = false;
 
   function registerSchedule(): void {
     digestQueue
@@ -132,6 +134,7 @@ export function createNotificationDelivery(deps: NotificationDeliveryDependencie
       .then(() => logger.info(DIGEST_SCHEDULE, 'Hourly digest plan scheduled'))
       .catch((error: unknown) => {
         logger.warn({ err: error }, 'Could not schedule digest plan; retrying in 60 s');
+        if (isStopped) return;
         scheduleRetry = setTimeout(registerSchedule, SCHEDULE_RETRY_MS);
         scheduleRetry.unref();
       });
@@ -147,6 +150,7 @@ export function createNotificationDelivery(deps: NotificationDeliveryDependencie
 
     start(): void {
       if (consumer) return;
+      isStopped = false;
       consumer = createEventWorker({
         queueName: NOTIFICATIONS_QUEUE_NAME,
         redisUrl: deps.redisUrl,
@@ -188,6 +192,7 @@ export function createNotificationDelivery(deps: NotificationDeliveryDependencie
 
     /** Para os consumidores (aguardando os jobs em andamento) e fecha as filas. */
     async stop(): Promise<unknown[]> {
+      isStopped = true;
       clearTimeout(scheduleRetry);
       const stopped = await Promise.allSettled([consumer?.close(), digestConsumer?.close()]);
       consumer = undefined;

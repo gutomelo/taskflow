@@ -30,7 +30,7 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 
 ## Fase 2 — Colaboração · Em andamento
 
-**`010-comments` concluída**: comentários em tarefas e menções estruturadas (BR-031, BR-032), sem entrega de notificações. Próximas: notificações in-app (`008-notifications`), Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
+**`010-comments` concluída**: comentários em tarefas e menções estruturadas (BR-031, BR-032). **`008-notifications` concluída**: notificações de menção e atribuição in-app (sino com contador por consulta periódica, lista, marcar como lida) e resumo por e-mail sem conteúdo, com preferência na conta (BR-033, BR-034; ADR 0017). Próximas: Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
 
 Escopo da fase: comentários e menções (Collaboration), notificações in-app (`008-notifications`), Socket.IO para Kanban/tarefas/notificações, histórico de atividades, melhorias de usabilidade.
 
@@ -40,6 +40,6 @@ Backlog e sprints (`007-sprints`, BR-005), dashboards e indicadores (`009-analyt
 
 ## Fase 4 — Robustez · Não iniciado
 
-Novas filas do `apps/worker` (notificações, outros jobs agendados) — worker, BullMQ e Outbox já existem desde a spec 001 para e-mails e retenção (ADR 0011) —, OpenTelemetry (traces/métricas), testes de carga, RLS como defesa adicional (adiado pela spec 006 — ADR 0014, com gatilhos de reavaliação antecipada), CI/CD com deploy independente de web/api/worker.
+Novas filas do `apps/worker` (outros jobs agendados) — worker, BullMQ e Outbox já existem desde a spec 001 para e-mails e retenção (ADR 0011) e, desde a spec 008, para notificações (ADR 0017) —, OpenTelemetry (traces/métricas), testes de carga, RLS como defesa adicional (adiado pela spec 006 — ADR 0014, com gatilhos de reavaliação antecipada), CI/CD com deploy independente de web/api/worker.
 
 > A exceção prevista aconteceu: a spec 001 antecipou `apps/worker`, BullMQ e a Outbox para os e-mails transacionais (ADR 0011).

@@ -123,7 +123,7 @@ sequenceDiagram
     API-->>UI: 201 Comment (Location)
 ```
 
-Sem tempo real: a conversa recarrega ao abrir e depois de conflitos. A entrega das menções (notificações) é **planejada** para a spec 008, pela Outbox.
+Sem tempo real: a conversa recarrega ao abrir e depois de conflitos. As menções **novas** viram o evento de integração `collaboration.mentions_added`, gravado na Outbox na mesma transação (spec 008, §4a).
 
 ## 4. Comunicação assíncrona
 
@@ -155,6 +155,37 @@ sequenceDiagram
 - O consumidor valida cada job com Zod. Job inválido falha sem retry (`UnrecoverableError`); falha de SMTP volta para a fila. Como o token é regravado a cada tentativa, só o link do último envio funciona, e um evento reprocessado nunca gera um segundo token. Se o link do evento já foi usado, o reenvio é descartado (não se envia link morto).
 - Avisos sem token (cadastro com e-mail existente, senha alterada) podem, raramente, chegar duplicados: entrega pelo menos uma vez.
 
+### 4a. Notificações (BR-033, BR-034) — implementado (spec 008, ADR [0017](adr/0017-outbox-for-cross-context-integration-events.md))
+
+```mermaid
+sequenceDiagram
+    participant P as tasks / collaboration (apps/api)
+    participant DB as PostgreSQL
+    participant R as OutboxRelay único (apps/worker)
+    participant Q as BullMQ (fila notifications)
+    participant C as Consumidor (apps/worker)
+    participant D as Fila notification-digests
+    participant M as SMTP
+
+    P->>DB: fato + INSERT outbox_events (tasks.assignee_changed / collaboration.mentions_added)
+    R->>DB: lote FOR UPDATE SKIP LOCKED (tipos de emails e notifications)
+    R->>Q: addBulk (jobId = id do evento)
+    Q->>C: job validado (Zod satisfies o payload do produtor) → anticorrupção → RecordNotifications
+    C->>DB: INSERT … ON CONFLICT DO NOTHING por destinatário (sem o ator; teto de menções; P2003 ⇒ descartada)
+    loop de hora em hora (job scheduler)
+        D->>DB: quem tem candidatas (não lidas, não enviadas, 24 h) e preferência ligada
+        D->>D: um job por pessoa (jobId digest-{userId}-{AAAAMMDDHH})
+        D->>DB: até 50 candidatas; visibilidade pelo papel atual (falha fechado)
+        D->>M: resumo sem nomes nem conteúdo (se sobrar algo e o e-mail for verificado)
+        D->>DB: emailed_at em todas as candidatas lidas (… AND emailed_at IS NULL)
+    end
+```
+
+- A validade é decidida **na leitura** (lista, contador e resumo): tarefa legível pelo papel atual e menção ainda ativa; o que deixou de valer some sem apagar a linha.
+- Um único relay roteia `emails` e `notifications`; tipo roteado duas vezes é erro de composição. Um tipo sem rota fica pendente sem bloquear os demais.
+- O sino consulta `GET …/notifications/unread-count` a cada 60 s com a aba visível e ao voltar para ela (sem tempo real).
+- A retenção de 90 dias roda na limpeza diária (`maintenance`), em lotes de 1 000.
+
 **Planejado (Fase 2–4)**: eventos em processo para Socket.IO e as demais filas.
 
 ```mermaid
@@ -165,7 +196,7 @@ flowchart LR
         disp --> sock[Socket.IO gateway]
         disp --> enq[Enfileirar job]
     end
-    subgraph outboxflow[Outbox — implementada para e-mails]
+    subgraph outboxflow[Outbox — implementada para e-mails e notificações]
         uc -->|mesma tx| outbox[(tabela outbox)]
         relay[Outbox relay] --> outbox
         relay --> q

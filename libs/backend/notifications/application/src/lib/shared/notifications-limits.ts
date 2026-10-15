@@ -24,3 +24,10 @@ export const NOTIFICATIONS_WRITE_POLICY = {
   points: 60,
   durationSeconds: 60,
 } as const satisfies RateLimitPolicy;
+
+/** Preferência da própria conta (rotas `/me`): leitura e escrita somam no mesmo limite. */
+export const NOTIFICATIONS_PREFERENCE_POLICY = {
+  name: 'notifications.preference.user.minute',
+  points: 30,
+  durationSeconds: 60,
+} as const satisfies RateLimitPolicy;

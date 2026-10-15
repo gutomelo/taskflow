@@ -30,15 +30,15 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 
 | ID  | Tarefa                                                                                              | Depende de | Verificação                             | Status |
 | --- | --------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------- | ------ |
-| T10 | Sino com contador (polling 60 s e `visibilitychange`), página de notificações, preferência na conta | T7         | testes de componente (CA-09)            | [ ]    |
-| T11 | E2E: menção e atribuição viram notificações; resumo chega no Mailpit sem conteúdo                   | T8, T10    | Playwright no banco descartável (CA-10) | [ ]    |
+| T10 | Sino com contador (polling 60 s e `visibilitychange`), página de notificações, preferência na conta | T7         | testes de componente (CA-09)            | [x]    |
+| T11 | E2E: menção e atribuição viram notificações; resumo chega no Mailpit sem conteúdo                   | T8, T10    | Playwright no banco descartável (CA-10) | [x]    |
 
 ## Bloco E — Documentação e validação
 
 | ID  | Tarefa                                                                                                                                                                                                                          | Depende de | Verificação                                                           | Status |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------ |
-| T12 | Docs: `bounded-contexts.md`, `dependency-rules.md`, `business-rules.md` (BR-033, BR-034), `data-flow.md` §4, `authorization.md`, `multi-tenancy.md`, `testing.md`; ADR 0008 (Outbox aceita para notificações); índice e roadmap | T1–T11     | verificação de links                                                  | [ ]    |
-| T13 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                       | T12        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [ ]    |
+| T12 | Docs: `bounded-contexts.md`, `dependency-rules.md`, `business-rules.md` (BR-033, BR-034), `data-flow.md` §4, `authorization.md`, `multi-tenancy.md`, `testing.md`; ADR 0008 (Outbox aceita para notificações); índice e roadmap | T1–T11     | verificação de links                                                  | [x]    |
+| T13 | `/review-code` e `/security-audit`; correções; gate final                                                                                                                                                                       | T12        | sem bloqueantes / sem Críticos-Altos; `pnpm verify`, integração e E2E | [x]    |
 
 ## Evidências
 
@@ -158,6 +158,8 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 - **Mutation testing**: 4 mutantes no router (`upToId`, CSRF, 404 do malformado, `authenticate` na preferência), 4 mortos.
 - **Gate**: `pnpm nx affected -t lint typecheck test --base=HEAD` exit 0.
 
+### T8 — 2026-10-15
+
 - **Entregue**:
   - `apps/worker/src/outbox-relay.ts`: relay **único**, montado no `main.ts` com as rotas de `emails` e `notifications`. Um tipo roteado por dois pipelines é erro de composição. O relay saiu de `email-delivery.ts`, que agora expõe `routes`. No shutdown, o relay para primeiro.
   - `queues/notification-jobs.ts`:
@@ -189,6 +191,8 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 - **Mutation testing**: 17 mutantes, 17 mortos (13 unitários e 4 de integração: relay duplicado, `jobId` ausente, retenção desligada, usuário errado no job).
 - **Gate**: `pnpm nx affected -t lint typecheck test --base=HEAD` exit 0 (33 projetos).
 
+### T9 — 2026-10-15
+
 - **Entregue**:
   - Harness entre organizações: os 4 casos declarados (lista com cursor `noLeak` de B, contador, `read` e `read-all` com ids de B ⇒ 404) já tinham entrado com as rotas na T7. Aqui foram reexecutados junto com a integração completa.
   - Nova bateria entre usuários da mesma organização, `apps/api/src/modules/notifications-isolation.integration.spec.ts`. Usa a API real com a mesma composição do `main.ts` e PostgreSQL. Para owner, admin, member e viewer:
@@ -201,3 +205,83 @@ Regras: uma tarefa por vez; marcar `[x]` somente com evidência executada (seç�
 - **Testes**: 7 novos. `api:integration-test`: 63 de 63 (9 arquivos).
 - **Mutation testing**: 5 mutantes no repositório Prisma, 5 mortos: sem destinatário em `markAllRead`, `page`, `recentUnread` e `findOwn`; sem organização em `findOwn`. A base do mesmo comando passa (7/7).
 - **Gate**: `pnpm nx affected -t lint typecheck test --base=HEAD` exit 0 (33 projetos).
+
+### T10 — 2026-10-15
+
+- **Entregue** (`apps/web/src/app/features/notifications/`):
+  - `NotificationApi` com guards de contrato.
+  - `UnreadNotificationsStore`, provido na área `/o/:slug` (recriada por organização):
+    - consulta ao abrir, a cada 60 s com a aba visível e no `visibilitychange`;
+    - pausa com a aba oculta;
+    - falha mantém o último valor;
+    - anúncio quando o número aumenta.
+  - `NotificationBell` na barra da organização:
+    - nome acessível "Notificações, N não lidas" e "mais de 99", com badge `aria-hidden`;
+    - anúncio numa região `role="status"`, para não competir com o `aria-live` das páginas.
+  - `NotificationsPage` em `/o/:slug/notifications`:
+    - estados de carregamento, vazio e erro com "tentar de novo";
+    - "Ex-membro", frase por tipo, chave, título e data relativa;
+    - abrir marca como lida (sem segurar a navegação) e leva à tarefa;
+    - "carregar mais" e "marcar todas" com `upToId` da mais recente exibida.
+  - Página "Notificações da conta" (`/account/notifications`), com o interruptor do resumo; volta ao valor salvo se a gravação falhar. Também entrou no menu da conta.
+- **Correção encontrada**: o link do e-mail apontava para `/account`, rota que não existe (cairia no `**`). Agora aponta para `/account/notifications`. Ajustados o caso de uso, os testes e o design (seções "E-mail" e "Conta").
+- **Ajuste em teste existente**: `project-tasks.page.spec` atende a consulta do sino antes do `verify()`.
+- **Testes**: 12 de componente (CA-09: sino, polling e visibilidade, página, preferência) e 9 de guards. Web: 353 testes no total.
+- **Mutation testing**: 14 mutantes, 14 mortos (pausa, intervalo, anúncio, falha, decremento, `upToId`, `markRead`, "carregar mais", plural, "99+", reversão da preferência e guards). O teto do guard sobreviveu na primeira rodada; o teste de guards foi criado e o matou.
+- **Gate**: `pnpm nx affected -t lint typecheck test --base=2788799` exit 0 (33 projetos). A base é o commit da spec, porque parte do trabalho já foi commitada em `23d4243`.
+
+### T11 — 2026-10-15
+
+- **Entregue**:
+  - Passo "spec 008" na jornada real `projects-journey.spec.ts` (web, API, worker e Mailpit, banco `taskflow_e2e`). Reaproveita as contas da jornada, porque a suíte já usa os 5 cadastros por IP. O membro recebeu do owner a atribuição de PDC-1 e a menção em PDC-5. Verificado:
+    - o sino chega a "Notificações, 2 não lidas";
+    - o planejamento do resumo é disparado na fila `notification-digests` (`support/digests.ts`, como o agendador horário) e o e-mail chega ao Mailpit com assunto fixo, "1 menção e 1 atribuição", links de PDC-1, PDC-5 e `/account/notifications`;
+    - o e-mail não traz nome do owner, títulos, texto do comentário nem nome da organização;
+    - a lista mostra as duas notificações; abrir a atribuição leva a `tasks/1` e o sino cai para 1;
+    - o resumo é desligado em "Notificações da conta" e continua desligado após recarregar.
+  - `support/organizations.ts`: as sessões simuladas também respondem o contador do sino. Sem isso, a API real devolvia 401 e o refresh de sessão re-renderizava a tela; foi o que quebrou `account-area` na primeira rodada.
+- **Execução**: `pnpm exec playwright test -c apps/web-e2e/playwright.config.mts` (variáveis do `.env.example`, `DATABASE_URL=…/taskflow_e2e`, `REDIS_URL=…/2`, chaves `rate-limit:auth.*` limpas):
+  - primeira rodada: 18 passaram e 1 falhou (`account-area`, causa acima);
+  - depois da correção: **19 passed** (46,2 s).
+- **Mutation testing**: não feito no E2E (custo de uma rodada completa por mutante). Os comportamentos estão cobertos por mutantes nas camadas de unidade e integração (T8–T10).
+- **Gate**: lint e typecheck do `web-e2e` verdes.
+
+### T12 — 2026-10-15
+
+- **Entregue**:
+  - `bounded-contexts.md`:
+    - status com Notifications implementado;
+    - setas de consulta `NOT → TSK/COL/ORG/IAM` e eventos `TSK/COL → NOT` pela Outbox (ADR 0017);
+    - linha do contexto;
+    - duas decisões de fronteira (produtores com anticorrupção; leitura que falha fechado, grafo sem ciclo, montagem por último). As FKs já constavam desde a T2.
+  - `dependency-rules.md`: seção das bibliotecas de Notifications (portas, fornecedores, lints).
+  - `business-rules.md`: BR-033 e BR-034, mais o status.
+  - `data-flow.md`: §4a com diagrama do pipeline (relay único, consumidor, resumo horário, retenção); a nota da 010 agora aponta para ela.
+  - `authorization.md`: notificação pessoal, sem permissão de catálogo, 404 único e bateria entre usuários.
+  - `multi-tenancy.md`: casos do harness, allowlist `/me`, bateria entre usuários e a exceção documentada dos índices parciais do worker, que não começam por `organization_id`.
+  - `testing.md`: estratégia da spec 008.
+  - ADR 0008: nota apontando para o 0017 (Outbox adotada para notificações, como previsto). Índice de ADRs atualizado.
+  - `roadmap.md`: 008 concluída na Fase 2; Fase 4 sem "filas de notificações".
+- **Verificação**: script de links relativos nos 11 documentos alterados: 0 quebrados. Prettier aplicado.
+
+### T13 — 2026-10-15
+
+- **`/review-code`**: nenhum bloqueante.
+  - I1 corrigido. Uma consulta velha do contador, respondida depois de abrir uma notificação, desfazia a baixa e anunciava um aumento falso; e um duplo clique baixava o contador duas vezes. Agora há uma geração por consulta e baixa local, e o item é marcado localmente pelo estado atual. Testes novos e 4 mutantes mortos (inclui o S4).
+  - I2: documentos ("concluída") alinhados com este fechamento.
+  - Sugestões aplicadas:
+    - S1: o E2E confere a soma dos resumos; o caso residual da virada da hora está registrado nos riscos;
+    - S2: cabeçalhos das evidências T8–T12;
+    - S3: BR-032 aponta para `mentions_added`;
+    - S4: o anúncio é limpo antes de repetir;
+    - S6: flag `isStopped` no reagendamento (`notification-delivery` e `maintenance`).
+  - S5 registrado como risco aceito no design. S7: arquivos novos ficam para o commit do usuário.
+- **`/security-audit`**: sem Críticos, Altos ou Médios.
+  - B1 corrigido: limite de 30/min para a preferência, leitura e escrita somadas. Teste novo e 2 mutantes mortos.
+  - B2: colegas podem esconder notificações legítimas com menções criadas e depois removidas, que ocupam a janela de 200 do contador. Ficou registrado como risco **Proposto**, porque a correção muda o comportamento aprovado (apagar ou marcar a notificação quando a menção some). Decisão do usuário.
+  - B3: o gatilho do ADR 0014 (worker com dados de várias organizações) foi reavaliado no design; o adiamento do RLS foi mantido, com justificativa.
+- **Gate final**:
+  - `pnpm verify`: exit 0, 102 tarefas (92 do cache do Nx);
+  - `pnpm test:integration --skip-nx-cache`: exit 0, 9 projetos, 272 testes;
+  - E2E `playwright test`: 19 passed (49,1 s).
+- **Aceitação**: CA-01 a CA-10 com evidência em `acceptance.md`; status "Concluída" em `specs/README.md`; checklists de `requirements.md` e `acceptance.md` marcados.

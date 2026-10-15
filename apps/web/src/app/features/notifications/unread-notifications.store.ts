@@ -6,6 +6,7 @@ import { notificationsMessages } from './notifications.messages';
 
 /** Intervalo da consulta (decisão 4): 60 s, pausada com a aba oculta. */
 export const UNREAD_POLL_MS = 60_000;
+const ANNOUNCE_DELAY_MS = 100;
 
 /**
  * Contador de não lidas da organização ativa (spec 008, RF-05). Provido na área da organização
@@ -20,6 +21,8 @@ export class UnreadNotificationsStore {
   private readonly state = signal({ count: 0, capped: false });
   private timer: ReturnType<typeof setInterval> | undefined;
   private started = false;
+  /** Cada mudança local ou consulta nova invalida respostas em voo (chegada fora de ordem). */
+  private generation = 0;
 
   readonly count = computed(() => this.state().count);
   readonly capped = computed(() => this.state().capped);
@@ -42,11 +45,18 @@ export class UnreadNotificationsStore {
   async refresh(): Promise<void> {
     const organizationId = this.organization.id();
     if (!organizationId) return;
+    const generation = ++this.generation;
     try {
       const next = await this.api.unreadCount(organizationId);
+      // Resposta velha (outra consulta ou baixa local depois dela): não desfaz nem anuncia.
+      if (generation !== this.generation) return;
       const previous = this.state();
       if (next.count > previous.count || (next.capped && !previous.capped)) {
-        this.announcement.set(notificationsMessages.arrived(next.count, next.capped));
+        // Limpa e anuncia depois de uma renderização: a mesma frase repetida não mudaria o DOM e
+        // não seria lida de novo.
+        this.announcement.set('');
+        const message = notificationsMessages.arrived(next.count, next.capped);
+        setTimeout(() => this.announcement.set(message), ANNOUNCE_DELAY_MS);
       }
       this.state.set(next);
     } catch {
@@ -56,13 +66,10 @@ export class UnreadNotificationsStore {
 
   /** Atualização local imediata (a próxima consulta confirma). */
   decrement(by = 1): void {
+    this.generation += 1;
     this.state.update((state) =>
       state.capped ? state : { count: Math.max(0, state.count - by), capped: false },
     );
-  }
-
-  clear(): void {
-    this.state.set({ count: 0, capped: false });
   }
 
   private readonly onVisibilityChange = () => {

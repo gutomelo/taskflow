@@ -17,6 +17,7 @@ import {
   NOTIFICATIONS_DEFAULT_PAGE,
   NOTIFICATIONS_LIST_POLICY,
   NOTIFICATIONS_MAX_PAGE,
+  NOTIFICATIONS_PREFERENCE_POLICY,
   NOTIFICATIONS_WRITE_POLICY,
 } from '../shared/notifications-limits';
 import { visibleOnly } from '../shared/visibility';
@@ -40,9 +41,10 @@ const viewerOf = (context: TenantRequestContext): Viewer => ({
 async function consume(
   deps: Pick<NotificationsDependencies, 'rateLimiter'>,
   policy: RateLimitPolicy,
-  context: TenantRequestContext,
+  context: TenantRequestContext | string,
 ): Promise<void> {
-  const decision = await deps.rateLimiter.consume(policy, context.actor.userId);
+  const userId = typeof context === 'string' ? context : context.actor.userId;
+  const decision = await deps.rateLimiter.consume(policy, userId);
   if (!decision.allowed) throw new RateLimitedError(decision.retryAfterSeconds);
 }
 
@@ -173,21 +175,28 @@ export class MarkAllReadUseCase {
 
 /** RF-09: preferência global da própria conta (rotas `/me`). */
 export class GetNotificationPreferenceUseCase {
-  constructor(private readonly deps: Pick<NotificationsDependencies, 'preferences'>) {}
+  constructor(
+    private readonly deps: Pick<NotificationsDependencies, 'preferences' | 'rateLimiter'>,
+  ) {}
 
   async execute(userId: string): Promise<Readonly<{ emailDigest: boolean }>> {
+    await consume(this.deps, NOTIFICATIONS_PREFERENCE_POLICY, userId);
     return { emailDigest: await this.deps.preferences.emailDigest(userId) };
   }
 }
 
 /** RF-09: última escrita vence (um booleano, sem conflito a resolver — S4 da arquitetura). */
 export class UpdateNotificationPreferenceUseCase {
-  constructor(private readonly deps: Pick<NotificationsDependencies, 'preferences' | 'clock'>) {}
+  constructor(
+    private readonly deps: Pick<NotificationsDependencies, 'preferences' | 'clock' | 'rateLimiter'>,
+  ) {}
 
   async execute(
     userId: string,
     command: Readonly<{ emailDigest: boolean }>,
   ): Promise<Readonly<{ emailDigest: boolean }>> {
+    // Auditoria da 008 (B1): sem limite, um laço de PUT amplificaria escritas no banco.
+    await consume(this.deps, NOTIFICATIONS_PREFERENCE_POLICY, userId);
     await this.deps.preferences.setEmailDigest(userId, command.emailDigest, this.deps.clock.now());
     return { emailDigest: command.emailDigest };
   }

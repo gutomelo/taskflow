@@ -1,6 +1,6 @@
 # Bounded contexts
 
-Status: **Identity & Access** (spec 001), **Organizations** (spec 002), **Projects** (spec 003) e **Tasks** (specs 004 e 005, inclusive o quadro Kanban) e **Collaboration** (spec 010: comentários e menções) **implementados**; **Boards adiado** ([ADR 0016](adr/0016-kanban-board-as-tasks-view.md)); os demais **planejados**. A coluna "Spec/Fase" indica quando cada um nasce.
+Status: **Identity & Access** (spec 001), **Organizations** (spec 002), **Projects** (spec 003) e **Tasks** (specs 004 e 005, inclusive o quadro Kanban) e **Collaboration** (spec 010: comentários e menções) e **Notifications** (spec 008: notificações in-app e resumo por e-mail) **implementados**; **Boards adiado** ([ADR 0016](adr/0016-kanban-board-as-tasks-view.md)); os demais **planejados**. A coluna "Spec/Fase" indica quando cada um nasce.
 
 ## Mapa de contextos
 
@@ -28,16 +28,20 @@ flowchart LR
     COL -- "quem lê o projeto (candidatos)" --> PRJ
     COL -- "membros atuais (Ex-membro)" --> ORG
     COL -- "nomes e busca entre ids" --> IAM
+    NOT -- "tarefas visíveis ao leitor, em lote" --> TSK
+    NOT -- "menções ainda ativas" --> COL
+    NOT -- "papel atual e slug; nomes de membros" --> ORG
+    NOT -- "nomes; e-mail verificado (resumo)" --> IAM
 
-    TSK -. eventos .-> NOT
-    COL -. eventos .-> NOT
+    TSK -. "tasks.assignee_changed (Outbox, ADR 0017)" .-> NOT
+    COL -. "collaboration.mentions_added (Outbox, ADR 0017)" .-> NOT
     TSK -. eventos .-> ANA
     SPR -. eventos .-> ANA
     ORG -. eventos .-> AUD
     TSK -. eventos .-> AUD
 ```
 
-Setas sólidas: dependência de consulta (via porta na `application` do consumidor, implementada no composition root). Setas tracejadas: reação a eventos publicados após commit.
+Setas sólidas: dependência de consulta (via porta na `application` do consumidor, implementada no composition root). Setas tracejadas: reação a eventos publicados após commit. As setas `TSK/COL → NOT` existem (spec 008); as demais tracejadas (`ANA`, `AUD`) são planejadas.
 
 ## Contextos
 
@@ -50,7 +54,7 @@ Setas sólidas: dependência de consulta (via porta na `application` do consumid
 | Boards                | `boards`        | **Adiado** ([ADR 0016](adr/0016-kanban-board-as-tasks-view.md)): nasce quando o quadro tiver estado próprio (vários quadros por projeto, limites de WIP, raias, colunas que não são 1:1 com status). Hoje o quadro é uma visão de `tasks`.                                                                                                                                               | Regras de conclusão (de `tasks`).                | Adiado                    |
 | Sprints               | `sprints`       | Backlog, planejamento, sprints, associação de tarefas, encerramento/reabertura (BR-005).                                                                                                                                                                                                                                                                                                 | Estado das tarefas.                              | 007 · F3                  |
 | Collaboration         | `collaboration` | Comentários em tarefas e subtarefas (texto simples, BR-031), menções estruturadas (BR-032), edição e exclusão lógica com moderação (**implementado**, spec 010); histórico de discussão e reações: planejados.                                                                                                                                                                           | Entrega de notificações.                         | 010 · F2                  |
-| Notifications         | `notifications` | Notificações in-app/e-mail, preferências, entrega assíncrona e em tempo real.                                                                                                                                                                                                                                                                                                            | Decidir _o que_ aconteceu (reage a eventos).     | 008 · F2                  |
+| Notifications         | `notifications` | Notificações pessoais de menção e atribuição (BR-033) registradas pelo worker a partir de eventos de integração; lista, contador e marcação de lidas; preferência e resumo por e-mail (BR-034); retenção de 90 dias (**implementado**, spec 008). Entrega em tempo real (Socket.IO): planejada.                                                                                          | Decidir _o que_ aconteceu (reage a eventos).     | 008 · F2                  |
 | Analytics             | `analytics`     | Indicadores, produtividade, métricas de projetos e sprints (modelos de leitura).                                                                                                                                                                                                                                                                                                         | Escrever estado de outros contextos.             | 009 · F3                  |
 | Audit                 | `audit`         | Registro imutável de alterações relevantes (BR-007), consulta administrativa.                                                                                                                                                                                                                                                                                                            | Regras de negócio dos contextos auditados.       | Transversal · consulta F3 |
 
@@ -67,6 +71,8 @@ Setas sólidas: dependência de consulta (via porta na `application` do consumid
 - **Ordem única de locks das escritas de tarefa**: projeto (`projects`) `FOR SHARE` → memberships `FOR SHARE` → contador ou lock do projeto em `tasks` (`task_project_locks`) → **uma** linha de `tasks`; a linha da organização nunca é travada. **Invariante**: toda mudança de papel efetivo trava a membership (`organizations`) ou o projeto em `FOR NO KEY UPDATE` (`projects`), e nenhuma transação trava `projects` depois de travar uma membership — por isso as participações são lidas sem lock. O runner fixa READ COMMITTED e repete uma vez a transação em deadlock/serialização (`P2034`); persistindo, 409 `CONCURRENT_UPDATE`.
 - **`collaboration` × `tasks`/`projects`/`organizations`/`identity`** (spec 010): uma porta só, `TaskDiscussionAccess`, na `application` de `collaboration`, que devolve **dados** (papéis efetivos, arquivado, cancelada ou `null`) — quem decide 404/403/estado é `collaboration`. O adaptador compõe `tasks` (`LockTaskForDiscussion`/`ResolveTaskForDiscussion`, no **módulo** de `tasks`), `projects` (`ListProjectReaderIds`) e `identity` (`SearchUsersAmong`, busca por nome/e-mail só entre os ids dados). Nomes exibidos só de membros atuais (`organizations` + `identity`; quem saiu é "Ex-membro"). Grafo sem ciclo: nenhum contexto anterior chama `collaboration`; ele é montado por último. Menções são tokens `<@id>` no texto e linhas em `comment_mentions` (sem FK para memberships: fato passado).
 - **Comentários na ordem de locks** (spec 010): projeto `FOR SHARE` → memberships `FOR SHARE` (ator e menções **novas**) → [`task_project_locks` — nunca usado por comentários] → **uma** linha de `tasks` em `FOR SHARE` → **uma** linha de `comments`. **Invariante**: nenhuma transação trava `tasks` depois de travar `comments`, e comentários nunca escrevem em `tasks` (o `FOR SHARE` não é promovido); a exclusão da tarefa apaga a conversa por cascata.
+- **`notifications` × produtores** (spec 008, [ADR 0017](adr/0017-outbox-for-cross-context-integration-events.md)): `tasks` e `collaboration` gravam **eventos de integração** (`tasks.assignee_changed`, `collaboration.mentions_added`, só ids, payload tipado na `application` do produtor) na Outbox, na mesma transação do fato. O worker valida o envelope com Zod (`satisfies` o tipo do produtor) e traduz para o fato de `notifications` numa camada anticorrupção no composition root; `notifications` nunca importa tipos dos produtores. Um único `OutboxRelay` roteia os tipos para as filas `emails` e `notifications`.
+- **Leitura de `notifications`** (spec 008): a validade é decidida **na leitura**, nunca na gravação (D8). A porta `NotificationTargets` consulta `tasks` (`ResolveVisibleTasks`, que consulta `projects`) e `collaboration` (`ListActiveMentions`, amarrada à tarefa) em lote e **falha fechado**; `NotificationPeople` consulta `organizations` (papel atual, slug, membros) e `identity` (nomes, e-mail verificado). Grafo de consulta sem ciclo: `NOT → COL → TSK → PRJ → ORG → IAM`, mais `NOT → ORG` e `NOT → IAM`. Na API, `notifications` é o **último** módulo montado (nenhum depende dele); no worker, `notifications.module.ts` compõe os mesmos adaptadores **só de leitura**.
 - **Remover ou sair da organização** desfaz as atribuições pelo banco (`ON DELETE SET NULL ("assignee_user_id")`), sem evento de `tasks` nem incremento de `version` (exceção a BR-008 registrada no design da spec 004).
 
 ## Exceções de integridade referencial entre contextos (ADR 0015)

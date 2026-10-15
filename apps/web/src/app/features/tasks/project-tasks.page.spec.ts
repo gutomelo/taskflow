@@ -105,6 +105,12 @@ describe('ProjectTasksPage (RF-03, RF-13)', () => {
     await stable(env.harness);
 
     expect(env.root().textContent).toContain('Nenhuma tarefa com estes filtros.');
+    // O sino da organização (spec 008) consulta o contador por conta própria.
+    for (const request of env.backend.match((req) =>
+      req.url.endsWith('/notifications/unread-count'),
+    )) {
+      request.flush({ count: 0, capped: false });
+    }
     env.backend.verify();
   });
 

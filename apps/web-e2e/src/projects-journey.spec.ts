@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { inviteAndJoin, password, signUpAndCreateOrganization } from './support/accounts';
+import { planDigestsNow } from './support/digests';
+import { messagesTo, waitForEmail } from './support/mailpit';
 
-// CA-10 das specs 003, 004, 005 e 010: jornada real — web, API, worker e Mailpit, sem simulações.
+// CA-10 das specs 003, 004, 005, 008 e 010: jornada real — web, API, worker e Mailpit, sem simulações.
 // Grava dados: rode contra um banco descartável (docs/development/testing.md). As
 // tarefas continuam a jornada de projetos com as mesmas contas: a suíte já faz os 5 cadastros que o
 // limite por IP permite.
@@ -273,5 +275,64 @@ test('CA-10: create a project, add a participant, archive and restore; then its 
     await expect(composer(ownerPage)).toHaveCount(0);
     await expect(conversation(ownerPage).getByRole('button', { name: 'Editar' })).toHaveCount(0);
     await expect(ownerItems.first().getByRole('button', { name: 'Excluir' })).toBeVisible();
+  });
+
+  await test.step('spec 008: assignment and mention become notifications and an email digest', async () => {
+    const bell = guestPage.getByRole('link', { name: /^Notificações/ });
+
+    // O membro recebeu PDC-1 (atribuição) e foi mencionado em PDC-5: o worker registrou as duas
+    await expect(async () => {
+      await guestPage.goto(`/o/${organization.slug}`);
+      await expect(bell).toHaveAccessibleName('Notificações, 2 não lidas', { timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+
+    // Resumo por e-mail: só contagens, chaves e links — sem nomes, títulos nem texto (decisões 7 e 8)
+    // O agendador real também pode ter rodado no minuto zero: confere a soma de todos os resumos.
+    await planDigestsNow();
+    await waitForEmail(guest.email, 'Você tem novidades no TaskFlow');
+    const digests = (await messagesTo(guest.email)).filter(
+      (message) => message.Subject === 'Você tem novidades no TaskFlow',
+    );
+    const digest = {
+      Text: digests.map((message) => message.Text).join('\n'),
+      HTML: digests.map((message) => message.HTML).join('\n'),
+    };
+    if (digests.length === 1) {
+      expect(digest.Text).toContain(
+        `Na organização ${organization.slug}: 1 menção e 1 atribuição.`,
+      );
+    }
+    expect(digest.Text).toContain(`/o/${organization.slug}/projects/PDC/tasks/1`);
+    expect(digest.Text).toContain(`/o/${organization.slug}/projects/PDC/tasks/5`);
+    expect(digest.Text).toContain('/account/notifications');
+    for (const secret of [
+      owner.name,
+      'Login com SSO',
+      'Revisar textos',
+      'até amanhã',
+      organization.name,
+    ]) {
+      expect(digest.Text).not.toContain(secret);
+      expect(digest.HTML).not.toContain(secret);
+    }
+
+    // CA-09: a lista mostra as duas; abrir a atribuição leva à tarefa e a marca como lida
+    await bell.click();
+    await expect(guestPage).toHaveURL(new RegExp(`/o/${organization.slug}/notifications$`));
+    const items = guestPage.getByRole('link', { name: /PDC-\d/ });
+    await expect(items).toHaveCount(2);
+    await expect(items.first()).toContainText('Dona Projetos mencionou você em PDC-5');
+    await guestPage.getByRole('link', { name: /atribuiu a você PDC-1/ }).click();
+    await expect(guestPage).toHaveURL(new RegExp(`/o/${organization.slug}/projects/PDC/tasks/1$`));
+    await expect(bell).toHaveAccessibleName('Notificações, 1 não lida');
+
+    // Preferência na conta: desliga o resumo por e-mail e continua desligado ao voltar
+    await guestPage.goto('/account/notifications');
+    const digestSwitch = guestPage.getByRole('switch', { name: 'Receber resumo por e-mail' });
+    await expect(digestSwitch).toBeChecked();
+    await digestSwitch.uncheck();
+    await expect(guestPage.getByText('Resumo por e-mail desligado.')).toBeAttached();
+    await guestPage.reload();
+    await expect(digestSwitch).not.toBeChecked();
   });
 });
