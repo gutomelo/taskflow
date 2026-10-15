@@ -1,9 +1,10 @@
 name: CI
 
+# Desativado por decisão do autor (2026-10-15): o projeto valida localmente (`pnpm verify`,
+# integração e E2E no Docker). Só roda se disparado à mão na aba Actions. Para reativar,
+# volte os gatilhos `push` (branches: [master]) e `pull_request`.
 on:
-  push:
-    branches: [master]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

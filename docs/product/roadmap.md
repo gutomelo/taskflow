@@ -13,7 +13,7 @@ Spec: [`specs/000-foundation`](../../specs/000-foundation/requirements.md)
 - Processo SDD com templates.
 - Monorepo Nx: `apps/web` (Angular), `apps/api` (Express), libs mínimas, limites de dependência.
 - Prisma configurado, Docker Compose (PostgreSQL + Redis), health checks.
-- Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions, Dependabot.
+- Qualidade: lint, typecheck, testes unitários/integração/E2E iniciais, CI no GitHub Actions (desativado em 2026-10-15 por decisão do autor: só disparo manual; a validação é local com `pnpm verify`, integração e E2E no Docker), Dependabot.
 
 ## Fase 1 — MVP · Concluído
 
