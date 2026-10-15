@@ -55,7 +55,7 @@ Proporcionalidade: correções triviais não exigem spec; melhorias pequenas vir
 | [005-kanban](005-kanban/requirements.md)                 | 1    | Concluída    |
 | [006-permissions](006-permissions/requirements.md)       | 1    | Concluída    |
 | 007-sprints                                              | 3    | Não iniciada |
-| 008-notifications                                        | 2    | Não iniciada |
+| [008-notifications](008-notifications/requirements.md)   | 2    | Rascunho     |
 | 009-analytics                                            | 3    | Não iniciada |
 | [010-comments](010-comments/requirements.md)             | 2    | Concluída    |
 
