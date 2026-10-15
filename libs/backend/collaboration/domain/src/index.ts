@@ -14,4 +14,9 @@ export {
   parseCommentBody,
 } from './lib/comment/comment-content';
 export { Comment, type CommentEdit, type CommentSnapshot } from './lib/comment/comment';
-export type { CommentPosition, CommentRepository } from './lib/repositories/comment-repository';
+export {
+  mentionKey,
+  type CommentPosition,
+  type CommentRepository,
+  type MentionReference,
+} from './lib/repositories/comment-repository';

@@ -1,5 +1,8 @@
 import { RateLimitedError, type TenantRequestContext } from '@taskflow/backend/shared/application';
-import { CommentNotFoundError } from '@taskflow/backend/collaboration/domain';
+import {
+  CommentNotFoundError,
+  type MentionReference,
+} from '@taskflow/backend/collaboration/domain';
 import { canOnProject } from '@taskflow/backend/shared/kernel';
 import type { DiscussionTask, MentionCandidate } from '../ports/task-discussion-access';
 import type { CollaborationDependencies } from '../shared/collaboration-dependencies';
@@ -153,5 +156,26 @@ export class ListMentionCandidatesUseCase {
         ? encodeCandidateCursor(task.taskId, query.query, page.nextCursor)
         : null,
     };
+  }
+}
+
+/** Teto de menções por consulta em lote (uma página de notificações). */
+export const MAX_ACTIVE_MENTIONS_QUERY = 200;
+
+/**
+ * Spec 008 (porta `NotificationTargets`, obrigação 2 da 010): quais menções ainda existem em
+ * comentário não removido da tarefa indicada. Sem chave = não mostrar (falha fechado).
+ */
+export class ListActiveMentionsUseCase {
+  constructor(private readonly deps: Pick<CollaborationDependencies, 'comments'>) {}
+
+  execute(
+    organizationId: string,
+    mentions: ReadonlyArray<MentionReference>,
+  ): Promise<ReadonlySet<string>> {
+    if (mentions.length > MAX_ACTIVE_MENTIONS_QUERY) {
+      throw new RangeError(`At most ${MAX_ACTIVE_MENTIONS_QUERY} mentions per query`);
+    }
+    return this.deps.comments.activeMentions(organizationId, mentions);
   }
 }

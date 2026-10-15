@@ -29,6 +29,9 @@ import { createProjectsFoundation, createProjectsModule } from '../modules/proje
 import { createProjectAccess } from '../modules/adapters/project-access.adapter';
 import { createTasksFoundation, createTasksModule } from '../modules/tasks.module';
 import { createCollaborationModule } from '../modules/collaboration.module';
+import { createNotificationsModule } from '../modules/notifications.module';
+import { createNotificationPeople } from '../modules/adapters/notification-people.adapter';
+import { createNotificationTargets } from '../modules/adapters/notification-targets.adapter';
 import { createCollaborationUserDirectory } from '../modules/adapters/collaboration-user-directory.adapter';
 import { createTaskDiscussionAccess } from '../modules/adapters/task-discussion-access.adapter';
 import type { TestClient } from './isolation-cases';
@@ -109,6 +112,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     foundation: tasksFoundation,
     logger,
     transactions,
+    outbox: new PrismaOutboxWriter(transactions),
     rateLimiter: new InMemoryRateLimiter(),
     idGenerator: new UuidV7Generator(),
     clock,
@@ -157,11 +161,22 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
   const collaboration = createCollaborationModule({
     logger,
     transactions,
+    outbox: new PrismaOutboxWriter(transactions),
     rateLimiter: new InMemoryRateLimiter(),
     idGenerator: new UuidV7Generator(),
     clock,
     discussion: createTaskDiscussionAccess({ tasks, projects, identity }),
     users: createCollaborationUserDirectory({ organizations, identity }),
+  });
+  const notifications = createNotificationsModule({
+    transactions,
+    rateLimiter: new InMemoryRateLimiter(),
+    idGenerator: new UuidV7Generator(),
+    clock,
+    targets: createNotificationTargets({ tasks, collaboration }),
+    people: createNotificationPeople({ organizations, identity }),
+    authenticate,
+    csrf,
   });
   // No lugar do router de identidade: só a emissão do cookie CSRF ligada à sessão de teste.
   const identityRouter = Router().get('/test/csrf', authenticate, (req, res) => {
@@ -176,6 +191,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
     projects,
     tasks,
     collaboration,
+    notifications,
   });
   const app = createApp({
     config: { trustProxy: false, jsonBodyLimit: '100kb', healthCheckTimeoutMs: 100 },
@@ -187,6 +203,7 @@ export async function startIntegrationApi(): Promise<IntegrationApi> {
       projects.domainErrors,
       tasks.domainErrors,
       collaboration.domainErrors,
+      notifications.domainErrors,
     ),
   });
 

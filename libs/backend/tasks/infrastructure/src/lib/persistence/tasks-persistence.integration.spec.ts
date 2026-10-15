@@ -183,6 +183,18 @@ describe('tasks persistence (integration, T3)', () => {
     );
   });
 
+  it('spec 008: finds tasks by id across projects, only in the organization', async () => {
+    const [a, b] = [await organization(), await organization()];
+    const [web, app] = [await project(a, 'WEB'), await project(a, 'APP')];
+    const [t1, t2] = [await task(a, web), await task(a, app)];
+
+    expect(
+      (await tasks.findAnyByIds(a, [t1.id, t2.id, randomUUID()])).map((found) => found.id).sort(),
+    ).toEqual([t1.id, t2.id].sort());
+    expect(await tasks.findAnyByIds(b, [t1.id])).toEqual([]);
+    expect(await tasks.findAnyByIds(a, [])).toEqual([]);
+  });
+
   it('finds, saves and removes with the organization, project and version', async () => {
     const [a, b] = [await organization(), await organization()];
     const target = await project(a);

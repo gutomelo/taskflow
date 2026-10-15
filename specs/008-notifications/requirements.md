@@ -1,10 +1,10 @@
 # 008 — Notificações · Requisitos
 
-- **Status**: Rascunho (revisão 2: decisões 8 a 10)
+- **Status**: Aprovado
 - **Fase do roadmap**: 2 — Colaboração (depois de `010-comments`)
 - **Bounded contexts**: Notifications (`notifications`, **novo**: notificações in-app, preferência e resumo por e-mail). Produtores por Outbox: Collaboration (menções) e Tasks (atribuição). Consultas por porta: Tasks (tarefa visível, chave), Collaboration (menção ainda ativa), Organizations (membro atual, slug), Identity (nome e e-mail)
 - **Autor / data**: Claude Code (com decisões do usuário) / 2026-10-15
-- **Aprovado por / data**: —
+- **Aprovado por / data**: usuário / 2026-10-15
 
 ## Objetivo
 

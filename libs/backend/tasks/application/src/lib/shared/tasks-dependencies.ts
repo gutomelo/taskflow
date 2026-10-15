@@ -1,4 +1,8 @@
-import type { RateLimiter, TransactionRunner } from '@taskflow/backend/shared/application';
+import type {
+  OutboxWriter,
+  RateLimiter,
+  TransactionRunner,
+} from '@taskflow/backend/shared/application';
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
 import type { TaskDependencyRepository, TaskRepository } from '@taskflow/backend/tasks/domain';
 import type { ProjectAccess } from '../ports/project-access';
@@ -14,6 +18,8 @@ export interface TasksDependencies {
   readonly transactions: TransactionRunner;
   readonly rateLimiter: RateLimiter;
   readonly events: TasksEventRecorder;
+  /** Eventos de integração (ADR 0017), na transação da casca. */
+  readonly outbox: OutboxWriter;
   readonly idGenerator: IdGenerator;
   readonly clock: Clock;
 }

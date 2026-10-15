@@ -32,6 +32,7 @@ import {
 import { CreateOrganizationUseCase } from './create-organization.use-case';
 import { GetOrganizationUseCase } from './get-organization.use-case';
 import { ListMyOrganizationsUseCase } from './list-my-organizations.use-case';
+import { ListUserMembershipsUseCase } from './list-user-memberships.use-case';
 import { UpdateOrganizationUseCase } from './update-organization.use-case';
 import { ResolveTenantMembershipUseCase } from './resolve-tenant-membership.use-case';
 
@@ -254,6 +255,23 @@ describe('ListMyOrganizationsUseCase (RF-02)', () => {
 
     expect(await new ListMyOrganizationsUseCase(bed).execute(contextFor(ANA))).toEqual([]);
     expect(bed.organizations.batches).toEqual([]);
+  });
+});
+
+describe('ListUserMembershipsUseCase (spec 008)', () => {
+  it('lists where the person is a member now, with slug and role', async () => {
+    const bed = createOrganizationsTestbed();
+    const acme = await seedOrganization(bed, 'acme', [[ANA, 'owner']]);
+    const beta = await seedOrganization(bed, 'beta', [
+      [ANA, 'viewer'],
+      [BRUNO, 'member'],
+    ]);
+
+    expect(await new ListUserMembershipsUseCase(bed).execute(ANA)).toEqual([
+      { organizationId: acme, slug: 'acme', role: 'owner' },
+      { organizationId: beta, slug: 'beta', role: 'viewer' },
+    ]);
+    expect(await new ListUserMembershipsUseCase(bed).execute('u-ninguem')).toEqual([]);
   });
 });
 

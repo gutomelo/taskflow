@@ -376,6 +376,17 @@ export class PrismaTaskRepository implements TaskRepository {
     return rows.map(toTask);
   }
 
+  async findAnyByIds(
+    organizationId: string,
+    taskIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyArray<Task>> {
+    if (taskIds.length === 0) return [];
+    const rows = await this.transactions.client().task.findMany({
+      where: { organizationId, id: { in: [...taskIds] } },
+    });
+    return rows.map(toTask);
+  }
+
   async findByIds(
     organizationId: string,
     projectId: string,

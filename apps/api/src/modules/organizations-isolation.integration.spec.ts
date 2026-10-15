@@ -17,6 +17,7 @@ import {
   boardSchema,
   commentPageSchema,
   commentSchema,
+  notificationPageSchema,
 } from '@taskflow/contracts';
 import { startIntegrationApi, type IntegrationApi } from '../testing/integration-api';
 import { ISOLATION_CASES, type IsolationWorld, type TestClient } from '../testing/isolation-cases';
@@ -236,6 +237,27 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
       (await asBob.get(`/organizations/${orgB}/tasks/${taskB.id}/comments?limit=1`)).body,
     );
     if (!commentsB.nextCursor) throw new Error('expected a second page of comments in B');
+    // Spec 008: duas notificações de bob em B (o worker não roda aqui: semeadas direto).
+    const notificationsB = [0, 1].map((index) => ({
+      id: randomUUID(),
+      organizationId: orgB,
+      recipientUserId: bob,
+      kind: 'assignment' as const,
+      actorUserId: bia,
+      projectId: projectB.id,
+      taskId: taskB.id,
+      commentId: null,
+      dedupeKey: `assignment:${randomUUID()}`,
+      sourceEventId: randomUUID(),
+      occurredAt: new Date(Date.UTC(2026, 9, 15, 10, index)),
+      createdAt: new Date(),
+    }));
+    await prisma.notification.createMany({ data: notificationsB });
+    const notificationPageB = notificationPageSchema.parse(
+      (await asBob.get(`/organizations/${orgB}/notifications?limit=1`)).body,
+    );
+    if (!notificationPageB.nextCursor)
+      throw new Error('expected a second page of notifications in B');
     const workflowB = workflowSchema.parse(
       (await asBob.get(`/organizations/${orgB}/projects/${projectB.id}/workflow`)).body,
     );
@@ -266,6 +288,8 @@ describe('tenant isolation over HTTP (integration, spec 002/T14 + spec 006/T6)',
         boardCursor,
         commentId: commentB.id,
         commentsCursor: commentsB.nextCursor,
+        notificationId: notificationsB[0]?.id ?? '',
+        notificationsCursor: notificationPageB.nextCursor,
         taskKey: taskB.key,
         blockingTaskId: blockerB.id,
         // Status inicial de B: é onde estão as tarefas de B (um filtro sem tenant as vazaria).

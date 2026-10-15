@@ -6,3 +6,4 @@ export * from './lib/projects/projects.contract';
 export * from './lib/tasks/tasks.contract';
 export * from './lib/tasks/board.contract';
 export * from './lib/collaboration/comments.contract';
+export * from './lib/notifications/notifications.contract';

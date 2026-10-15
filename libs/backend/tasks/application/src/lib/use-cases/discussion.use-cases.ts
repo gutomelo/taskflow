@@ -1,4 +1,5 @@
 import type { OrganizationRole, ProjectRole } from '@taskflow/backend/shared/kernel';
+import { formatTaskKey } from '@taskflow/backend/tasks/domain';
 import type { TasksDependencies } from '../shared/tasks-dependencies';
 
 // Casos de uso que servem à porta `TaskDiscussionAccess` de `collaboration` (spec 010), ligada no
@@ -83,5 +84,50 @@ export class ResolveTaskForDiscussionUseCase {
       canceled: task.isCanceled,
       effectiveRole: project.effectiveRole,
     };
+  }
+}
+
+/** Teto de tarefas por consulta em lote (uma página de notificações). */
+export const MAX_VISIBLE_TASKS_QUERY = 200;
+
+/**
+ * Spec 008 (porta `NotificationTargets`): quais das tarefas dadas o leitor vê agora, com chave e
+ * título — numa consulta de tarefas e uma de projetos. Ausente do mapa = não visível (falha
+ * fechado): tarefa excluída, de outra organização ou de projeto sem leitura.
+ */
+export class ResolveVisibleTasksUseCase {
+  // Só `readableProjects`: o worker (resumo) monta este caso de uso sem o resto da porta.
+  constructor(
+    private readonly deps: Pick<TasksDependencies, 'tasks'> &
+      Readonly<{ projectAccess: Pick<TasksDependencies['projectAccess'], 'readableProjects'> }>,
+  ) {}
+
+  async execute(
+    organizationId: string,
+    viewer: Readonly<{ userId: string; organizationRole: OrganizationRole }>,
+    taskIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyMap<string, Readonly<{ key: string; title: string }>>> {
+    const unique = [...new Set(taskIds)];
+    if (unique.length > MAX_VISIBLE_TASKS_QUERY) {
+      throw new RangeError(`At most ${MAX_VISIBLE_TASKS_QUERY} tasks per query`);
+    }
+    if (unique.length === 0) return new Map();
+    const tasks = await this.deps.tasks.findAnyByIds(organizationId, unique);
+    if (tasks.length === 0) return new Map();
+    const projects = await this.deps.projectAccess.readableProjects(
+      organizationId,
+      [...new Set(tasks.map((task) => task.projectId))],
+      viewer,
+    );
+    return new Map(
+      tasks.flatMap((task) => {
+        const project = projects.get(task.projectId);
+        if (!project) return [];
+        const { number, title } = task.toSnapshot();
+        return [
+          [task.id, { key: formatTaskKey(project.key, number), title: title.value }] as const,
+        ];
+      }),
+    );
   }
 }

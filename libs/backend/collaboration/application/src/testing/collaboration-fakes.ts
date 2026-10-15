@@ -1,6 +1,8 @@
 // Fakes em memória para os testes de casos de uso de `collaboration`. Nunca em produção.
 import {
   Comment,
+  mentionKey,
+  type MentionReference,
   type CommentPosition,
   type CommentRepository,
   type CommentSnapshot,
@@ -8,6 +10,7 @@ import {
 import {
   FakeTransactionRunner,
   FixedClock,
+  InMemoryOutbox,
   InMemoryRateLimiter,
   SequentialIds,
   type TransactionalStore,
@@ -82,6 +85,22 @@ export class InMemoryCommentRepository implements CommentRepository, Transaction
       .sort((a, b) => (later(a, b) ? -1 : 1))
       .slice(0, limit)
       .map((row) => Comment.restore(row));
+  }
+  async activeMentions(organizationId: string, mentions: ReadonlyArray<MentionReference>) {
+    return new Set(
+      mentions
+        .filter(({ taskId, commentId, userId }) =>
+          this.rows.some(
+            (row) =>
+              row.organizationId === organizationId &&
+              row.id === commentId &&
+              row.taskId === taskId &&
+              row.deletedAt === null &&
+              row.mentionedUserIds.includes(userId),
+          ),
+        )
+        .map(({ commentId, userId }) => mentionKey(commentId, userId)),
+    );
   }
   async countActive(organizationId: string, taskId: string) {
     return this.rows.filter(
@@ -236,13 +255,15 @@ export class RecordingCollaborationEvents implements CollaborationEventRecorder 
 export function createCollaborationTestbed() {
   const transactions = new FakeTransactionRunner();
   const comments = new InMemoryCommentRepository(transactions);
-  transactions.register(comments);
+  const outbox = new InMemoryOutbox(transactions);
+  transactions.register(comments, outbox);
   return {
     transactions,
     comments,
     discussion: new FakeTaskDiscussionAccess(transactions),
     users: new InMemoryCollaborationUserDirectory(),
     events: new RecordingCollaborationEvents(),
+    outbox,
     rateLimiter: new InMemoryRateLimiter(),
     clock: new FixedClock(),
     idGenerator: new SequentialIds(),

@@ -9,7 +9,9 @@ export type EmailRecipient = Readonly<{ email: EmailAddress; name: string | null
 
 export type EmailBlock =
   | Readonly<{ kind: 'paragraph'; text: string }>
-  | Readonly<{ kind: 'action'; label: string; href: string }>;
+  | Readonly<{ kind: 'action'; label: string; href: string }>
+  /** Lista de links secundários (ex.: tarefas do resumo de notificações, spec 008). */
+  | Readonly<{ kind: 'links'; items: ReadonlyArray<Readonly<{ label: string; href: string }>> }>;
 
 const HTML_ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -40,9 +42,11 @@ export function renderEmail(
 
   const text = [
     greeting,
-    ...blocks.map((block) =>
-      block.kind === 'paragraph' ? block.text : `${block.label}: ${block.href}`,
-    ),
+    ...blocks.map((block) => {
+      if (block.kind === 'paragraph') return block.text;
+      if (block.kind === 'action') return `${block.label}: ${block.href}`;
+      return block.items.map((item) => `- ${item.label}: ${item.href}`).join('\n');
+    }),
     `— ${FOOTER}`,
   ].join('\n\n');
 
@@ -50,10 +54,17 @@ export function renderEmail(
     .map((block) =>
       block.kind === 'paragraph'
         ? `<p style="margin:0 0 16px">${escapeHtml(block.text)}</p>`
-        : [
-            `<p style="margin:0 0 16px"><a href="${escapeHtml(block.href)}" style="display:inline-block;padding:12px 20px;border-radius:6px;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:600">${escapeHtml(block.label)}</a></p>`,
-            `<p style="margin:0 0 16px;font-size:13px;color:#4b5563">Se o botão não funcionar, copie e cole este endereço no navegador:<br><span style="word-break:break-all">${escapeHtml(block.href)}</span></p>`,
-          ].join(''),
+        : block.kind === 'links'
+          ? `<ul style="margin:0 0 16px;padding-left:20px">${block.items
+              .map(
+                (item) =>
+                  `<li><a href="${escapeHtml(item.href)}" style="color:#1d4ed8">${escapeHtml(item.label)}</a></li>`,
+              )
+              .join('')}</ul>`
+          : [
+              `<p style="margin:0 0 16px"><a href="${escapeHtml(block.href)}" style="display:inline-block;padding:12px 20px;border-radius:6px;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:600">${escapeHtml(block.label)}</a></p>`,
+              `<p style="margin:0 0 16px;font-size:13px;color:#4b5563">Se o botão não funcionar, copie e cole este endereço no navegador:<br><span style="word-break:break-all">${escapeHtml(block.href)}</span></p>`,
+            ].join(''),
     )
     .join('');
 

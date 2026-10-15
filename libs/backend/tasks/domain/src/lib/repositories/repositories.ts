@@ -122,6 +122,11 @@ export interface TaskRepository {
     projectId: string,
     taskIds: ReadonlyArray<string>,
   ): Promise<ReadonlyArray<Task>>;
+  /** Spec 008: tarefas da organização pelos ids, de qualquer projeto (a visibilidade vem depois). */
+  findAnyByIds(
+    organizationId: string,
+    taskIds: ReadonlyArray<string>,
+  ): Promise<ReadonlyArray<Task>>;
   /** Ids das subtarefas obrigatórias dos pais indicados (aresta implícita D4). */
   requiredSubtaskIds(
     organizationId: string,

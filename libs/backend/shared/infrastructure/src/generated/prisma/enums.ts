@@ -28,6 +28,14 @@ export const UserTokenPurpose = {
 export type UserTokenPurpose = (typeof UserTokenPurpose)[keyof typeof UserTokenPurpose]
 
 
+export const NotificationKind = {
+  mention: 'mention',
+  assignment: 'assignment'
+} as const
+
+export type NotificationKind = (typeof NotificationKind)[keyof typeof NotificationKind]
+
+
 export const OrganizationRole = {
   owner: 'owner',
   admin: 'admin',

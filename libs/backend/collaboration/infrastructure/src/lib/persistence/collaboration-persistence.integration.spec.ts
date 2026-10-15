@@ -233,4 +233,29 @@ describe('collaboration persistence (integration, T3)', () => {
 
     expect(order).toEqual(['first locked', 'first done', 'second locked']);
   });
+
+  it('spec 008: active mentions only in a comment not removed of the given task, in the organization', async () => {
+    const a = await world();
+    const kept = newComment(a, a.taskA, `oi <@${bia}> <@${vivi}>`);
+    const removed = newComment(a, a.taskA, `oi <@${otto}>`);
+    await comments.add(kept);
+    await comments.add(removed);
+    removed.delete(author, now);
+    await comments.save(removed);
+
+    const active = await comments.activeMentions(a.organizationId, [
+      { taskId: a.taskA, commentId: kept.id, userId: bia },
+      { taskId: a.taskB, commentId: kept.id, userId: vivi },
+      { taskId: a.taskA, commentId: kept.id, userId: otto },
+      { taskId: a.taskA, commentId: removed.id, userId: otto },
+    ]);
+
+    expect([...active]).toEqual([`${kept.id}|${bia}`]);
+    expect(
+      await comments.activeMentions(randomUUID(), [
+        { taskId: a.taskA, commentId: kept.id, userId: bia },
+      ]),
+    ).toEqual(new Set());
+    expect(await comments.activeMentions(a.organizationId, [])).toEqual(new Set());
+  });
 });

@@ -1,7 +1,9 @@
 import {
   Comment,
+  mentionKey,
   type CommentPosition,
   type CommentRepository,
+  type MentionReference,
 } from '@taskflow/backend/collaboration/domain';
 import type { PrismaTransactionRunner } from '@taskflow/backend/shared/infrastructure';
 import { VersionConflictError } from '@taskflow/backend/shared/kernel';
@@ -120,6 +122,25 @@ export class PrismaCommentRepository implements CommentRepository {
       include: withMentions,
     });
     return rows.map(toComment);
+  }
+
+  async activeMentions(
+    organizationId: string,
+    mentions: ReadonlyArray<MentionReference>,
+  ): Promise<ReadonlySet<string>> {
+    if (mentions.length === 0) return new Set();
+    const rows = await this.transactions.client().commentMention.findMany({
+      where: {
+        organizationId,
+        OR: mentions.map(({ taskId, commentId, userId }) => ({
+          commentId,
+          userId,
+          comment: { taskId, deletedAt: null },
+        })),
+      },
+      select: { commentId: true, userId: true },
+    });
+    return new Set(rows.map((row) => mentionKey(row.commentId, row.userId)));
   }
 
   countActive(organizationId: string, taskId: string): Promise<number> {

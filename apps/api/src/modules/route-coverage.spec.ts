@@ -8,6 +8,16 @@ import {
 } from '@taskflow/backend/collaboration/application';
 import { createCollaborationTestbed } from '@taskflow/backend/collaboration/application/testing';
 import { createCollaborationRouter } from '@taskflow/backend/collaboration/http';
+import {
+  CountUnreadUseCase,
+  GetNotificationPreferenceUseCase,
+  ListNotificationsUseCase,
+  MarkAllReadUseCase,
+  MarkReadUseCase,
+  UpdateNotificationPreferenceUseCase,
+} from '@taskflow/backend/notifications/application';
+import { createNotificationsTestbed } from '@taskflow/backend/notifications/application/testing';
+import { createNotificationsRouters } from '@taskflow/backend/notifications/http';
 import { commentBodySchema } from '@taskflow/contracts';
 import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
@@ -221,6 +231,19 @@ function composed() {
       deleteComment: new DeleteCommentUseCase(collaborationBed),
     },
   });
+  const notificationsBed = createNotificationsTestbed();
+  const notificationsRouters = createNotificationsRouters({
+    useCases: {
+      listNotifications: new ListNotificationsUseCase(notificationsBed),
+      countUnread: new CountUnreadUseCase(notificationsBed),
+      markRead: new MarkReadUseCase(notificationsBed),
+      markAllRead: new MarkAllReadUseCase(notificationsBed),
+      getPreference: new GetNotificationPreferenceUseCase(notificationsBed),
+      updatePreference: new UpdateNotificationPreferenceUseCase(notificationsBed),
+    },
+    authenticate,
+    csrf,
+  });
   return composeApiRouters({
     identityRouter,
     authenticate,
@@ -229,6 +252,7 @@ function composed() {
     projects: { tenantRouter: projectsRouter },
     tasks: { tenantRouter: tasksRouter },
     collaboration: { tenantRouter: collaborationRouter },
+    notifications: notificationsRouters,
   });
 }
 

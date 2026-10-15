@@ -263,3 +263,39 @@ export class ListProjectReaderIdsUseCase {
     return { userIds: [...readers].slice(0, MAX_PROJECT_READER_IDS), complete };
   }
 }
+
+/** Teto de ids por consulta em lote (spec 008: uma página de notificações). */
+export const MAX_READABLE_PROJECTS_QUERY = 200;
+
+/**
+ * Spec 008 (porta `ProjectAccess` de `tasks` → `NotificationTargets`): quais dos projetos dados o
+ * leitor vê agora, numa consulta, sem workflow. Ausente do mapa = não visível (falha fechado).
+ */
+export class ResolveReadableProjectsUseCase {
+  constructor(private readonly deps: { readonly projects: ProjectRepository }) {}
+
+  async execute(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: Readonly<{ userId: string; organizationRole: OrganizationRole }>,
+  ): Promise<ReadonlyMap<string, Readonly<{ key: string }>>> {
+    const unique = [...new Set(projectIds)];
+    if (unique.length > MAX_READABLE_PROJECTS_QUERY) {
+      // Erro de programação de quem chama (lotes são de uma página), não entrada do usuário.
+      throw new RangeError(`At most ${MAX_READABLE_PROJECTS_QUERY} projects per query`);
+    }
+    if (unique.length === 0) return new Map();
+    const seesAll = viewer.organizationRole === 'owner' || viewer.organizationRole === 'admin';
+    const visible = await this.deps.projects.findVisibleMany(organizationId, unique, {
+      userId: viewer.userId,
+      seesAll,
+    });
+    return new Map(
+      visible.flatMap(({ project, participation }) =>
+        effectiveProjectRole(viewer.organizationRole, participation)
+          ? [[project.id, { key: project.toSnapshot().key.value }] as const]
+          : [],
+      ),
+    );
+  }
+}

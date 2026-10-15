@@ -55,6 +55,7 @@ import {
   PrismaOrganizationRepository,
 } from '@taskflow/backend/organizations/infrastructure';
 import { createEmailDelivery, type EmailDelivery } from './email-delivery';
+import { createOutboxRelay } from './outbox-relay';
 
 const APP_URL = 'http://localhost:4200';
 const PASSWORD = 'Correct-Horse-9-Battery';
@@ -90,6 +91,13 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   let smtp: SmtpEmailSender;
   let sender: FlakyEmailSender;
   let delivery: EmailDelivery | undefined;
+  let relay: ReturnType<typeof createOutboxRelay> | undefined;
+
+  /** Relay único (como no `main.ts`) mais o consumidor de e-mails. */
+  function startDelivery() {
+    relay?.start();
+    delivery?.start();
+  }
 
   const transactions = () => new PrismaTransactionRunner(prisma);
   const mailpitApi = () => `http://${mailpit.getHost()}:${mailpit.getMappedPort(8025)}/api/v1`;
@@ -114,6 +122,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   });
 
   afterAll(async () => {
+    await relay?.stop();
     await delivery?.stop();
     smtp?.close();
     redis?.disconnect();
@@ -132,14 +141,22 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
       idGenerator: new UuidV7Generator(),
       clock: new SystemClock(),
       logger: pino({ level: 'silent' }),
-      relayPollIntervalMs: 50,
       // Backoff curto: o retry acontece em milissegundos em vez de 5 s.
       jobOptions: { backoff: { type: 'fixed', delay: 100 } },
+    });
+    relay = createOutboxRelay({
+      prisma,
+      routes: [delivery.routes],
+      clock: new SystemClock(),
+      logger: pino({ level: 'silent' }),
+      pollIntervalMs: 50,
     });
   });
 
   afterEach(async () => {
+    await relay?.stop();
     await delivery?.stop();
+    relay = undefined;
     delivery = undefined;
   });
 
@@ -222,7 +239,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
 
   it('delivers the verification link of a new account to Mailpit (CA-01)', async () => {
     const email = uniqueEmail();
-    delivery?.start();
+    startDelivery();
 
     await register(email);
 
@@ -239,7 +256,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   it('retries after an SMTP failure with a new link; only the delivered link works', async () => {
     const email = uniqueEmail();
     sender.failNext();
-    delivery?.start();
+    startDelivery();
 
     await register(email);
 
@@ -269,7 +286,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
     expect(await messagesTo(email)).toHaveLength(0);
     expect(event.publishedAt).toBeNull();
 
-    delivery?.start();
+    startDelivery();
     await waitForMessages(email, 1);
 
     // Republicação pelo relay (commit perdido): a fila ignora o mesmo jobId.
@@ -299,7 +316,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
 
   it('sends an informative notice, not a verification link, for an existing address (CA-02)', async () => {
     const email = uniqueEmail();
-    delivery?.start();
+    startDelivery();
     await register(email);
     await waitForMessages(email, 1);
 
@@ -318,7 +335,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   it('sends a 30 min reset link to account owners and nothing to unknown addresses', async () => {
     const owner = uniqueEmail();
     const stranger = uniqueEmail();
-    delivery?.start();
+    startDelivery();
     await register(owner);
     await waitForMessages(owner, 1);
 
@@ -403,7 +420,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   it('CA-04: delivers the invitation with a fragment link that resolves to the invitation', async () => {
     const { organizationId, ownerId } = await organizationWithOwner();
     const email = uniqueEmail();
-    delivery?.start();
+    startDelivery();
 
     const { invitation } = await new InviteMemberUseCase(invitationDependencies()).execute(
       asOwner(organizationId, ownerId),
@@ -420,7 +437,7 @@ describe('email delivery pipeline (integration: PostgreSQL + Redis + Mailpit)', 
   it('CA-06: a resend invalidates the previous link; the old event, reprocessed late, is discarded', async () => {
     const { organizationId, ownerId } = await organizationWithOwner();
     const email = uniqueEmail();
-    delivery?.start();
+    startDelivery();
     const { invitation } = await new InviteMemberUseCase(invitationDependencies()).execute(
       asOwner(organizationId, ownerId),
       { email, role: 'viewer' },

@@ -120,6 +120,7 @@ describe('tasks composition (integration, spec 004 T8)', () => {
       foundation: tasksFoundation,
       logger,
       transactions,
+      outbox: new PrismaOutboxWriter(transactions),
       rateLimiter,
       idGenerator,
       clock,

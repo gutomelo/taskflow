@@ -25,6 +25,7 @@ import {
   ListMembersExcludingUseCase,
   ListMembersUseCase,
   ListMyOrganizationsUseCase,
+  ListUserMembershipsUseCase,
   LockMembersForShareUseCase,
   LockOrganizationForShareUseCase,
   LookupInvitationUseCase,
@@ -77,6 +78,8 @@ export interface OrganizationsModule {
     lockMembersForShare: LockMembersForShareUseCase;
     rolesOf: GetMemberRolesUseCase;
     membersExcluding: ListMembersExcludingUseCase;
+    /** Spec 008: vínculos de uma pessoa (resumo por e-mail). */
+    userMemberships: ListUserMembershipsUseCase;
   }>;
 }
 
@@ -141,6 +144,7 @@ export function createOrganizationsModule(
       lockMembersForShare: new LockMembersForShareUseCase({ memberships }),
       rolesOf: new GetMemberRolesUseCase({ memberships }),
       membersExcluding: new ListMembersExcludingUseCase({ memberships }),
+      userMemberships: new ListUserMembershipsUseCase({ organizations, memberships }),
     },
   };
 }

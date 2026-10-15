@@ -10,6 +10,10 @@ import {
   collaborationOpenApiPaths,
   collaborationOpenApiSchemas,
 } from '@taskflow/backend/collaboration/http';
+import {
+  notificationsOpenApiPaths,
+  notificationsOpenApiSchemas,
+} from '@taskflow/backend/notifications/http';
 import { healthOpenApiPaths } from './health/health.openapi';
 
 /** Documento OpenAPI 3.1 da API, composto pelas rotas de cada módulo (RF-14). */
@@ -27,6 +31,7 @@ export function createTaskflowApiDocument(): ApiDocument {
       projectsOpenApiPaths,
       tasksOpenApiPaths,
       collaborationOpenApiPaths,
+      notificationsOpenApiPaths,
     ],
     schemas: {
       ...identityOpenApiSchemas,
@@ -34,6 +39,7 @@ export function createTaskflowApiDocument(): ApiDocument {
       ...projectsOpenApiSchemas,
       ...tasksOpenApiSchemas,
       ...collaborationOpenApiSchemas,
+      ...notificationsOpenApiSchemas,
     },
   });
 }

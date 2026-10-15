@@ -34,6 +34,8 @@ import {
   createCommentRequestSchema,
   editCommentRequestSchema,
   mentionCandidatesQuerySchema,
+  markAllReadRequestSchema,
+  notificationListQuerySchema,
 } from '@taskflow/contracts';
 import type { InputSchema, IsolationExpectation, RouteKey } from './tenant-isolation';
 
@@ -749,6 +751,41 @@ export const ISOLATION_CASES: Readonly<Record<RouteKey, IsolationCase>> = {
       ),
     },
   },
+
+  // --- notifications (spec 008): pessoais; ids e cursores de B nunca alcançam nada em A ---
+  'GET /organizations/:organizationId/notifications': {
+    body: null,
+    query: notificationListQuerySchema,
+    references: {
+      // Cursor real de B: só desloca o keyset dentro das notificações do próprio leitor em A.
+      cursor: noLeak((world, actor) =>
+        actor.get(`${org(world)}/notifications?cursor=${world.ofB['notificationsCursor']}`),
+      ),
+    },
+  },
+  'GET /organizations/:organizationId/notifications/unread-count': {
+    body: null,
+    query: null,
+    references: {},
+  },
+  'POST /organizations/:organizationId/notifications/read-all': {
+    body: markAllReadRequestSchema,
+    query: null,
+    references: {
+      upToId: notFound('NOTIFICATION_NOT_FOUND', (world, actor) =>
+        actor.post(`${org(world)}/notifications/read-all`, { upToId: world.ofB['notificationId'] }),
+      ),
+    },
+  },
+  'POST /organizations/:organizationId/notifications/:notificationId/read': {
+    body: emptyBody,
+    query: null,
+    references: {
+      notificationId: notFound('NOTIFICATION_NOT_FOUND', (world, actor) =>
+        actor.post(`${org(world)}/notifications/${world.ofB['notificationId']}/read`),
+      ),
+    },
+  },
 };
 
 /**
@@ -766,6 +803,8 @@ export const GLOBAL_ROUTES: Readonly<Record<RouteKey, string>> = {
   'POST /auth/password/forgot': 'identidade: recuperação de senha',
   'POST /auth/password/reset': 'identidade: recuperação de senha',
   'GET /me': 'identidade: própria conta',
+  'GET /me/notification-preferences': 'identidade: preferência da própria conta (spec 008)',
+  'PUT /me/notification-preferences': 'identidade: preferência da própria conta (spec 008)',
   'POST /me/password': 'identidade: própria conta',
   'GET /me/sessions': 'identidade: sessões da própria conta',
   'DELETE /me/sessions/:sessionId': 'identidade: sessão da própria conta (404 para alheia)',

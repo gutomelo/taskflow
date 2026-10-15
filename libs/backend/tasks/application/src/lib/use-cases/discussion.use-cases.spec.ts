@@ -11,6 +11,7 @@ import { CreateTaskUseCase } from './create-task.use-case';
 import {
   LockTaskForDiscussionUseCase,
   ResolveTaskForDiscussionUseCase,
+  ResolveVisibleTasksUseCase,
 } from './discussion.use-cases';
 
 async function world() {
@@ -120,5 +121,28 @@ describe('ResolveTaskForDiscussion (spec 010)', () => {
     expect(await resolve(task.id, 'otto')).toBeNull();
     expect(await resolve(foreign.id, 'bia')).toBeNull();
     expect(await resolve('missing', 'bia')).toBeNull();
+  });
+});
+
+describe('ResolveVisibleTasks (spec 008)', () => {
+  it('keys and titles of the tasks the viewer reads now; others are absent', async () => {
+    const { bed, task, foreign } = await world();
+    const inApp = await new CreateTaskUseCase(bed).execute(as('bia'), {
+      projectId: 'p-app',
+      title: 'No APP',
+    });
+    const visible = (userId: string, organizationRole: 'owner' | 'member' | 'viewer') =>
+      new ResolveVisibleTasksUseCase(bed).execute(ORG, { userId, organizationRole }, [
+        task.id,
+        inApp.id,
+        foreign.id,
+        'missing',
+      ]);
+
+    expect(await visible('vivi', 'viewer')).toEqual(
+      new Map([[task.id, { key: 'WEB-1', title: 'T' }]]),
+    );
+    expect([...(await visible('ana', 'owner')).keys()].sort()).toEqual([task.id, inApp.id].sort());
+    expect(await visible('otto', 'member')).toEqual(new Map());
   });
 });

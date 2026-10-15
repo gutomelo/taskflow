@@ -100,6 +100,7 @@ describe('board composition (integration, spec 005 T7)', () => {
       foundation: tasksFoundation,
       logger,
       transactions,
+      outbox: new PrismaOutboxWriter(transactions),
       rateLimiter,
       idGenerator,
       clock,

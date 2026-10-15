@@ -61,6 +61,7 @@ export {
   LockProjectForContributionUseCase,
   MAX_PROJECT_READER_IDS,
   ResolveProjectForReadUseCase,
+  ResolveReadableProjectsUseCase,
   type AssignableUser,
   type ProjectContribution,
   type ProjectForRead,

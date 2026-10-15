@@ -53,8 +53,13 @@ export {
 } from './lib/use-cases/board.use-cases';
 export { CreateTaskUseCase, type CreateTaskCommand } from './lib/use-cases/create-task.use-case';
 export {
+  TasksIntegrationEventType,
+  type AssigneeChangedPayload,
+} from './lib/shared/tasks-integration-events';
+export {
   LockTaskForDiscussionUseCase,
   ResolveTaskForDiscussionUseCase,
+  ResolveVisibleTasksUseCase,
   type TaskDiscussionLock,
   type TaskDiscussionView,
 } from './lib/use-cases/discussion.use-cases';

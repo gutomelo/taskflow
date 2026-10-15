@@ -4,6 +4,7 @@ export const layoutMessages = {
   userMenu: {
     open: (name: string) => `Menu da conta de ${name}`,
     security: 'Segurança da conta',
+    notifications: 'Notificações da conta',
     signOut: 'Sair',
     signOutFailed: 'Não foi possível sair agora. Verifique sua conexão e tente novamente.',
   },

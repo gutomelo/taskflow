@@ -1,6 +1,7 @@
 # 0011 — Worker BullMQ e Transactional Outbox antecipados para e-mails transacionais
 
 - **Status**: Aceito (2026-10-08, com a aprovação da spec 001) · Substitui parcialmente o [ADR 0008](0008-domain-events-and-outbox.md)
+- **Nota**: escopo ampliado pelo [ADR 0017](0017-outbox-for-cross-context-integration-events.md) (Outbox também para eventos de integração entre contextos, a partir da spec 008); o restante continua valendo.
 - **Data**: 2026-10-08
 - **Relacionados**: [ADR 0008](0008-domain-events-and-outbox.md), [spec 001](../../../specs/001-authentication/design.md), [roadmap](../../product/roadmap.md)
 

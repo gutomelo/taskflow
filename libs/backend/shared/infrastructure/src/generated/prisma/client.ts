@@ -70,6 +70,17 @@ export type RefreshToken = Prisma.RefreshTokenModel
  */
 export type UserToken = Prisma.UserTokenModel
 /**
+ * Model Notification
+ * Notificação pessoal: só o destinatário a lê ou marca. Some na leitura se o alvo deixou de ser
+ * visível (D3); apagada com a membership, com a tarefa ou após 90 dias.
+ */
+export type Notification = Prisma.NotificationModel
+/**
+ * Model NotificationPreference
+ * Preferência global por usuário (sem linha = resumo por e-mail ligado).
+ */
+export type NotificationPreference = Prisma.NotificationPreferenceModel
+/**
  * Model Organization
  * Tenant (ADR 0004). Slug único e imutável (BR-022) — CHECK de formato na migration.
  */

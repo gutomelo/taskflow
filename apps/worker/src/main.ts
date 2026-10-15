@@ -15,9 +15,12 @@ import { loadWorkerConfig } from './config/env';
 import { createEmailDelivery } from './email-delivery';
 import { createHealthServer } from './health/health-server';
 import { createMaintenance } from './maintenance';
+import { createNotificationDelivery } from './notification-delivery';
+import { createOutboxRelay } from './outbox-relay';
 
 // Composition root do worker: único lugar que lê o ambiente, cria clientes externos e liga
-// os processadores: relay da outbox, envio de e-mails e limpeza diária de dados vencidos.
+// os processadores: relay único da outbox, envio de e-mails, notificações (registro e resumo) e
+// limpeza diária de dados vencidos.
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -73,17 +76,29 @@ async function bootstrap(): Promise<void> {
     from: config.emailFrom,
     requireTls: config.environment === 'production',
   });
-  const emailDelivery = createEmailDelivery({
+  const idGenerator = new UuidV7Generator();
+  const pipelineDependencies = {
     prisma,
     redis,
     redisUrl: config.redisUrl,
     emailSender,
     appUrl: config.appUrl,
-    idGenerator: new UuidV7Generator(),
+    idGenerator,
+    clock,
+    logger,
+  };
+  const emailDelivery = createEmailDelivery(pipelineDependencies);
+  emailDelivery.start();
+  const notificationDelivery = createNotificationDelivery(pipelineDependencies);
+  notificationDelivery.start();
+  // Relay único (ADR 0017): um leitor da outbox para todas as filas.
+  const outboxRelay = createOutboxRelay({
+    prisma,
+    routes: [emailDelivery.routes, notificationDelivery.routes],
     clock,
     logger,
   });
-  emailDelivery.start();
+  outboxRelay.start();
   const maintenance = createMaintenance({
     prisma,
     redis,
@@ -105,8 +120,15 @@ async function bootstrap(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
-    // Envios, lote da outbox e limpeza em andamento terminam antes de SMTP e conexões fecharem.
-    const failures = (await Promise.all([emailDelivery.stop(), maintenance.stop()])).flat();
+    // O relay para primeiro (nada novo nas filas); envios, registros e limpeza em andamento
+    // terminam antes de SMTP e conexões fecharem.
+    const relayStopped = await Promise.allSettled([outboxRelay.stop()]);
+    const failures: unknown[] = [
+      ...relayStopped.flatMap((result) => (result.status === 'rejected' ? [result.reason] : [])),
+      ...(
+        await Promise.all([emailDelivery.stop(), notificationDelivery.stop(), maintenance.stop()])
+      ).flat(),
+    ];
     emailSender.close();
     const results = await Promise.allSettled([
       closeServer(healthServer),

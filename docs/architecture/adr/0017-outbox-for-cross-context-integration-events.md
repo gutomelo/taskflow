@@ -1,6 +1,6 @@
 # 0017 — Outbox para eventos de integração entre contextos (notificações)
 
-- **Status**: Proposto
+- **Status**: Aceito (2026-10-15, com a aprovação da spec 008)
 - **Data**: 2026-10-15
 - **Decisores**: usuário (product owner); arquitetura (Claude Code, revisão da spec 008)
 - **Relacionados**: [ADR 0008](0008-domain-events-and-outbox.md), [ADR 0011](0011-early-worker-and-outbox-for-email.md) (escopo ampliado), [ADR 0015](0015-cross-context-referential-integrity.md), [spec 008](../../../specs/008-notifications/design.md), [spec 010](../../../specs/010-comments/design.md) (obrigações para a 008)

@@ -155,6 +155,31 @@ describe('projects persistence (integration, T3)', () => {
       ).toBeNull();
     });
 
+    it('spec 008: finds many visible projects at once, only in the organization', async () => {
+      const [a, b] = [await organization(), await organization()];
+      const [web, app, foreign] = [
+        await project(a, 'WEB'),
+        await project(a, 'APP'),
+        await project(b, 'WEB'),
+      ];
+      const participant = await membership(a);
+      await participation(a, web, participant, 'viewer');
+      const ids = [web, app, foreign];
+      const found = async (seesAll: boolean) =>
+        (await projects.findVisibleMany(a, ids, { userId: participant, seesAll }))
+          .map((item) => [item.project.toSnapshot().key.value, item.participation])
+          .sort();
+
+      expect(await found(false)).toEqual([['WEB', 'viewer']]);
+      expect(await found(true)).toEqual([
+        ['APP', null],
+        ['WEB', 'viewer'],
+      ]);
+      expect(await projects.findVisibleMany(a, [], { userId: participant, seesAll: true })).toEqual(
+        [],
+      );
+    });
+
     it('lists visible projects by name, active or archived, page by page', async () => {
       const organizationId = await organization();
       const viewer = await membership(organizationId);

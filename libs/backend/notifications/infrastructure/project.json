@@ -1,0 +1,26 @@
+{
+  "name": "backend-notifications-infrastructure",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/notifications/infrastructure/src",
+  "projectType": "library",
+  "tags": ["scope:backend", "domain:notifications", "type:infrastructure"],
+  "// targets": "to see all targets run: nx show project backend-notifications-infrastructure --web",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "options": {
+        "command": "tsc --noEmit -p libs/backend/notifications/infrastructure/tsconfig.lib.json && tsc --noEmit -p libs/backend/notifications/infrastructure/tsconfig.spec.json"
+      }
+    },
+    "integration-test": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "vitest run --config vitest.integration.config.mts",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}

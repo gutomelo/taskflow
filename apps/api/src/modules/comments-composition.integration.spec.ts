@@ -104,6 +104,7 @@ describe('comments composition (integration, spec 010 T6)', () => {
       foundation: tasksFoundation,
       logger,
       transactions,
+      outbox: new PrismaOutboxWriter(transactions),
       rateLimiter,
       idGenerator,
       clock,
@@ -141,6 +142,7 @@ describe('comments composition (integration, spec 010 T6)', () => {
     collaboration = createCollaborationModule({
       logger,
       transactions,
+      outbox: new PrismaOutboxWriter(transactions),
       rateLimiter,
       idGenerator,
       clock,

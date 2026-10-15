@@ -26,6 +26,12 @@ export interface ProjectRepository {
     by: Readonly<{ projectId: string } | { key: string }>,
     viewer: ProjectViewer,
   ): Promise<VisibleProject | null>;
+  /** Spec 008: os projetos visíveis ao leitor entre os ids dados, numa consulta. */
+  findVisibleMany(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: ProjectViewer,
+  ): Promise<ReadonlyArray<VisibleProject>>;
   listVisiblePage(
     organizationId: string,
     filter: Readonly<{ viewer: ProjectViewer; archived: boolean }>,

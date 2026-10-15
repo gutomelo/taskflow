@@ -14,6 +14,8 @@ import {
   type IdentityPurgeReport,
 } from '@taskflow/backend/identity/application';
 import { PrismaIdentityDataRetention } from '@taskflow/backend/identity/infrastructure';
+import { PurgeOldNotificationsUseCase } from '@taskflow/backend/notifications/application';
+import { PrismaNotificationRepository } from '@taskflow/backend/notifications/infrastructure';
 import { PurgeClosedInvitationsUseCase } from '@taskflow/backend/organizations/application';
 import { PrismaInvitationRetention } from '@taskflow/backend/organizations/infrastructure';
 import { describeJobError } from './queues/email-jobs';
@@ -30,7 +32,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_RETRY_MS = 60_000;
 
 export type DataPurgeReport = IdentityPurgeReport &
-  Readonly<{ closedInvitations: number; outboxEvents: number }>;
+  Readonly<{ closedInvitations: number; outboxEvents: number; notifications: number }>;
 
 export interface MaintenanceDependencies {
   readonly prisma: PrismaClient;
@@ -61,6 +63,10 @@ export function createMaintenance(deps: MaintenanceDependencies) {
     clock,
   });
   const outboxRetention = new PrismaOutboxRetention(transactions);
+  // Spec 008 (decisão 5): notificações com mais de 90 dias, em lotes.
+  const purgeNotifications = new PurgeOldNotificationsUseCase({
+    notifications: new PrismaNotificationRepository(transactions),
+  });
 
   async function purgeExpiredData(): Promise<DataPurgeReport> {
     const identity = await purgeIdentity.execute();
@@ -68,7 +74,8 @@ export function createMaintenance(deps: MaintenanceDependencies) {
     const outboxEvents = await outboxRetention.deletePublishedBefore(
       new Date(clock.now().getTime() - OUTBOX_RETENTION_DAYS * DAY_MS),
     );
-    const report = { ...identity, ...invitations, outboxEvents };
+    const notifications = await purgeNotifications.execute(clock.now());
+    const report = { ...identity, ...invitations, outboxEvents, notifications };
     logger.info({ report }, 'Expired data purged');
     return report;
   }

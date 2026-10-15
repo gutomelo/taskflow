@@ -4,6 +4,7 @@ import {
   DeleteCommentUseCase,
   EditCommentUseCase,
   GetCommentUseCase,
+  ListActiveMentionsUseCase,
   ListCommentsUseCase,
   ListMentionCandidatesUseCase,
   type CollaborationDependencies,
@@ -16,7 +17,11 @@ import {
   createCollaborationRouter,
 } from '@taskflow/backend/collaboration/http';
 import { PrismaCommentRepository } from '@taskflow/backend/collaboration/infrastructure';
-import type { RateLimiter, TransactionRunner } from '@taskflow/backend/shared/application';
+import type {
+  OutboxWriter,
+  RateLimiter,
+  TransactionRunner,
+} from '@taskflow/backend/shared/application';
 import type { PrismaTransactionRunner } from '@taskflow/backend/shared/infrastructure';
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
 
@@ -25,6 +30,8 @@ export interface CollaborationModuleDependencies {
   /** A mesma instância dos outros módulos (a porta roda na transação de `collaboration`). */
   readonly transactions: PrismaTransactionRunner & TransactionRunner;
   readonly rateLimiter: RateLimiter;
+  /** Eventos de integração na transação do comentário (ADR 0017). */
+  readonly outbox: OutboxWriter;
   readonly idGenerator: IdGenerator;
   readonly clock: Clock;
   /** Adaptador para `tasks`, `projects` e `identity` (último passo da ordem de montagem). */
@@ -46,6 +53,7 @@ export function createCollaborationModule(deps: CollaborationModuleDependencies)
     transactions: deps.transactions,
     rateLimiter: deps.rateLimiter,
     events,
+    outbox: deps.outbox,
     idGenerator: deps.idGenerator,
     clock: deps.clock,
   };
@@ -59,6 +67,8 @@ export function createCollaborationModule(deps: CollaborationModuleDependencies)
   };
   return {
     useCases,
+    /** Spec 008: menções ativas em lote (porta `NotificationTargets`). */
+    notifications: { activeMentions: new ListActiveMentionsUseCase(shared) },
     /** Rotas tenant-scoped, montadas pelo composition root no `createTenantScope`. */
     tenantRouter: createCollaborationRouter({ useCases }),
     domainErrors: collaborationErrorMappings,

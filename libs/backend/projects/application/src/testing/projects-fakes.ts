@@ -226,6 +226,18 @@ export class InMemoryProjectRepository implements ProjectRepository, Transaction
     );
     return row ? this.visible(row, viewer) : null;
   }
+  async findVisibleMany(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: ProjectViewer,
+  ) {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && projectIds.includes(row.id))
+      .flatMap((row) => {
+        const visible = this.visible(row, viewer);
+        return visible ? [visible] : [];
+      });
+  }
   async listVisiblePage(
     organizationId: string,
     filter: Readonly<{ viewer: ProjectViewer; archived: boolean }>,

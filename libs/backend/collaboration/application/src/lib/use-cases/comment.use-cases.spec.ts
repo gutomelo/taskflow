@@ -12,6 +12,7 @@ import {
 import {
   GetCommentUseCase,
   ListCommentsUseCase,
+  ListActiveMentionsUseCase,
   ListMentionCandidatesUseCase,
 } from './comment-queries.use-cases';
 import {
@@ -500,5 +501,30 @@ describe('ListMentionCandidates (RF-08)', () => {
       MENTION_SEARCH_POLICY.points,
     );
     expect(await code(candidates(bed, 'bia', { query: 'a' }))).toBe('RATE_LIMITED');
+  });
+});
+
+describe('ListActiveMentions (spec 008, obligation 2 of spec 010)', () => {
+  it('only mentions that still exist, in a comment not removed, of the given task', async () => {
+    const { bed } = world();
+    const kept = await create(bed, 'bia', `oi ${token('mia')}`);
+    const edited = await create(bed, 'bia', `oi ${token('caio')}`);
+    const removed = await create(bed, 'bia', `oi ${token('vivi')}`);
+    await edit(bed, 'bia', edited.id, 'sem menção');
+    await remove(bed, 'bia', removed.id);
+
+    const active = await new ListActiveMentionsUseCase(bed).execute(ORG, [
+      { taskId: TASK, commentId: kept.id, userId: id('mia') },
+      { taskId: OTHER_TASK, commentId: kept.id, userId: id('mia') },
+      { taskId: TASK, commentId: edited.id, userId: id('caio') },
+      { taskId: TASK, commentId: removed.id, userId: id('vivi') },
+    ]);
+
+    expect([...active]).toEqual([`${kept.id}|${id('mia')}`]);
+    expect(
+      await new ListActiveMentionsUseCase(bed).execute(OTHER_ORG, [
+        { taskId: TASK, commentId: kept.id, userId: id('mia') },
+      ]),
+    ).toEqual(new Set());
   });
 });

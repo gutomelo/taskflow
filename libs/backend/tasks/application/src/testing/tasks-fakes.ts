@@ -8,6 +8,7 @@ import {
 import {
   FakeTransactionRunner,
   FixedClock,
+  InMemoryOutbox,
   InMemoryRateLimiter,
   SequentialIds,
   type TransactionalStore,
@@ -279,6 +280,11 @@ export class InMemoryTaskRepository implements TaskRepository, TransactionalStor
       .sort((a, b) => a.number - b.number)
       .map((row) => Task.restore(row));
   }
+  async findAnyByIds(organizationId: string, taskIds: ReadonlyArray<string>) {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && taskIds.includes(row.id))
+      .map((row) => Task.restore(row));
+  }
   async findByIds(organizationId: string, projectId: string, taskIds: ReadonlyArray<string>) {
     return this.in(organizationId, projectId)
       .filter((row) => taskIds.includes(row.id))
@@ -502,6 +508,24 @@ export class FakeProjectAccess implements ProjectAccess {
       ),
     };
   }
+  async readableProjects(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: Readonly<{ userId: string; organizationRole: OrganizationRole }>,
+  ) {
+    return new Map(
+      this.projects.flatMap((project) =>
+        project.organizationId === organizationId &&
+        projectIds.includes(project.projectId) &&
+        effectiveProjectRole(
+          viewer.organizationRole,
+          project.participations.get(viewer.userId) ?? null,
+        )
+          ? [[project.projectId, { key: project.key }] as const]
+          : [],
+      ),
+    );
+  }
   async resolveForRead(
     organizationId: string,
     lookup: ProjectLookup,
@@ -559,7 +583,8 @@ export function createTasksTestbed() {
   const transactions = new FakeTransactionRunner();
   const tasks = new InMemoryTaskRepository(transactions);
   const dependencies = new InMemoryTaskDependencyRepository(tasks);
-  transactions.register(tasks, dependencies);
+  const outbox = new InMemoryOutbox(transactions);
+  transactions.register(tasks, dependencies, outbox);
   return {
     transactions,
     tasks,
@@ -567,6 +592,7 @@ export function createTasksTestbed() {
     projectAccess: new FakeProjectAccess(transactions),
     users: new InMemoryTaskUserDirectory(),
     events: new RecordingTasksEvents(),
+    outbox,
     rateLimiter: new InMemoryRateLimiter(),
     clock: new FixedClock(),
     idGenerator: new SequentialIds(),

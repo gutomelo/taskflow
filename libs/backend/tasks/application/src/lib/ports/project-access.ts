@@ -52,6 +52,15 @@ export interface ProjectAccess {
     lookup: ProjectLookup,
     viewer: Readonly<{ userId: string; organizationRole: OrganizationRole }>,
   ): Promise<ReadableProject | null>;
+  /**
+   * Spec 008: quais dos projetos dados o leitor vê agora (chave), numa consulta. Ausente = não
+   * visível.
+   */
+  readableProjects(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: Readonly<{ userId: string; organizationRole: OrganizationRole }>,
+  ): Promise<ReadonlyMap<string, Readonly<{ key: string }>>>;
   /** Quem pode ser responsável (papel efetivo manager/member), por cursor. */
   assignableUsers(
     organizationId: string,

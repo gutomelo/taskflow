@@ -1,6 +1,7 @@
 import type { RequestHandler, Router } from 'express';
 import { createTenantScope, type CsrfProtection } from '@taskflow/backend/shared/http';
 import type { CollaborationModule } from './collaboration.module';
+import type { NotificationsModule } from './notifications.module';
 import type { OrganizationsModule } from './organizations.module';
 import type { ProjectsModule } from './projects.module';
 import type { TasksModule } from './tasks.module';
@@ -17,6 +18,7 @@ export interface ApiModules {
   readonly projects: Pick<ProjectsModule, 'tenantRouter'>;
   readonly tasks: Pick<TasksModule, 'tenantRouter'>;
   readonly collaboration: Pick<CollaborationModule, 'tenantRouter'>;
+  readonly notifications: Pick<NotificationsModule, 'tenantRouter' | 'globalRouter'>;
 }
 
 export interface ComposedApi {
@@ -30,7 +32,11 @@ export interface ComposedApi {
 
 /** Composição única das rotas da API: usada por `main.ts` e pelos testes de rotas e isolamento. */
 export function composeApiRouters(modules: ApiModules): ComposedApi {
-  const globalRouters = [modules.identityRouter, modules.organizations.router];
+  const globalRouters = [
+    modules.identityRouter,
+    modules.organizations.router,
+    modules.notifications.globalRouter,
+  ];
   const tenantScope = createTenantScope({
     authenticate: modules.authenticate,
     csrf: modules.csrf,
@@ -40,6 +46,7 @@ export function composeApiRouters(modules: ApiModules): ComposedApi {
       modules.projects.tenantRouter,
       modules.tasks.tenantRouter,
       modules.collaboration.tenantRouter,
+      modules.notifications.tenantRouter,
     ],
   });
   return { globalRouters, tenantScope, apiRouters: [...globalRouters, tenantScope] };

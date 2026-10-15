@@ -9,6 +9,7 @@ import { TASK_LOCK_TIMEOUT_MS } from './task-limits';
 import { loadTaskView, type TaskProjectContext, type TaskView } from './task-views';
 import type { TasksDependencies } from './tasks-dependencies';
 import type { TasksEvent } from './tasks-events';
+import { toTasksIntegrationEvents } from './tasks-integration-events';
 
 /** Resultado de um núcleo de escrita: a tarefa gravada e os eventos para depois do commit. */
 export type TaskWriteOutcome = Readonly<{
@@ -22,16 +23,26 @@ export type TaskWriteOutcome = Readonly<{
  * numa transação e registra os eventos **depois do commit**.
  */
 export async function runTaskMutation<T>(
-  deps: Pick<TasksDependencies, 'rateLimiter' | 'transactions' | 'events'>,
+  deps: Pick<
+    TasksDependencies,
+    'rateLimiter' | 'transactions' | 'events' | 'outbox' | 'idGenerator' | 'clock'
+  >,
   context: TenantRequestContext,
   policy: RateLimitPolicy,
   work: () => Promise<Readonly<{ result: T; events: ReadonlyArray<TasksEvent> }>>,
 ): Promise<T> {
   const decision = await deps.rateLimiter.consume(policy, context.actor.userId);
   if (!decision.allowed) throw new RateLimitedError(decision.retryAfterSeconds);
-  const { result, events } = await deps.transactions.run(work, {
-    lockTimeoutMs: TASK_LOCK_TIMEOUT_MS,
-  });
+  const { result, events } = await deps.transactions.run(
+    async () => {
+      const outcome = await work();
+      // ADR 0017: eventos de integração na mesma transação do fato (repetição em P2034 regera).
+      const integration = toTasksIntegrationEvents(outcome.events, deps);
+      if (integration.length > 0) await deps.outbox.append(integration);
+      return outcome;
+    },
+    { lockTimeoutMs: TASK_LOCK_TIMEOUT_MS },
+  );
   events.forEach((event) => deps.events.record(event));
   return result;
 }

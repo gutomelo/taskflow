@@ -47,15 +47,17 @@ model Task {
   createdAt         DateTime     @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  project   Project          @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
-  status    WorkflowStatus   @relation(fields: [organizationId, projectId, statusId], references: [organizationId, projectId, id], onDelete: Restrict, onUpdate: Restrict)
-  assignee  Membership?      @relation(fields: [organizationId, assigneeUserId], references: [organizationId, userId], onDelete: SetNull, onUpdate: Restrict)
-  parent    Task?            @relation("Subtasks", fields: [organizationId, projectId, parentTaskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
-  subtasks  Task[]           @relation("Subtasks")
-  blockedBy TaskDependency[] @relation("Blocked")
-  blocking  TaskDependency[] @relation("Blocking")
+  project       Project          @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+  status        WorkflowStatus   @relation(fields: [organizationId, projectId, statusId], references: [organizationId, projectId, id], onDelete: Restrict, onUpdate: Restrict)
+  assignee      Membership?      @relation(fields: [organizationId, assigneeUserId], references: [organizationId, userId], onDelete: SetNull, onUpdate: Restrict)
+  parent        Task?            @relation("Subtasks", fields: [organizationId, projectId, parentTaskId], references: [organizationId, projectId, id], onDelete: Cascade, onUpdate: Restrict)
+  subtasks      Task[]           @relation("Subtasks")
+  blockedBy     TaskDependency[] @relation("Blocked")
+  blocking      TaskDependency[] @relation("Blocking")
   /// Inerte (ADR 0015, item 3): existe só pela FK de `comments` (spec 010); barrada por lint.
-  comments  Comment[]
+  comments      Comment[]
+  /// Inerte (ADR 0015, item 3): existe só pela FK de `notifications` (spec 008); barrada por lint.
+  notifications Notification[]
 
   /// Alvo das FKs compostas internas.
   @@unique([organizationId, projectId, id])

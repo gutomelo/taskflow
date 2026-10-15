@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthStore } from '../auth';
 import { layoutMessages } from './layout.messages';
 
-/** Menu da conta no cabeçalho: segurança e logout (CA-07). */
+/** Menu da conta no cabeçalho: segurança, notificações (spec 008) e logout (CA-07). */
 @Component({
   selector: 'tf-user-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,6 +26,7 @@ import { layoutMessages } from './layout.messages';
       </button>
       <mat-menu #menu="matMenu" xPosition="before">
         <a mat-menu-item routerLink="/account/security">{{ messages.security }}</a>
+        <a mat-menu-item routerLink="/account/notifications">{{ messages.notifications }}</a>
         <button mat-menu-item type="button" (click)="signOut()">{{ messages.signOut }}</button>
       </mat-menu>
     }

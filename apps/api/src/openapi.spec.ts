@@ -72,7 +72,8 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
           !path.includes('/projects') &&
           !path.includes('/tasks') &&
           !path.includes('/board') &&
-          !path.includes('/comments'),
+          !path.includes('/comments') &&
+          !path.includes('/notifications'),
       ),
     ).toHaveLength(8);
   });
@@ -136,6 +137,29 @@ describe('OpenAPI document (RF-14, CA-15)', () => {
           !path.endsWith('/mentionable-users'),
       ),
     ).toHaveLength(11);
+  });
+
+  it('spec 008: describes the notifications and the preference, under the Notifications tag', () => {
+    const base = '/api/v1/organizations/{organizationId}/notifications';
+    const expected: Array<[string, string]> = [
+      ['get', base],
+      ['get', `${base}/unread-count`],
+      ['post', `${base}/read-all`],
+      ['post', `${base}/{notificationId}/read`],
+      ['get', '/api/v1/me/notification-preferences'],
+      ['put', '/api/v1/me/notification-preferences'],
+    ];
+    const paths = document.paths ?? {};
+
+    for (const [method, path] of expected) {
+      const operation = paths[path]?.[method as 'get'];
+      expect(operation, `${method.toUpperCase()} ${path}`).toBeDefined();
+      expect(operation?.tags).toEqual(['Notifications']);
+    }
+    expect(Object.keys(paths[`${base}/{notificationId}/read`]?.post?.responses ?? {})).toContain(
+      '404',
+    );
+    expect(Object.keys(paths).filter((path) => path.includes('notification'))).toHaveLength(5);
   });
 
   it('spec 010: describes the comments and mention candidates, with 404, under the Comments tag', () => {

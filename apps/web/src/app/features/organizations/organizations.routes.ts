@@ -118,6 +118,12 @@ export const organizationsRoutes: Route[] = [
         ],
       },
       {
+        path: 'notifications',
+        title: 'Notificações · TaskFlow',
+        loadComponent: () =>
+          import('../notifications/notifications.page').then((module) => module.NotificationsPage),
+      },
+      {
         path: 'members',
         title: 'Membros · TaskFlow',
         loadComponent: () => import('./members.page').then((module) => module.MembersPage),

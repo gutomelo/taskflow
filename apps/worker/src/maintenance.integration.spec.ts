@@ -143,6 +143,7 @@ describe('maintenance (integration: PostgreSQL + Redis)', () => {
           userTokens: 0,
           closedInvitations: 1,
           outboxEvents: 1,
+          notifications: 0,
         });
       },
       { timeout: 10_000, interval: 100 },

@@ -57,6 +57,8 @@ export const ModelName = {
   Session: 'Session',
   RefreshToken: 'RefreshToken',
   UserToken: 'UserToken',
+  Notification: 'Notification',
+  NotificationPreference: 'NotificationPreference',
   Organization: 'Organization',
   Membership: 'Membership',
   Invitation: 'Invitation',
@@ -168,6 +170,35 @@ export const UserTokenScalarFieldEnum = {
 } as const
 
 export type UserTokenScalarFieldEnum = (typeof UserTokenScalarFieldEnum)[keyof typeof UserTokenScalarFieldEnum]
+
+
+export const NotificationScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  recipientUserId: 'recipientUserId',
+  kind: 'kind',
+  actorUserId: 'actorUserId',
+  projectId: 'projectId',
+  taskId: 'taskId',
+  commentId: 'commentId',
+  dedupeKey: 'dedupeKey',
+  sourceEventId: 'sourceEventId',
+  occurredAt: 'occurredAt',
+  createdAt: 'createdAt',
+  readAt: 'readAt',
+  emailedAt: 'emailedAt'
+} as const
+
+export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const NotificationPreferenceScalarFieldEnum = {
+  userId: 'userId',
+  emailDigest: 'emailDigest',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferenceScalarFieldEnum)[keyof typeof NotificationPreferenceScalarFieldEnum]
 
 
 export const OrganizationScalarFieldEnum = {

@@ -29,6 +29,10 @@ export {
   type CreateOrganizationDependencies,
 } from './lib/use-cases/create-organization.use-case';
 export { ListMyOrganizationsUseCase } from './lib/use-cases/list-my-organizations.use-case';
+export {
+  ListUserMembershipsUseCase,
+  type UserMembershipView,
+} from './lib/use-cases/list-user-memberships.use-case';
 export { GetOrganizationUseCase } from './lib/use-cases/get-organization.use-case';
 export {
   UpdateOrganizationUseCase,

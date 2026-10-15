@@ -23,4 +23,30 @@ describe('transactional email layout', () => {
     expect(message.html).toContain('Texto &lt;b&gt;');
     expect(message.html).not.toContain('<b>');
   });
+
+  it('renders a list of links in both versions, escaping labels and hrefs', () => {
+    const message = renderEmail(
+      { email: EmailAddress.create('ana@exemplo.com'), name: null },
+      'Assunto',
+      [
+        {
+          kind: 'links',
+          items: [
+            { label: 'WEB-1', href: 'https://app.taskflow.dev/a' },
+            { label: '<i>x</i>', href: 'https://app.taskflow.dev/b?"q' },
+          ],
+        },
+      ],
+    );
+
+    expect(message.text).toContain(
+      '- WEB-1: https://app.taskflow.dev/a\n- <i>x</i>: https://app.taskflow.dev/b?"q',
+    );
+    expect(message.html).toContain(
+      '<li><a href="https://app.taskflow.dev/a" style="color:#1d4ed8">WEB-1</a></li>',
+    );
+    expect(message.html).toContain('href="https://app.taskflow.dev/b?&quot;q"');
+    expect(message.html).toContain('&lt;i&gt;x&lt;/i&gt;');
+    expect(message.html).not.toContain('<i>');
+  });
 });

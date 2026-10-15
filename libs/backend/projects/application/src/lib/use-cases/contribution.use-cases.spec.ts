@@ -7,6 +7,8 @@ import {
   ListProjectReaderIdsUseCase,
   LockProjectForContributionUseCase,
   MAX_PROJECT_READER_IDS,
+  MAX_READABLE_PROJECTS_QUERY,
+  ResolveReadableProjectsUseCase,
   ResolveProjectForReadUseCase,
 } from './contribution.use-cases';
 import { CreateProjectUseCase } from './create-project.use-case';
@@ -274,5 +276,51 @@ describe('project readers for mentions (spec 010)', () => {
 
     expect(readers.complete).toBe(false);
     expect(readers.userIds).toHaveLength(MAX_PROJECT_READER_IDS);
+  });
+});
+
+describe('readable projects in batch (spec 008)', () => {
+  it('returns only the projects the viewer reads now, with the key; owners and admins read all', async () => {
+    const { bed, p1, p2 } = await world();
+    const readable = new ResolveReadableProjectsUseCase(bed);
+    const keys = async (userId: string) =>
+      [
+        ...(
+          await readable.execute(ORG, [p1, p2, 'missing'], {
+            userId,
+            organizationRole: ROLES[userId] ?? 'member',
+          })
+        ).entries(),
+      ]
+        .map(([projectId, { key }]) => [projectId === p1 ? 'p1' : 'p2', key])
+        .sort();
+
+    expect(await keys('ana')).toEqual([
+      ['p1', 'WEB'],
+      ['p2', 'APP'],
+    ]);
+    expect(await keys('adm')).toEqual([
+      ['p1', 'WEB'],
+      ['p2', 'APP'],
+    ]);
+    expect(await keys('bia')).toEqual([['p1', 'WEB']]);
+    expect(await keys('vivi')).toEqual([['p1', 'WEB']]);
+    expect(
+      await readable.execute('org-b', [p1], { userId: 'ana', organizationRole: 'owner' }),
+    ).toEqual(new Map());
+    expect(await readable.execute(ORG, [], { userId: 'ana', organizationRole: 'owner' })).toEqual(
+      new Map(),
+    );
+  });
+
+  it('rejects more ids than a page (programming error)', async () => {
+    const { bed } = await world();
+    const ids = Array.from({ length: MAX_READABLE_PROJECTS_QUERY + 1 }, (_, index) => `p-${index}`);
+    await expect(
+      new ResolveReadableProjectsUseCase(bed).execute(ORG, ids, {
+        userId: 'ana',
+        organizationRole: 'owner',
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
   });
 });

@@ -210,7 +210,7 @@ export const organizationsMustNotReachProjects = {
       ...TENANT_PARAM_RESTRICTIONS,
       {
         selector:
-          'MemberExpression[property.name=/^(projects|projectParticipations|assignedTasks|project|projectMember|workflowStatus|workflowTransition|task|taskDependency|taskCounter|taskProjectLock)$/], Property[key.name=/^(projects|projectParticipations|assignedTasks)$/]',
+          'MemberExpression[property.name=/^(projects|projectParticipations|assignedTasks|notifications|project|projectMember|workflowStatus|workflowTransition|task|taskDependency|taskCounter|taskProjectLock|notification)$/], Property[key.name=/^(projects|projectParticipations|assignedTasks|notifications)$/]',
         message:
           'ADR 0015: organizations não usa as back-relations nem os modelos de projects/tasks; integre por porta.',
       },
@@ -257,7 +257,7 @@ export const tasksMustNotReachOtherContexts = {
       ...TENANT_PARAM_RESTRICTIONS,
       {
         selector:
-          'MemberExpression[property.name=/^(project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user|comment|commentMention)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(project|status|assignee|comments)$/]',
+          'MemberExpression[property.name=/^(project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user|comment|commentMention|notification)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(project|status|assignee|comments|notifications)$/]',
         message:
           'ADR 0015: tasks não lê tabelas de outros contextos; use ProjectAccess ou UserDirectory.',
       },
@@ -283,6 +283,30 @@ export const collaborationMustNotReachOtherContexts = {
           'MemberExpression[property.name=/^(task|taskDependency|taskCounter|taskProjectLock|project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(task)$/]',
         message:
           'ADR 0015: collaboration não lê tabelas de outros contextos; use TaskDiscussionAccess ou CollaborationUserDirectory.',
+      },
+    ],
+  },
+};
+
+/**
+ * ADR 0015 (spec 008): as relações `recipient` e `task` de `Notification` existem só para as FKs;
+ * `notifications` não lê tabelas de outros contextos (visibilidade, menções, papéis e nomes chegam
+ * por `NotificationTargets` e `NotificationPeople`). Incluída só pela infraestrutura de
+ * `notifications` (único lugar com Prisma; nas outras camadas `task` é campo das visões).
+ */
+export const notificationsMustNotReachOtherContexts = {
+  files: ['**/*.ts'],
+  // Testes de integração semeiam tabelas de outros contextos de propósito.
+  ignores: ['**/*.integration.spec.ts'],
+  rules: {
+    'no-restricted-syntax': [
+      'error',
+      ...TENANT_PARAM_RESTRICTIONS,
+      {
+        selector:
+          'MemberExpression[property.name=/^(task|taskDependency|taskCounter|taskProjectLock|project|projectMember|workflowStatus|workflowTransition|membership|organization|invitation|user|comment|commentMention)$/], Property[key.name=/^(include|select)$/] > ObjectExpression > Property[key.name=/^(task|recipient)$/]',
+        message:
+          'ADR 0015: notifications não lê tabelas de outros contextos; use NotificationTargets ou NotificationPeople.',
       },
     ],
   },

@@ -1,10 +1,10 @@
 # 008 — Notificações · Design técnico
 
-- **Status**: Rascunho (revisão 2 — achados de arquitetura e segurança incorporados; decisões 8 a 10 do usuário)
+- **Status**: Aprovado (revisão 2 — achados de arquitetura e segurança incorporados; decisões 8 a 10 do usuário)
 - **Requisitos**: [requirements.md](requirements.md)
 - **Revisão de arquitetura**: feita (2026-10-15) — aprovado com ajustes; B1–B4 e I1–I8 incorporados
 - **Revisão de segurança**: feita (2026-10-15) — sem Críticos/Altos; M1–M4 e B1–B9 incorporados
-- **ADR**: [0017 — Outbox para eventos de integração entre contextos](../../docs/architecture/adr/0017-outbox-for-cross-context-integration-events.md) (Proposto; amplia o escopo do 0011)
+- **ADR**: [0017 — Outbox para eventos de integração entre contextos](../../docs/architecture/adr/0017-outbox-for-cross-context-integration-events.md) (Aceito; amplia o escopo do 0011)
 
 ## Solução proposta
 
@@ -22,7 +22,7 @@ Nasce o contexto **`notifications`**, dono de `notifications` e `notification_pr
    - **Não** confere acesso ao registrar: a validade é decidida na leitura (D3) — quem não lê a tarefa naquele momento não vê a notificação, e passa a vê-la se o acesso voltar.
    - Evento inválido ⇒ `UnrecoverableError` (sem retry).
 4. **Leitura (API)**: rotas tenant-scoped **pessoais**. Lista e contador filtram pela porta `NotificationTargets`, em lote e **falhando fechado** (erro ⇒ 5xx; ausência no mapa ⇒ não mostrar): tarefa visível ao leitor agora (com chave e título) e, para menções, menção ainda existente em comentário não removido **daquela tarefa**.
-5. **Resumo (worker)**: um job agendado de hora em hora faz só o **fan-out** — pessoas com notificações candidatas (não lidas, não enviadas, das últimas **24 h**) e preferência ligada — e enfileira um job por pessoa com `jobId = digest:{userId}:{AAAAMMDDHH}` (no máximo um por pessoa por hora, retry isolado). O job da pessoa, **sem lock**: lê até 50 candidatas, filtra a visibilidade por organização (papel atual pela porta de pessoas), envia o e-mail se sobrar algo e só então grava `emailed_at` (`… WHERE id IN (…) AND emailed_at IS NULL`, transação curta) em **todas** as candidatas lidas, visíveis ou não. Queda entre envio e gravação ⇒ reenvio (aceito, "pelo menos uma vez").
+5. **Resumo (worker)**: um job agendado de hora em hora faz só o **fan-out** — pessoas com notificações candidatas (não lidas, não enviadas, das últimas **24 h**) e preferência ligada — e enfileira um job por pessoa com `jobId = digest-{userId}-{AAAAMMDDHH}` (sem `:`, que o BullMQ reserva) (no máximo um por pessoa por hora, retry isolado). O job da pessoa, **sem lock**: lê até 50 candidatas, filtra a visibilidade por organização (papel atual pela porta de pessoas), envia o e-mail se sobrar algo e só então grava `emailed_at` (`… WHERE id IN (…) AND emailed_at IS NULL`, transação curta) em **todas** as candidatas lidas, visíveis ou não. Queda entre envio e gravação ⇒ reenvio (aceito, "pelo menos uma vez").
 6. **Retenção**: a limpeza diária (`maintenance`) apaga, em lotes de 1 000, notificações com `occurred_at` acima de 90 dias.
 
 ## Componentes envolvidos
@@ -110,7 +110,7 @@ notification_preferences
 
 - `Notification` = `{ id, kind, actor: { userId, name | null }, task: { id, key, title }, commentId | null, occurredAt, readAt }`; `name: null` = "Ex-membro". Só as visíveis agora.
 - **Lista**: busca `limit` linhas por keyset `(occurred_at DESC, id DESC)`, filtra e devolve o que sobrar com `nextCursor` — **páginas curtas ou vazias são válidas** (documentado no contrato; o frontend continua com "carregar mais"). Cursor validado (formato, data ISO, uuid ⇒ senão 400); fora isso é só posição no keyset filtrado pelo próprio destinatário (no harness: `noLeak`).
-- **Contador**: sem não lidas ⇒ nenhuma porta chamada (caso comum do polling); senão analisa as 200 mais recentes, filtra, `count = min(visíveis, 99)`, `capped = visíveis ≥ 99`. No máximo 4 consultas.
+- **Contador**: sem não lidas ⇒ nenhuma porta chamada (caso comum do polling); senão analisa as 200 mais recentes, filtra, `count = min(visíveis, 99)`, `capped = visíveis > 99` (a interface mostra "99+"). No máximo 4 consultas.
 - **`read`**: alheia, inexistente, de outra organização ou invisível ⇒ o mesmo 404. **`read-all`**: marca as não lidas do próprio usuário na organização até `upToId` (inclusive; ausente = todas), inclusive as invisíveis no momento.
 - Comandos `strictObject`. Preferências são rotas globais (`/me`), na allowlist com a justificativa "identidade: preferência da própria conta"; `PUT` passa por `authenticate → csrf`.
 - **Limites de leitura por usuário**: `notifications.count.user.minute` 120, `notifications.list.user.minute` 60, `notifications.write.user.minute` 60 (`read` e `read-all`).
@@ -135,7 +135,7 @@ notification_preferences
 - **Notificações são pessoais**: só o destinatário lê, conta ou marca; nenhum papel (nem owner/admin) vê as de outro — 404 idêntico ao de inexistente. Repositório sempre com `(organizationId, recipientUserId)`. Sem permissão nova na matriz (recurso próprio; negação por padrão para o resto).
 - **Isolamento**: harness com as 4 rotas tenant-scoped (notificação de B ⇒ 404; cursor de B ⇒ `noLeak`); **bateria própria** com owner, admin, member e viewer da **mesma** organização: `read` alheio ⇒ 404 igual a inexistente e a própria invisível; lista e contador sem alheias; `read-all` não toca terceiros (conferido no banco); notificação própria de outra organização pelo caminho de A ⇒ 404.
 - **Visibilidade (RNF-01)**: título só se a tarefa é visível ao leitor agora; menção só se existe em comentário não removido da mesma tarefa (B2 da segurança); portas falham fechado (teste com fake que lança).
-- **E-mail (M1 da segurança, decisão 8)**: **sem nome de ator, sem título, sem texto, sem nome de organização**. Assunto fixo ("Você tem novidades no TaskFlow"); corpo com frases fixas por organização identificada pelo **slug** (formato restrito): "Em acme: 2 menções e 1 atribuição — WEB-12, WEB-15", com links montados de `appUrl` (configuração, nunca do `Host`) e slug/chave codificados, mais o link para `${appUrl}/account`. Só para e-mail verificado. Teste do template com valores hostis.
+- **E-mail (M1 da segurança, decisão 8)**: **sem nome de ator, sem título, sem texto, sem nome de organização**. Assunto fixo ("Você tem novidades no TaskFlow"); corpo com frases fixas por organização identificada pelo **slug** (formato restrito): "Em acme: 2 menções e 1 atribuição — WEB-12, WEB-15", com links montados de `appUrl` (configuração, nunca do `Host`) e slug/chave codificados, mais o link para `${appUrl}/account/notifications` (página "Notificações da conta"). Só para e-mail verificado. Teste do template com valores hostis.
 - **Worker**: envelope validado; logs só com `eventId`, tipo e contagens; tipos listados um a um no roteamento.
 - **Abuso**: teto de menções; resumo 1/h por pessoa e só 24 h; limites de leitura e escrita por usuário.
 - **Informativo**: o prefixo da chave da tarefa (ex.: `DEMISSOES-3`) fica na caixa de e-mail — aceito pela decisão 7.
@@ -152,7 +152,7 @@ notification_preferences
 
 - **Sino** na barra da organização: botão com nome acessível "Notificações, N não lidas" (ou "Notificações"), badge visual; consulta a cada 60 s e no `visibilitychange`, pausada com a aba oculta; anúncio discreto (`aria-live="polite"`) quando o número aumenta.
 - **Página** `/o/:slug/notifications`: ator (ou "Ex-membro"), frase ("mencionou você em", "atribuiu a você"), chave e título, data relativa; não lida destacada; abrir marca como lida e navega para a tarefa; "Marcar todas como lidas" (com `upToId` do item mais recente exibido); "carregar mais" (aceita páginas curtas); estados de carregamento, vazio e erro.
-- **Conta**: seção "Notificações por e-mail" com o interruptor do resumo.
+- **Conta**: página "Notificações da conta" (`/account/notifications`, no menu da conta e no link do e-mail) com a seção "Notificações por e-mail" e o interruptor do resumo.
 - Textos em `notifications.messages.ts`.
 
 ## Observabilidade

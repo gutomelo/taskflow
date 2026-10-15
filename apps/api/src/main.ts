@@ -33,6 +33,9 @@ import { createTaskUserDirectory } from './modules/adapters/task-user-directory.
 import { createTaskDiscussionAccess } from './modules/adapters/task-discussion-access.adapter';
 import { createCollaborationUserDirectory } from './modules/adapters/collaboration-user-directory.adapter';
 import { createCollaborationModule } from './modules/collaboration.module';
+import { createNotificationsModule } from './modules/notifications.module';
+import { createNotificationPeople } from './modules/adapters/notification-people.adapter';
+import { createNotificationTargets } from './modules/adapters/notification-targets.adapter';
 import { createTaskflowApiDocument } from './openapi';
 
 // Composition root: único lugar que lê o ambiente, cria clientes externos e liga os módulos.
@@ -109,11 +112,19 @@ async function bootstrap(): Promise<void> {
     projectAccess: createProjectAccess(projects),
     users: createTaskUserDirectory(identity),
   });
-  // Spec 010: `collaboration` por último — nenhum módulo anterior depende dele.
+  // Spec 010: `collaboration` depois de `tasks` (só `notifications` depende dele).
   const collaboration = createCollaborationModule({
     ...shared,
     discussion: createTaskDiscussionAccess({ tasks, projects, identity }),
     users: createCollaborationUserDirectory({ organizations, identity }),
+  });
+  // Spec 008: `notifications` por último — lê de `tasks`, `collaboration`, `organizations`, `identity`.
+  const notifications = createNotificationsModule({
+    ...shared,
+    targets: createNotificationTargets({ tasks, collaboration }),
+    people: createNotificationPeople({ organizations, identity }),
+    authenticate: identity.authenticate,
+    csrf: identity.csrf,
   });
   // ADR 0012: `authenticate → csrf → tenantContext` uma vez sobre /organizations/:organizationId.
   const { apiRouters } = composeApiRouters({
@@ -124,6 +135,7 @@ async function bootstrap(): Promise<void> {
     projects,
     tasks,
     collaboration,
+    notifications,
   });
 
   const app = createApp({
@@ -137,6 +149,7 @@ async function bootstrap(): Promise<void> {
       projects.domainErrors,
       tasks.domainErrors,
       collaboration.domainErrors,
+      notifications.domainErrors,
     ),
     // RF-14: documentação interativa apenas fora de produção.
     ...(config.environment === 'production' ? {} : { apiDocument: createTaskflowApiDocument() }),

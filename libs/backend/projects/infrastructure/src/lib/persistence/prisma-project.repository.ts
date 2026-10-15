@@ -82,6 +82,25 @@ export class PrismaProjectRepository implements ProjectRepository {
     };
   }
 
+  async findVisibleMany(
+    organizationId: string,
+    projectIds: ReadonlyArray<string>,
+    viewer: ProjectViewer,
+  ): Promise<ReadonlyArray<VisibleProject>> {
+    if (projectIds.length === 0) return [];
+    const rows = await this.transactions.client().project.findMany({
+      where: { organizationId, id: { in: [...projectIds] }, ...visibleTo(viewer) },
+      include: participationOf(viewer),
+    });
+    return rows.map(({ members, ...project }) => {
+      const participation = members[0];
+      return {
+        project: toProject(project),
+        participation: participation ? projectRoleFrom(participation.role) : null,
+      };
+    });
+  }
+
   async listVisiblePage(
     organizationId: string,
     filter: Readonly<{ viewer: ProjectViewer; archived: boolean }>,

@@ -1,5 +1,9 @@
 import type { Logger } from 'pino';
-import type { RateLimiter, TransactionRunner } from '@taskflow/backend/shared/application';
+import type {
+  OutboxWriter,
+  RateLimiter,
+  TransactionRunner,
+} from '@taskflow/backend/shared/application';
 import type { Clock, IdGenerator } from '@taskflow/backend/shared/kernel';
 import type { PrismaTransactionRunner } from '@taskflow/backend/shared/infrastructure';
 import { createTasksRouter, tasksErrorMappings } from '@taskflow/backend/tasks/http';
@@ -19,6 +23,7 @@ import {
   MoveCardUseCase,
   RemoveDependencyUseCase,
   ResolveTaskForDiscussionUseCase,
+  ResolveVisibleTasksUseCase,
   ReassignTasksStatusUseCase,
   ReopenTaskUseCase,
   RevokeAssignmentsOnAccessLossUseCase,
@@ -67,6 +72,8 @@ export interface TasksModuleDependencies {
   readonly logger: Logger;
   readonly transactions: PrismaTransactionRunner & TransactionRunner;
   readonly rateLimiter: RateLimiter;
+  /** Eventos de integração na transação do fato (ADR 0017). */
+  readonly outbox: OutboxWriter;
   readonly idGenerator: IdGenerator;
   readonly clock: Clock;
   /** Adaptador para `projects` (passo 5 da ordem de montagem). */
@@ -90,6 +97,7 @@ export function createTasksModule(deps: TasksModuleDependencies) {
     transactions: deps.transactions,
     rateLimiter: deps.rateLimiter,
     events,
+    outbox: deps.outbox,
     idGenerator: deps.idGenerator,
     clock: deps.clock,
   };
@@ -117,6 +125,8 @@ export function createTasksModule(deps: TasksModuleDependencies) {
       lockForComment: new LockTaskForDiscussionUseCase(shared),
       resolveForRead: new ResolveTaskForDiscussionUseCase(shared),
     },
+    /** Spec 008: tarefas visíveis em lote (porta `NotificationTargets`). */
+    notifications: { visibleTasks: new ResolveVisibleTasksUseCase(shared) },
     /** Rotas tenant-scoped, montadas pelo composition root no `createTenantScope`. */
     tenantRouter: createTasksRouter({ useCases }),
     domainErrors: tasksErrorMappings,

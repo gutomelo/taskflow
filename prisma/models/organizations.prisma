@@ -49,6 +49,8 @@ model Membership {
   projectParticipations ProjectMember[]
   /// ADR 0015: exigida pelo Prisma para a FK do responsável em `tasks`; nunca usada por `organizations`.
   assignedTasks         Task[]
+  /// ADR 0015: exigida pelo Prisma para a FK do destinatário em `notifications`; nunca usada por `organizations`.
+  notifications         Notification[]
 
   /// Usado pelo middleware de tenant (uma consulta por requisição).
   @@unique([organizationId, userId])

@@ -42,6 +42,19 @@
         "./libs/backend/identity/application/src/testing.ts"
       ],
       "@taskflow/backend/identity/domain": ["./libs/backend/identity/domain/src/index.ts"],
+      "@taskflow/backend/notifications/application": [
+        "./libs/backend/notifications/application/src/index.ts"
+      ],
+      "@taskflow/backend/notifications/application/testing": [
+        "./libs/backend/notifications/application/src/testing.ts"
+      ],
+      "@taskflow/backend/notifications/domain": [
+        "./libs/backend/notifications/domain/src/index.ts"
+      ],
+      "@taskflow/backend/notifications/http": ["./libs/backend/notifications/http/src/index.ts"],
+      "@taskflow/backend/notifications/infrastructure": [
+        "./libs/backend/notifications/infrastructure/src/index.ts"
+      ],
       "@taskflow/backend/organizations/application": [
         "./libs/backend/organizations/application/src/index.ts"
       ],

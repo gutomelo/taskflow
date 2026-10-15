@@ -6,6 +6,10 @@ export type {
   TaskDiscussionAccess,
 } from './lib/ports/task-discussion-access';
 export type { CollaborationUserDirectory } from './lib/ports/user-directory';
+export {
+  CollaborationIntegrationEventType,
+  type MentionsAddedPayload,
+} from './lib/shared/collaboration-integration-events';
 export type { CollaborationDependencies } from './lib/shared/collaboration-dependencies';
 export type {
   CollaborationEvent,
@@ -31,6 +35,7 @@ export type { CommentView, PersonView } from './lib/shared/comment-views';
 export {
   GetCommentUseCase,
   ListCommentsUseCase,
+  ListActiveMentionsUseCase,
   ListMentionCandidatesUseCase,
   type CommentPageView,
 } from './lib/use-cases/comment-queries.use-cases';

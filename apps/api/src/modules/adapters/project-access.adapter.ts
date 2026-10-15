@@ -2,6 +2,7 @@ import type {
   ListAssignableUsersUseCase,
   LockProjectForContributionUseCase,
   ResolveProjectForReadUseCase,
+  ResolveReadableProjectsUseCase,
 } from '@taskflow/backend/projects/application';
 import type { ProjectAccess } from '@taskflow/backend/tasks/application';
 import type { WorkflowView } from '@taskflow/backend/tasks/domain';
@@ -34,6 +35,8 @@ export function createProjectAccess(projects: {
     lockForContribution: Pick<LockProjectForContributionUseCase, 'execute'>;
     resolveForRead: Pick<ResolveProjectForReadUseCase, 'execute'>;
     assignableUsers: Pick<ListAssignableUsersUseCase, 'execute'>;
+    /** Spec 008: projetos visíveis em lote. */
+    readableProjects: Pick<ResolveReadableProjectsUseCase, 'execute'>;
   }>;
 }): ProjectAccess {
   const { contribution } = projects;
@@ -50,6 +53,8 @@ export function createProjectAccess(projects: {
       const readable = await contribution.resolveForRead.execute(organizationId, lookup, viewer);
       return readable && { ...readable, workflow: toWorkflowView(readable.workflow) };
     },
+    readableProjects: (organizationId, projectIds, viewer) =>
+      contribution.readableProjects.execute(organizationId, projectIds, viewer),
     assignableUsers(organizationId, projectId, page) {
       return contribution.assignableUsers.execute(organizationId, projectId, page);
     },
