@@ -107,7 +107,7 @@
     "rate-limiter-flexible": "^11.2.1",
     "rxjs": "~7.8.0",
     "swagger-ui-dist": "^5.33.1",
-    "uuid": "^14.0.2",
+    "uuid": "^14.0.3",
     "zod": "^4.6.5",
     "zod-openapi": "^6.0.2"
   }
