@@ -11,7 +11,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm nx run web:build:production
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY infra/docker/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY infra/docker/spa-document.conf /etc/nginx/snippets/spa-document.conf
